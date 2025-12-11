@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { LandingPage } from './components/LandingPage';
+import { TermsAgreement } from './components/TermsAgreement';
 import { OnboardingFlow } from './components/OnboardingFlow';
 import { ChatInterface } from './components/ChatInterface';
 
@@ -8,10 +9,21 @@ function LandingPageWrapper() {
   const navigate = useNavigate();
 
   const handleLogin = () => {
-    navigate('/survey');
+    navigate('/terms');
   };
 
   return <LandingPage onLogin={handleLogin} />;
+}
+
+function TermsWrapper() {
+  const navigate = useNavigate();
+
+  return (
+    <TermsAgreement
+      onComplete={() => navigate('/survey')}
+      onGoBack={() => navigate('/')}
+    />
+  );
 }
 
 function SurveyWrapper() {
@@ -41,6 +53,7 @@ export default function App() {
       <div className="min-h-screen bg-white">
         <Routes>
           <Route path="/" element={<LandingPageWrapper />} />
+          <Route path="/terms" element={<TermsWrapper />} />
           <Route path="/survey" element={<SurveyWrapper />} />
           <Route path="/setup" element={<SetupWrapper />} />
         </Routes>

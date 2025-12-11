@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, CheckCircle2, Circle, Sparkles, Copy, Check, ExternalLink,
-  Smartphone, Code, Tv, AlertCircle, ChevronRight, ChevronDown, Loader2, Plus, Lightbulb,
+  Smartphone, Code, Tv, AlertCircle, ChevronRight, ChevronDown, ChevronLeft, Loader2, Plus, Lightbulb,
   Maximize2, Minimize2, MessageCircle, X, Share2, MessageSquare
 } from 'lucide-react';
 import { AirbridgeBackground } from './AirbridgeBackground';
@@ -59,6 +59,27 @@ type MessageContent =
   | { type: 'sdk-verify' }
   | { type: 'channel-select' }
   | { type: 'channel-integration'; channel: string; step: number }
+  | { type: 'channel-integration-overview'; selectedChannels: string[] }
+  | { type: 'channel-progress'; channel: string; steps: ChannelStep[]; hasIOS: boolean }
+  | { type: 'meta-channel-integration' }
+  | { type: 'meta-cost-integration' }
+  | { type: 'meta-skan-integration' }
+  | { type: 'google-channel-integration' }
+  | { type: 'google-cost-integration' }
+  | { type: 'google-skan-integration' }
+  | { type: 'apple-version-check' }
+  | { type: 'apple-channel-integration' }
+  | { type: 'apple-cost-integration' }
+  | { type: 'tiktok-channel-integration' }
+  | { type: 'tiktok-cost-integration' }
+  | { type: 'tiktok-skan-integration' }
+  | { type: 'channel-completion'; channel: string }
+  | { type: 'event-taxonomy-intro' }
+  | { type: 'standard-event-select' }
+  | { type: 'custom-event-input' }
+  | { type: 'event-property-config'; eventName: string }
+  | { type: 'event-verify' }
+  | { type: 'event-taxonomy-summary'; events: EventConfig[] }
   | { type: 'completion-summary'; data: CompletionData }
   | { type: 'single-select'; options: { label: string; value: string; description?: string }[] }
   | { type: 'confirm-select'; options: { label: string; value: string }[] }
@@ -89,6 +110,42 @@ type CompletionData = {
   channels: string[];
 };
 
+// Channel Integration Types
+type ChannelStep = {
+  id: 'channel' | 'cost' | 'skan';
+  label: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+  required: boolean;
+};
+
+type ChannelIntegrationState = {
+  channel: string;
+  steps: ChannelStep[];
+  currentStep: 'channel' | 'cost' | 'skan';
+};
+
+// Event Taxonomy Types
+type StandardEvent = {
+  id: string;
+  name: string;
+  description: string;
+  category: 'lifecycle' | 'engagement' | 'ecommerce';
+  isAutomatic?: boolean;
+};
+
+type EventConfig = {
+  eventId: string;
+  eventName: string;
+  isStandard: boolean;
+  properties: EventProperty[];
+};
+
+type EventProperty = {
+  name: string;
+  type: 'string' | 'number' | 'boolean';
+  isSemantic: boolean;
+};
+
 type AppInfo = {
   appName: string;
   storeUrl: string;
@@ -113,15 +170,31 @@ type RegisteredApp = {
 };
 
 const createAppSteps = (): OnboardingStep[] => [
+  // Phase 2: SDK Installation
   { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install packages and initialize', status: 'pending' },
   { id: 'sdk-init', phase: 2, title: 'SDK Initialization', description: 'Add SDK code to your app', status: 'pending' },
   { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links (optional)', status: 'pending' },
   { id: 'sdk-verify', phase: 2, title: 'SDK Verification', description: 'Verify event reception', status: 'pending' },
-  { id: 'channel-connect', phase: 3, title: 'Ad Channel Integration', description: 'Connect ad platforms', status: 'pending' },
+  // Phase 3: Event Taxonomy
+  { id: 'event-taxonomy', phase: 3, title: 'Event Taxonomy', description: 'Define events to track', status: 'pending' },
+  // Phase 4: Ad Channel Integration
+  { id: 'channel-select', phase: 4, title: 'Channel Selection', description: 'Select ad platforms', status: 'pending' },
+  { id: 'channel-integration', phase: 4, title: 'Channel Integration', description: 'Connect to ad platforms', status: 'pending' },
+  { id: 'cost-integration', phase: 4, title: 'Cost Integration', description: 'Enable cost data import', status: 'pending' },
+  { id: 'skan-integration', phase: 4, title: 'SKAN Integration', description: 'iOS attribution setup', status: 'pending' },
 ];
 
 // SDK Install Choice Component
-function SdkInstallChoice({ onSelect }: { onSelect: (choice: 'self' | 'share') => void }) {
+function SdkInstallChoice({ onSelect, isCompleted = false }: { onSelect: (choice: 'self' | 'share') => void; isCompleted?: boolean }) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">SDK Installation</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
       <div className="text-sm font-medium text-gray-700 mb-3">Who will install the SDK?</div>
@@ -156,14 +229,24 @@ function SdkInstallChoice({ onSelect }: { onSelect: (choice: 'self' | 'share') =
 }
 
 // SDK Guide Share Component
-function SdkGuideShare({ appName, platforms, framework, onCopy, onComplete }: {
+function SdkGuideShare({ appName, platforms, framework, onCopy, onComplete, isCompleted = false }: {
   appName: string;
   platforms: string[];
   framework?: string;
   onCopy: () => void;
   onComplete: () => void;
+  isCompleted?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">SDK Guide Share</div>
+        <div className="text-xs text-gray-400">Guide shared</div>
+      </div>
+    );
+  }
 
   const guideText = `
 Airbridge SDK Setup Guide for "${appName}"
@@ -253,18 +336,19 @@ function CodeBlock({ title, code }: { title: string; code: string; language: str
   };
 
   return (
-    <div className="bg-gray-100 rounded-xl overflow-hidden mt-4 border border-gray-200">
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-200 border-b border-gray-300">
-        <span className="text-sm text-gray-600">{title}</span>
+    <div className="rounded-xl overflow-hidden mt-4" style={{ backgroundColor: '#111827' }}>
+      <div className="flex items-center justify-between px-4 py-2" style={{ backgroundColor: '#1f2937' }}>
+        <span className="text-sm" style={{ color: '#9ca3af' }}>{title}</span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+          className="flex items-center gap-1.5 text-sm hover:text-white transition-colors"
+          style={{ color: '#9ca3af' }}
         >
-          {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+          {copied ? <Check className="w-4 h-4" style={{ color: '#4ade80' }} /> : <Copy className="w-4 h-4" />}
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <pre className="p-4 text-sm text-gray-800 overflow-x-auto bg-gray-50">
+      <pre className="p-4 text-sm overflow-x-auto" style={{ backgroundColor: '#111827', color: '#f3f4f6' }}>
         <code>{code}</code>
       </pre>
     </div>
@@ -272,7 +356,16 @@ function CodeBlock({ title, code }: { title: string; code: string; language: str
 }
 
 // Environment Select Component
-function EnvironmentSelect({ onSelect }: { onSelect: (env: 'dev' | 'production') => void }) {
+function EnvironmentSelect({ onSelect, isCompleted = false }: { onSelect: (env: 'dev' | 'production') => void; isCompleted?: boolean }) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Select Environment</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
       <div className="text-sm font-medium text-gray-700 mb-2">Select Environment</div>
@@ -312,7 +405,7 @@ function EnvironmentSelect({ onSelect }: { onSelect: (env: 'dev' | 'production')
 }
 
 // App Name Input Component
-function AppNameInput({ onSubmit }: { onSubmit: (name: string) => void }) {
+function AppNameInput({ onSubmit, isCompleted = false }: { onSubmit: (name: string) => void; isCompleted?: boolean }) {
   const [name, setName] = useState('');
 
   const handleSubmit = () => {
@@ -320,6 +413,15 @@ function AppNameInput({ onSubmit }: { onSubmit: (name: string) => void }) {
       onSubmit(name.trim());
     }
   };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">App Name</div>
+        <div className="text-xs text-gray-400">Input completed</div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
@@ -368,13 +470,24 @@ function AppSearchResults({
   results,
   query,
   onSelect,
-  onNotFound
+  onNotFound,
+  isCompleted = false
 }: {
   results: AppSearchResult[];
   query: string;
   onSelect: (app: AppSearchResult) => void;
   onNotFound: () => void;
+  isCompleted?: boolean;
 }) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Search Results</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
       <div className="text-sm font-medium text-gray-700 mb-3">
@@ -422,7 +535,7 @@ function AppSearchResults({
 }
 
 // Platform Select Component - Single choice with large buttons
-function PlatformSelect({ onSelect }: { onSelect: (platforms: string[]) => void }) {
+function PlatformSelect({ onSelect, isCompleted = false }: { onSelect: (platforms: string[]) => void; isCompleted?: boolean }) {
   const platforms = [
     { id: 'ios', label: 'iOS', description: 'iPhone & iPad apps', icon: <Smartphone className="w-8 h-8" /> },
     { id: 'android', label: 'Android', description: 'Google Play apps', icon: <Smartphone className="w-8 h-8" /> },
@@ -432,6 +545,15 @@ function PlatformSelect({ onSelect }: { onSelect: (platforms: string[]) => void 
   const handleSelect = (id: string) => {
     onSelect([id]);
   };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Select Platform</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
@@ -459,7 +581,7 @@ function PlatformSelect({ onSelect }: { onSelect: (platforms: string[]) => void 
 }
 
 // Platform Multi-Select Component (for Production)
-function PlatformMultiSelect({ onSelect }: { onSelect: (platforms: string[]) => void }) {
+function PlatformMultiSelect({ onSelect, isCompleted = false }: { onSelect: (platforms: string[]) => void; isCompleted?: boolean }) {
   const [selected, setSelected] = useState<string[]>([]);
 
   const platforms = [
@@ -471,6 +593,15 @@ function PlatformMultiSelect({ onSelect }: { onSelect: (platforms: string[]) => 
   const toggle = (id: string) => {
     setSelected(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
   };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Select Platforms</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
@@ -513,7 +644,7 @@ function PlatformMultiSelect({ onSelect }: { onSelect: (platforms: string[]) => 
 }
 
 // Dev App Name Input Component
-function DevAppNameInput({ onSubmit }: { onSubmit: (name: string) => void }) {
+function DevAppNameInput({ onSubmit, isCompleted = false }: { onSubmit: (name: string) => void; isCompleted?: boolean }) {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
 
@@ -533,6 +664,15 @@ function DevAppNameInput({ onSubmit }: { onSubmit: (name: string) => void }) {
   };
 
   const isValid = name.trim() && !error;
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">App Name</div>
+        <div className="text-xs text-gray-400">Input completed</div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
@@ -573,17 +713,28 @@ function PlatformRegistration({
   platformIndex,
   totalPlatforms,
   onSearch,
-  onUrlSubmit
+  onUrlSubmit,
+  isCompleted = false
 }: {
   platform: 'ios' | 'android' | 'web';
   platformIndex: number;
   totalPlatforms: number;
   onSearch: (query: string) => void;
   onUrlSubmit: (url: string) => void;
+  isCompleted?: boolean;
 }) {
   const [mode, setMode] = useState<'choice' | 'search' | 'url'>('choice');
   const [searchQuery, setSearchQuery] = useState('');
   const [url, setUrl] = useState('');
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Platform Registration</div>
+        <div className="text-xs text-gray-400">Registration completed</div>
+      </div>
+    );
+  }
 
   const platformLabels = {
     ios: { name: 'iOS', store: 'App Store', urlPlaceholder: 'https://apps.apple.com/app/...' },
@@ -766,13 +917,24 @@ function TimezoneCurrencyConfirm({
   timezone,
   currency,
   onConfirm,
-  onEdit
+  onEdit,
+  isCompleted = false
 }: {
   timezone: string;
   currency: string;
   onConfirm: () => void;
   onEdit: () => void;
+  isCompleted?: boolean;
 }) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Timezone & Currency</div>
+        <div className="text-xs text-gray-400">Confirmation completed</div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
       <div className="text-sm font-medium text-gray-700 mb-2">
@@ -820,9 +982,18 @@ function TimezoneCurrencyConfirm({
 }
 
 // Timezone & Currency Input Component
-function TimezoneCurrencyInput({ onSubmit }: { onSubmit: (timezone: string, currency: string) => void }) {
+function TimezoneCurrencyInput({ onSubmit, isCompleted = false }: { onSubmit: (timezone: string, currency: string) => void; isCompleted?: boolean }) {
   const [timezone, setTimezone] = useState('');
   const [currency, setCurrency] = useState('');
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Timezone & Currency</div>
+        <div className="text-xs text-gray-400">Input completed</div>
+      </div>
+    );
+  }
 
   const timezones = [
     'Asia/Seoul (KST, UTC+9)',
@@ -897,7 +1068,7 @@ function TimezoneCurrencyInput({ onSubmit }: { onSubmit: (timezone: string, curr
 }
 
 // App Info Form Component
-function AppInfoForm({ onSubmit, platforms }: { onSubmit: (info: AppInfo) => void; platforms: string[] }) {
+function AppInfoForm({ onSubmit, platforms, isCompleted = false }: { onSubmit: (info: AppInfo) => void; platforms: string[]; isCompleted?: boolean }) {
   const [info, setInfo] = useState<AppInfo>({ appName: '', storeUrl: '', bundleId: '', packageName: '' });
 
   const handleSubmit = () => {
@@ -905,6 +1076,15 @@ function AppInfoForm({ onSubmit, platforms }: { onSubmit: (info: AppInfo) => voi
       onSubmit(info);
     }
   };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">App Information</div>
+        <div className="text-xs text-gray-400">Form completed</div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
@@ -978,9 +1158,9 @@ function AppInfoForm({ onSubmit, platforms }: { onSubmit: (info: AppInfo) => voi
 
 // Dashboard Action Component
 function DashboardAction({
-  appName, bundleId, packageName, onConfirm
+  appName, bundleId, packageName, onConfirm, isCompleted = false
 }: {
-  appName: string; bundleId: string; packageName: string; onConfirm: (status: string) => void
+  appName: string; bundleId: string; packageName: string; onConfirm: (status: string) => void; isCompleted?: boolean
 }) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
@@ -988,6 +1168,7 @@ function DashboardAction({
 
   // Simulate auto-detection of app registration
   useEffect(() => {
+    if (isCompleted) return;
     const checkInterval = setInterval(() => {
       // In real implementation, this would call an API to check registration status
       // For demo, we simulate detection after 5 seconds
@@ -1007,7 +1188,16 @@ function DashboardAction({
       clearInterval(checkInterval);
       clearTimeout(detectionTimer);
     };
-  }, [onConfirm]);
+  }, [onConfirm, isCompleted]);
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Dashboard Action</div>
+        <div className="text-xs text-gray-400">Action completed</div>
+      </div>
+    );
+  }
 
   const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -1091,7 +1281,7 @@ function DashboardAction({
 }
 
 // Framework Select Component
-function FrameworkSelect({ onSelect }: { onSelect: (framework: string) => void }) {
+function FrameworkSelect({ onSelect, isCompleted = false }: { onSelect: (framework: string) => void; isCompleted?: boolean }) {
   const frameworks = [
     { category: 'Native', items: [
       { id: 'ios-native', label: 'iOS (Swift/Objective-C)' },
@@ -1104,6 +1294,15 @@ function FrameworkSelect({ onSelect }: { onSelect: (framework: string) => void }
       { id: 'expo', label: 'Expo' },
     ]},
   ];
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Development Framework</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
@@ -1132,8 +1331,17 @@ function FrameworkSelect({ onSelect }: { onSelect: (framework: string) => void }
 }
 
 // SDK Init Code Component
-function SDKInitCode({ appName, appToken, onConfirm }: { appName: string; appToken: string; onConfirm: (status: string) => void }) {
+function SDKInitCode({ appName, appToken, onConfirm, isCompleted = false }: { appName: string; appToken: string; onConfirm: (status: string) => void; isCompleted?: boolean }) {
   const [copied, setCopied] = useState(false);
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">SDK Initialization</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
 
   const code = `import Airbridge from 'airbridge-react-native-sdk';
 
@@ -1152,18 +1360,19 @@ Airbridge.init({
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
       <div className="text-sm font-medium text-gray-700 mb-3">SDK Initialization Code</div>
 
-      <div className="bg-gray-900 rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2 bg-gray-800">
-          <span className="text-sm text-gray-400">App.js or index.js</span>
+      <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#111827' }}>
+        <div className="flex items-center justify-between px-4 py-2" style={{ backgroundColor: '#1f2937' }}>
+          <span className="text-sm" style={{ color: '#9ca3af' }}>App.js or index.js</span>
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 text-sm hover:text-white transition-colors"
+            style={{ color: '#9ca3af' }}
           >
-            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+            {copied ? <Check className="w-4 h-4" style={{ color: '#4ade80' }} /> : <Copy className="w-4 h-4" />}
             {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
-        <pre className="p-4 text-sm text-gray-100 overflow-x-auto">
+        <pre className="p-4 text-sm overflow-x-auto" style={{ backgroundColor: '#111827', color: '#f3f4f6' }}>
           <code>{code}</code>
         </pre>
       </div>
@@ -1193,7 +1402,16 @@ Airbridge.init({
 }
 
 // Deep Link Choice Component
-function DeeplinkChoice({ onSelect }: { onSelect: (choice: string) => void }) {
+function DeeplinkChoice({ onSelect, isCompleted = false }: { onSelect: (choice: string) => void; isCompleted?: boolean }) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Deep Link Setup</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
       <div className="text-sm font-medium text-gray-700 mb-3">Deep Link Setup</div>
@@ -1233,7 +1451,16 @@ function DeeplinkChoice({ onSelect }: { onSelect: (choice: string) => void }) {
 }
 
 // SDK Verify Component
-function SDKVerify({ onConfirm }: { onConfirm: (status: string) => void }) {
+function SDKVerify({ onConfirm, isCompleted = false }: { onConfirm: (status: string) => void; isCompleted?: boolean }) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">SDK Verification</div>
+        <div className="text-xs text-gray-400">Verification completed</div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
       <div className="text-sm font-medium text-gray-700 mb-3">SDK Verification</div>
@@ -1284,8 +1511,17 @@ function SDKVerify({ onConfirm }: { onConfirm: (status: string) => void }) {
 }
 
 // Channel Select Component
-function ChannelSelect({ onSelect }: { onSelect: (channels: string[]) => void }) {
+function ChannelSelect({ onSelect, isCompleted = false }: { onSelect: (channels: string[]) => void; isCompleted?: boolean }) {
   const [selected, setSelected] = useState<string[]>([]);
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Ad Channel Selection</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
 
   const channels = [
     { category: 'SAN (Self-Attributing Networks)', items: [
@@ -1345,9 +1581,1146 @@ function ChannelSelect({ onSelect }: { onSelect: (channels: string[]) => void })
   );
 }
 
+// Channel Integration Overview Component
+function ChannelIntegrationOverview({
+  selectedChannels,
+  onStart,
+  isCompleted = false
+}: {
+  selectedChannels: string[];
+  onStart: () => void;
+  isCompleted?: boolean
+}) {
+  const channelInfo: Record<string, { name: string; icon: string; color: string }> = {
+    meta: { name: 'Meta Ads', icon: '📘', color: 'bg-blue-100 text-blue-800' },
+    google: { name: 'Google Ads', icon: '🔵', color: 'bg-red-100 text-red-800' },
+    apple: { name: 'Apple Search Ads', icon: '🍎', color: 'bg-gray-100 text-gray-800' },
+    tiktok: { name: 'TikTok For Business', icon: '🎵', color: 'bg-pink-100 text-pink-800' },
+    criteo: { name: 'Criteo', icon: '🟠', color: 'bg-orange-100 text-orange-800' },
+    unity: { name: 'Unity Ads', icon: '🎮', color: 'bg-purple-100 text-purple-800' },
+    applovin: { name: 'AppLovin', icon: '📱', color: 'bg-green-100 text-green-800' },
+  };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Channel Integration</div>
+        <div className="text-xs text-gray-400">Setup started</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="text-sm font-medium text-gray-700 mb-3">Selected Channels for Integration</div>
+
+      <div className="space-y-2 mb-4">
+        {selectedChannels.map((channelId, index) => {
+          const info = channelInfo[channelId] || { name: channelId, icon: '📺', color: 'bg-gray-100 text-gray-800' };
+          return (
+            <div key={channelId} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              <span className="text-lg">{info.icon}</span>
+              <span className="flex-1 text-sm font-medium text-gray-900">{info.name}</span>
+              <span className={`px-2 py-0.5 rounded text-xs ${info.color}`}>
+                {index === 0 ? 'Starting' : `#${index + 1}`}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="bg-blue-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-blue-800">
+            <p className="font-medium mb-1">Each channel has 3 integration steps:</p>
+            <ul className="space-y-0.5">
+              <li>1. Channel Integration (Required) - Attribution setup</li>
+              <li>2. Cost Integration (Recommended) - Ad spend data</li>
+              <li>3. SKAN Integration (iOS Required) - iOS 14.5+ support</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <button
+        onClick={onStart}
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-500 text-white hover:bg-blue-600"
+      >
+        Start Integration <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+// Channel Progress Component
+function ChannelProgress({
+  channel,
+  steps,
+  hasIOS,
+  currentStep,
+  isCompleted = false
+}: {
+  channel: string;
+  steps: ChannelStep[];
+  hasIOS: boolean;
+  currentStep: 'channel' | 'cost' | 'skan';
+  isCompleted?: boolean;
+}) {
+  const channelNames: Record<string, string> = {
+    meta: 'Meta Ads',
+    google: 'Google Ads',
+    apple: 'Apple Search Ads',
+    tiktok: 'TikTok For Business',
+  };
+
+  const completedSteps = steps.filter(s => s.status === 'completed').length;
+  const totalSteps = hasIOS ? 3 : 2;
+  const progress = (completedSteps / totalSteps) * 100;
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500">{channelNames[channel] || channel} Progress</div>
+        <div className="text-xs text-gray-400 mt-1">Viewing progress</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-sm font-medium text-gray-700">{channelNames[channel] || channel} Integration</div>
+        <span className="text-xs text-gray-500">{completedSteps}/{totalSteps} completed</span>
+      </div>
+
+      <div className="h-2 bg-gray-200 rounded-full mb-4 overflow-hidden">
+        <div
+          className="h-full bg-blue-500 rounded-full transition-all duration-300"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      <div className="space-y-2">
+        {steps.map((step) => {
+          if (step.id === 'skan' && !hasIOS) return null;
+
+          const isActive = step.id === currentStep;
+          const statusStyles = {
+            completed: 'bg-green-100 border-green-300',
+            in_progress: 'bg-blue-100 border-blue-300',
+            pending: 'bg-gray-50 border-gray-200',
+            skipped: 'bg-gray-50 border-gray-200 opacity-50',
+          };
+
+          return (
+            <div
+              key={step.id}
+              className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${statusStyles[step.status]} ${isActive ? 'ring-2 ring-blue-500' : ''}`}
+            >
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                step.status === 'completed' ? 'bg-green-500' :
+                step.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-300'
+              }`}>
+                {step.status === 'completed' ? (
+                  <Check className="w-4 h-4 text-white" />
+                ) : step.status === 'in_progress' ? (
+                  <Loader2 className="w-4 h-4 text-white animate-spin" />
+                ) : (
+                  <Circle className="w-4 h-4 text-white" />
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-900">{step.label}</div>
+                <div className="text-xs text-gray-500">
+                  {step.required ? 'Required' : 'Recommended'}
+                  {step.id === 'skan' && ' for iOS'}
+                </div>
+              </div>
+              {step.status === 'skipped' && (
+                <span className="text-xs text-gray-400">Skipped</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Meta Channel Integration Component
+function MetaChannelIntegration({
+  onComplete,
+  onHelp,
+  isCompleted = false
+}: {
+  onComplete: () => void;
+  onHelp: (issue: string) => void;
+  isCompleted?: boolean;
+}) {
+  const [metaAppId, setMetaAppId] = useState('');
+  const [step, setStep] = useState<'input' | 'connect' | 'done'>('input');
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Meta Channel Integration</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">📘</span>
+        <div className="text-sm font-medium text-gray-700">Meta Ads - Channel Integration</div>
+      </div>
+
+      {step === 'input' && (
+        <>
+          <div className="mb-4">
+            <label className="block text-sm text-gray-600 mb-2">Meta App ID</label>
+            <input
+              type="text"
+              value={metaAppId}
+              onChange={e => setMetaAppId(e.target.value)}
+              placeholder="Enter your Meta App ID"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+            />
+            <a
+              href="https://developers.facebook.com/apps"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 mt-2"
+            >
+              Find your Meta App ID <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
+          <button
+            onClick={() => metaAppId && setStep('connect')}
+            disabled={!metaAppId}
+            className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-white ${metaAppId ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'}`}
+          >
+            Continue <ChevronRight className="w-4 h-4" />
+          </button>
+        </>
+      )}
+
+      {step === 'connect' && (
+        <>
+          <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <div className="text-sm font-medium text-gray-700 mb-2">Step 2: Connect with Facebook</div>
+            <ol className="text-xs text-gray-600 space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="text-blue-500 font-medium">1.</span>
+                Open Airbridge Dashboard and navigate to Integrations → Ad Channels
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-500 font-medium">2.</span>
+                Find Meta Ads and click [Connect] button
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-500 font-medium">3.</span>
+                Login with your Facebook account
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-500 font-medium">4.</span>
+                Select your ad account and grant permissions
+              </li>
+            </ol>
+          </div>
+
+          <a
+            href="https://dashboard.airbridge.io/integrations/channels"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+          >
+            Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
+          </a>
+
+          <div className="flex gap-2">
+            <button
+              onClick={onComplete}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
+            >
+              Done
+            </button>
+            <button
+              onClick={() => onHelp('meta-permission')}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              I need help
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Meta Cost Integration Component
+function MetaCostIntegration({
+  onComplete,
+  onSkip,
+  isCompleted = false
+}: {
+  onComplete: () => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Meta Cost Integration</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">📘</span>
+        <div className="text-sm font-medium text-gray-700">Meta Ads - Cost Integration</div>
+        <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-800 rounded">Recommended</span>
+      </div>
+
+      <div className="bg-blue-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-blue-800">
+            Cost Integration allows you to see your ad spend data directly in Airbridge reports.
+            This helps you calculate ROI and ROAS for your Meta campaigns.
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+        <div className="text-sm font-medium text-gray-700 mb-2">Setup Steps:</div>
+        <ol className="text-xs text-gray-600 space-y-2">
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">1.</span>
+            Go to Integrations → Cost Integration in Dashboard
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">2.</span>
+            Find Meta Ads and click [Enable]
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">3.</span>
+            Grant additional permissions for cost data access
+          </li>
+        </ol>
+      </div>
+
+      <a
+        href="https://dashboard.airbridge.io/integrations/cost"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+      >
+        Open Cost Integration <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onComplete}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
+        >
+          Done
+        </button>
+        <button
+          onClick={onSkip}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          Skip for now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Meta SKAN Integration Component
+function MetaSkanIntegration({
+  onComplete,
+  onSkip,
+  isCompleted = false
+}: {
+  onComplete: () => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Meta SKAN Integration</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">📘</span>
+        <div className="text-sm font-medium text-gray-700">Meta Ads - SKAN Integration</div>
+        <span className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded">iOS Required</span>
+      </div>
+
+      <div className="bg-amber-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-amber-800">
+            SKAN (SKAdNetwork) Integration is required for iOS 14.5+ attribution.
+            Without this, you won't be able to track conversions from iOS users who opt-out of tracking.
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+        <div className="text-sm font-medium text-gray-700 mb-2">Setup Steps:</div>
+        <ol className="text-xs text-gray-600 space-y-2">
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">1.</span>
+            Go to Integrations → SKAN Integration in Dashboard
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">2.</span>
+            Find Meta Ads and configure conversion values
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">3.</span>
+            Enable SKAN postback forwarding to Meta
+          </li>
+        </ol>
+      </div>
+
+      <a
+        href="https://dashboard.airbridge.io/integrations/skan"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+      >
+        Open SKAN Integration <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onComplete}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
+        >
+          Done
+        </button>
+        <button
+          onClick={onSkip}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          Skip for now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Google Channel Integration Component
+function GoogleChannelIntegration({
+  onComplete,
+  onHelp,
+  isCompleted = false
+}: {
+  onComplete: () => void;
+  onHelp: (issue: string) => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Google Channel Integration</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">🔵</span>
+        <div className="text-sm font-medium text-gray-700">Google Ads - Channel Integration</div>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+        <div className="text-sm font-medium text-gray-700 mb-2">Setup Steps:</div>
+        <ol className="text-xs text-gray-600 space-y-2">
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">1.</span>
+            Open Airbridge Dashboard → Integrations → Ad Channels
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">2.</span>
+            Find Google Ads and click [Connect]
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">3.</span>
+            Sign in with your Google account
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">4.</span>
+            Select your Google Ads account
+          </li>
+        </ol>
+      </div>
+
+      <a
+        href="https://dashboard.airbridge.io/integrations/channels"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+      >
+        Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onComplete}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
+        >
+          Done
+        </button>
+        <button
+          onClick={() => onHelp('google-permission')}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          I need help
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Google Cost Integration Component
+function GoogleCostIntegration({
+  onComplete,
+  onSkip,
+  isCompleted = false
+}: {
+  onComplete: () => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Google Cost Integration</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">🔵</span>
+        <div className="text-sm font-medium text-gray-700">Google Ads - Cost Integration</div>
+        <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-800 rounded">Recommended</span>
+      </div>
+
+      <div className="bg-blue-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-blue-800">
+            See your Google Ads spend data directly in Airbridge. Calculate ROI and compare performance across channels.
+          </div>
+        </div>
+      </div>
+
+      <a
+        href="https://dashboard.airbridge.io/integrations/cost"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+      >
+        Open Cost Integration <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onComplete}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
+        >
+          Done
+        </button>
+        <button
+          onClick={onSkip}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          Skip for now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Google SKAN Integration Component
+function GoogleSkanIntegration({
+  onComplete,
+  onSkip,
+  isCompleted = false
+}: {
+  onComplete: () => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Google SKAN Integration</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">🔵</span>
+        <div className="text-sm font-medium text-gray-700">Google Ads - SKAN Integration</div>
+        <span className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded">iOS Required</span>
+      </div>
+
+      <div className="bg-amber-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-amber-800">
+            Required for iOS 14.5+ attribution tracking with opt-out users.
+          </div>
+        </div>
+      </div>
+
+      <a
+        href="https://dashboard.airbridge.io/integrations/skan"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+      >
+        Open SKAN Integration <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onComplete}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
+        >
+          Done
+        </button>
+        <button
+          onClick={onSkip}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          Skip for now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Apple Version Check Component
+function AppleVersionCheck({
+  onAdvanced,
+  onBasic,
+  onHelp,
+  isCompleted = false
+}: {
+  onAdvanced: () => void;
+  onBasic: () => void;
+  onHelp: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Apple Search Ads Version</div>
+        <div className="text-xs text-gray-400">Version confirmed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">🍎</span>
+        <div className="text-sm font-medium text-gray-700">Apple Search Ads - Version Check</div>
+      </div>
+
+      <div className="bg-amber-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-amber-800">
+            <p className="font-medium">Important: Airbridge only supports Apple Search Ads Advanced.</p>
+            <p className="mt-1">Basic version does not provide the API needed for integration.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="text-sm text-gray-600 mb-4">Which version of Apple Search Ads are you using?</div>
+
+      <div className="space-y-2">
+        <button
+          onClick={onAdvanced}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-green-100">
+            <CheckCircle2 className="w-5 h-5 text-green-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">Advanced</div>
+            <div className="text-xs text-gray-500">Campaign Management API available. Supported by Airbridge.</div>
+          </div>
+          <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">Supported</span>
+        </button>
+
+        <button
+          onClick={onBasic}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-red-300 hover:bg-red-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-red-100">
+            <X className="w-5 h-5 text-red-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">Basic</div>
+            <div className="text-xs text-gray-500">No API access. Cannot integrate with Airbridge.</div>
+          </div>
+          <span className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded">Not Supported</span>
+        </button>
+      </div>
+
+      <button
+        onClick={onHelp}
+        className="w-full mt-3 py-2 rounded-lg font-medium transition-colors text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+      >
+        I'm not sure which version I have
+      </button>
+    </div>
+  );
+}
+
+// Apple Channel Integration Component
+function AppleChannelIntegration({
+  onComplete,
+  onHelp,
+  isCompleted = false
+}: {
+  onComplete: () => void;
+  onHelp: (issue: string) => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Apple Channel Integration</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">🍎</span>
+        <div className="text-sm font-medium text-gray-700">Apple Search Ads - Channel Integration</div>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+        <div className="text-sm font-medium text-gray-700 mb-2">Setup Steps:</div>
+        <ol className="text-xs text-gray-600 space-y-2">
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">1.</span>
+            Open Airbridge Dashboard → Integrations → Ad Channels
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">2.</span>
+            Find Apple Search Ads and click [Connect]
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">3.</span>
+            Upload your Apple Search Ads API certificate
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">4.</span>
+            Enter your Org ID and select campaigns
+          </li>
+        </ol>
+      </div>
+
+      <a
+        href="https://dashboard.airbridge.io/integrations/channels"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+      >
+        Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onComplete}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
+        >
+          Done
+        </button>
+        <button
+          onClick={() => onHelp('apple-api')}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          I need help
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Apple Cost Integration Component
+function AppleCostIntegration({
+  onComplete,
+  onSkip,
+  isCompleted = false
+}: {
+  onComplete: () => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Apple Cost Integration</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">🍎</span>
+        <div className="text-sm font-medium text-gray-700">Apple Search Ads - Cost Integration</div>
+        <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-800 rounded">Recommended</span>
+      </div>
+
+      <div className="bg-blue-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-blue-800">
+            View your Apple Search Ads spend in Airbridge for comprehensive ROI analysis.
+          </div>
+        </div>
+      </div>
+
+      <a
+        href="https://dashboard.airbridge.io/integrations/cost"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+      >
+        Open Cost Integration <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onComplete}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
+        >
+          Done
+        </button>
+        <button
+          onClick={onSkip}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          Skip for now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// TikTok Channel Integration Component
+function TikTokChannelIntegration({
+  onComplete,
+  onHelp,
+  isCompleted = false
+}: {
+  onComplete: () => void;
+  onHelp: (issue: string) => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">TikTok Channel Integration</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">🎵</span>
+        <div className="text-sm font-medium text-gray-700">TikTok For Business - Channel Integration</div>
+      </div>
+
+      <div className="bg-amber-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-amber-800">
+            <p className="font-medium mb-1">Important Notes:</p>
+            <ul className="space-y-1">
+              <li>• Pangle performance requires "Sub-Publisher" GroupBy in reports</li>
+              <li>• EPC (Extended Privacy Control) may cause under-counting</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+        <div className="text-sm font-medium text-gray-700 mb-2">Setup Steps:</div>
+        <ol className="text-xs text-gray-600 space-y-2">
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">1.</span>
+            Open Airbridge Dashboard → Integrations → Ad Channels
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">2.</span>
+            Find TikTok For Business and click [Connect]
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">3.</span>
+            Login with your TikTok For Business account
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 font-medium">4.</span>
+            Select your ad account
+          </li>
+        </ol>
+      </div>
+
+      <a
+        href="https://dashboard.airbridge.io/integrations/channels"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+      >
+        Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onComplete}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
+        >
+          Done
+        </button>
+        <button
+          onClick={() => onHelp('tiktok-permission')}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          I need help
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// TikTok Cost Integration Component
+function TikTokCostIntegration({
+  onComplete,
+  onSkip,
+  isCompleted = false
+}: {
+  onComplete: () => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">TikTok Cost Integration</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">🎵</span>
+        <div className="text-sm font-medium text-gray-700">TikTok For Business - Cost Integration</div>
+        <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-800 rounded">Recommended</span>
+      </div>
+
+      <div className="bg-blue-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-blue-800">
+            View your TikTok ad spend in Airbridge to analyze campaign ROI.
+          </div>
+        </div>
+      </div>
+
+      <a
+        href="https://dashboard.airbridge.io/integrations/cost"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+      >
+        Open Cost Integration <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onComplete}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
+        >
+          Done
+        </button>
+        <button
+          onClick={onSkip}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          Skip for now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// TikTok SKAN Integration Component
+function TikTokSkanIntegration({
+  onComplete,
+  onSkip,
+  isCompleted = false
+}: {
+  onComplete: () => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">TikTok SKAN Integration</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">🎵</span>
+        <div className="text-sm font-medium text-gray-700">TikTok For Business - SKAN Integration</div>
+        <span className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded">iOS Required</span>
+      </div>
+
+      <div className="bg-amber-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-amber-800">
+            Required for iOS 14.5+ attribution with TikTok campaigns.
+          </div>
+        </div>
+      </div>
+
+      <a
+        href="https://dashboard.airbridge.io/integrations/skan"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+      >
+        Open SKAN Integration <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onComplete}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
+        >
+          Done
+        </button>
+        <button
+          onClick={onSkip}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          Skip for now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Channel Completion Component
+function ChannelCompletion({
+  channel,
+  onNext,
+  isLastChannel,
+  isCompleted = false
+}: {
+  channel: string;
+  onNext: () => void;
+  isLastChannel: boolean;
+  isCompleted?: boolean;
+}) {
+  const channelNames: Record<string, string> = {
+    meta: 'Meta Ads',
+    google: 'Google Ads',
+    apple: 'Apple Search Ads',
+    tiktok: 'TikTok For Business',
+  };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500">{channelNames[channel]} Setup</div>
+        <div className="text-xs text-gray-400 mt-1">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 text-lg font-semibold mb-4 text-emerald-600">
+        <CheckCircle2 className="w-6 h-6" />
+        {channelNames[channel] || channel} Integration Complete!
+      </div>
+
+      <div className="bg-green-50 rounded-lg p-4 mb-4">
+        <p className="text-sm text-gray-700">
+          You've successfully set up {channelNames[channel] || channel}. Attribution data will start appearing in your reports soon.
+        </p>
+      </div>
+
+      <button
+        onClick={onNext}
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-500 text-white hover:bg-blue-600"
+      >
+        {isLastChannel ? 'Complete Setup' : 'Continue to Next Channel'} <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
 // Token Display Component
-function TokenDisplay({ tokens, onContinue }: { tokens: { appSdkToken: string; webSdkToken: string; apiToken: string }; onContinue: () => void }) {
+function TokenDisplay({ tokens, onContinue, isCompleted = false }: { tokens: { appSdkToken: string; webSdkToken: string; apiToken: string }; onContinue: () => void; isCompleted?: boolean }) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">API Tokens</div>
+        <div className="text-xs text-gray-400">Token confirmation completed</div>
+      </div>
+    );
+  }
 
   const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -1401,6 +2774,587 @@ function TokenDisplay({ tokens, onContinue }: { tokens: { appSdkToken: string; w
         className="w-full mt-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-500 text-white hover:bg-blue-600"
       >
         Continue to SDK Setup <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+// Event Taxonomy Intro Component
+function EventTaxonomyIntro({
+  onStart,
+  isCompleted = false
+}: {
+  onStart: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Event Taxonomy</div>
+        <div className="text-xs text-gray-400">Introduction viewed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <Sparkles className="w-5 h-5 text-purple-500" />
+        <div className="text-sm font-medium text-gray-700">Event Taxonomy Setup</div>
+      </div>
+
+      <div className="space-y-4 mb-4">
+        <p className="text-sm text-gray-600">
+          Events are the foundation of your analytics. They help you understand user behavior and measure campaign effectiveness.
+        </p>
+
+        <div className="bg-purple-50 rounded-lg p-4">
+          <div className="text-sm font-medium text-purple-800 mb-2">Two types of events:</div>
+          <div className="space-y-2 text-xs text-purple-700">
+            <div className="flex items-start gap-2">
+              <span className="font-medium">Standard Events:</span>
+              <span>Pre-defined events like Install, Sign Up, Purchase. Recognized by ad platforms for optimization.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="font-medium">Custom Events:</span>
+              <span>Events specific to your app's unique features and user flows.</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-blue-50 rounded-lg p-3">
+          <div className="flex items-start gap-2">
+            <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+            <div className="text-xs text-blue-800">
+              <p className="font-medium">Tip:</p>
+              <p>Start with Standard Events. They're automatically recognized by ad platforms like Meta and Google for campaign optimization.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button
+        onClick={onStart}
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-purple-500 text-white hover:bg-purple-600"
+      >
+        Configure Events <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+// Standard Event Select Component
+function StandardEventSelect({
+  onSelect,
+  isCompleted = false
+}: {
+  onSelect: (events: string[]) => void;
+  isCompleted?: boolean;
+}) {
+  const [selected, setSelected] = useState<string[]>(['install', 'open']);
+
+  const standardEvents = [
+    { category: 'Lifecycle (Auto-tracked)', items: [
+      { id: 'install', name: 'Install', description: 'App installation', auto: true },
+      { id: 'open', name: 'Open', description: 'App open/launch', auto: true },
+    ]},
+    { category: 'User Authentication', items: [
+      { id: 'signup', name: 'Sign Up', description: 'Account registration' },
+      { id: 'signin', name: 'Sign In', description: 'User login' },
+    ]},
+    { category: 'E-commerce', items: [
+      { id: 'view_product', name: 'View Product', description: 'Product page view' },
+      { id: 'add_to_cart', name: 'Add to Cart', description: 'Item added to cart' },
+      { id: 'purchase', name: 'Purchase', description: 'Completed purchase' },
+    ]},
+    { category: 'Engagement', items: [
+      { id: 'view_content', name: 'View Content', description: 'Content viewed' },
+      { id: 'search', name: 'Search', description: 'Search performed' },
+      { id: 'share', name: 'Share', description: 'Content shared' },
+    ]},
+  ];
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Standard Events</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
+
+  const toggle = (id: string, auto?: boolean) => {
+    if (auto) return;
+    setSelected(prev => prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]);
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="text-sm font-medium text-gray-700 mb-3">Select Standard Events to Track</div>
+
+      {standardEvents.map(group => (
+        <div key={group.category} className="mb-4 last:mb-0">
+          <div className="text-xs text-gray-500 mb-2">{group.category}</div>
+          <div className="space-y-2">
+            {group.items.map(item => {
+              const isSelected = selected.includes(item.id);
+              const isAuto = 'auto' in item && item.auto;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => toggle(item.id, isAuto)}
+                  disabled={isAuto}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
+                    isSelected
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-200 bg-white'
+                  } ${isAuto ? 'opacity-75 cursor-default' : 'hover:border-purple-300'}`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                      isSelected
+                        ? 'bg-purple-500 border-purple-500'
+                        : 'bg-white border-gray-300'
+                    }`}
+                  >
+                    {isSelected && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-900">{item.name}</span>
+                      {isAuto && (
+                        <span className="px-1.5 py-0.5 text-[10px] bg-green-100 text-green-700 rounded">Auto</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500">{item.description}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      <button
+        onClick={() => onSelect(selected)}
+        className="w-full mt-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-purple-500 text-white hover:bg-purple-600"
+      >
+        Continue <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+// Custom Event Input Component
+function CustomEventInput({
+  onAdd,
+  onSkip,
+  isCompleted = false
+}: {
+  onAdd: (events: { name: string; category: string }[]) => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  const [events, setEvents] = useState<{ name: string; category: string }[]>([]);
+  const [newEventName, setNewEventName] = useState('');
+  const [newEventCategory, setNewEventCategory] = useState('engagement');
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Custom Events</div>
+        <div className="text-xs text-gray-400">Configuration completed</div>
+      </div>
+    );
+  }
+
+  const addEvent = () => {
+    if (newEventName.trim()) {
+      setEvents([...events, { name: newEventName.trim(), category: newEventCategory }]);
+      setNewEventName('');
+    }
+  };
+
+  const removeEvent = (index: number) => {
+    setEvents(events.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <Plus className="w-5 h-5 text-purple-500" />
+        <div className="text-sm font-medium text-gray-700">Add Custom Events (Optional)</div>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <Lightbulb className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-gray-600">
+            Custom events are specific to your app. Examples: "Tutorial Completed", "Subscription Started", "Level Up"
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3 mb-4">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Event Name</label>
+          <input
+            type="text"
+            value={newEventName}
+            onChange={e => setNewEventName(e.target.value)}
+            placeholder="e.g., tutorial_completed"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Category</label>
+          <select
+            value={newEventCategory}
+            onChange={e => setNewEventCategory(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 text-sm bg-white"
+          >
+            <option value="engagement">Engagement</option>
+            <option value="conversion">Conversion</option>
+            <option value="retention">Retention</option>
+            <option value="monetization">Monetization</option>
+          </select>
+        </div>
+
+        <button
+          onClick={addEvent}
+          disabled={!newEventName.trim()}
+          className={`w-full py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm ${
+            newEventName.trim()
+              ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          <Plus className="w-4 h-4" /> Add Event
+        </button>
+      </div>
+
+      {events.length > 0 && (
+        <div className="mb-4">
+          <div className="text-xs text-gray-500 mb-2">Added Events ({events.length})</div>
+          <div className="space-y-2">
+            {events.map((event, index) => (
+              <div key={index} className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
+                <div>
+                  <span className="text-sm text-gray-900">{event.name}</span>
+                  <span className="text-xs text-gray-500 ml-2">({event.category})</span>
+                </div>
+                <button
+                  onClick={() => removeEvent(index)}
+                  className="p-1 hover:bg-purple-100 rounded"
+                >
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => onAdd(events)}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-purple-500 text-white hover:bg-purple-600"
+        >
+          {events.length > 0 ? 'Continue' : 'Skip Custom Events'}
+        </button>
+        {events.length === 0 && (
+          <button
+            onClick={onSkip}
+            className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+          >
+            Skip for now
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Event Property Config Component
+function EventPropertyConfig({
+  eventName,
+  onComplete,
+  onSkip,
+  isCompleted = false
+}: {
+  eventName: string;
+  onComplete: (properties: EventProperty[]) => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  const [selectedProperties, setSelectedProperties] = useState<string[]>([]);
+
+  const semanticProperties = [
+    { id: 'value', name: 'Value', type: 'number', description: 'Monetary value of the event' },
+    { id: 'currency', name: 'Currency', type: 'string', description: 'Currency code (e.g., USD, KRW)' },
+    { id: 'products', name: 'Products', type: 'string', description: 'Product information array' },
+    { id: 'quantity', name: 'Quantity', type: 'number', description: 'Number of items' },
+    { id: 'transactionId', name: 'Transaction ID', type: 'string', description: 'Unique transaction identifier' },
+  ];
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Event Properties: {eventName}</div>
+        <div className="text-xs text-gray-400">Configuration completed</div>
+      </div>
+    );
+  }
+
+  const toggle = (id: string) => {
+    setSelectedProperties(prev =>
+      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    );
+  };
+
+  const handleComplete = () => {
+    const properties: EventProperty[] = selectedProperties.map(id => {
+      const prop = semanticProperties.find(p => p.id === id)!;
+      return {
+        name: prop.name,
+        type: prop.type as 'string' | 'number' | 'boolean',
+        isSemantic: true,
+      };
+    });
+    onComplete(properties);
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="text-sm font-medium text-gray-700 mb-3">
+        Configure Properties for "{eventName}"
+      </div>
+
+      <div className="bg-blue-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-blue-800">
+            Semantic attributes are recognized by Airbridge and ad platforms for advanced analytics and optimization.
+          </div>
+        </div>
+      </div>
+
+      <div className="text-xs text-gray-500 mb-2">Semantic Attributes</div>
+      <div className="space-y-2 mb-4">
+        {semanticProperties.map(prop => {
+          const isSelected = selectedProperties.includes(prop.id);
+          return (
+            <button
+              key={prop.id}
+              onClick={() => toggle(prop.id)}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
+                isSelected ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white hover:border-purple-300'
+              }`}
+            >
+              <div
+                className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                  isSelected ? 'bg-purple-500 border-purple-500' : 'bg-white border-gray-300'
+                }`}
+              >
+                {isSelected && <Check className="w-3 h-3 text-white" />}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-900">{prop.name}</span>
+                  <span className="px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-600 rounded">{prop.type}</span>
+                </div>
+                <div className="text-xs text-gray-500">{prop.description}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={handleComplete}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-purple-500 text-white hover:bg-purple-600"
+        >
+          Continue
+        </button>
+        <button
+          onClick={onSkip}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          Skip properties
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Event Verify Component
+function EventVerify({
+  onVerified,
+  onSkip,
+  isCompleted = false
+}: {
+  onVerified: () => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  const [verifying, setVerifying] = useState(false);
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Event Verification</div>
+        <div className="text-xs text-gray-400">Verification completed</div>
+      </div>
+    );
+  }
+
+  const handleVerify = () => {
+    setVerifying(true);
+    setTimeout(() => {
+      setVerifying(false);
+      onVerified();
+    }, 2000);
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <CheckCircle2 className="w-5 h-5 text-green-500" />
+        <div className="text-sm font-medium text-gray-700">Verify Event Tracking</div>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+        <div className="text-sm font-medium text-gray-700 mb-2">Test your events:</div>
+        <ol className="text-xs text-gray-600 space-y-2">
+          <li className="flex items-start gap-2">
+            <span className="text-purple-500 font-medium">1.</span>
+            Open your app on a test device
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-purple-500 font-medium">2.</span>
+            Trigger the events you've configured
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-purple-500 font-medium">3.</span>
+            Check Real-time Logs in Airbridge Dashboard
+          </li>
+        </ol>
+      </div>
+
+      <a
+        href="https://dashboard.airbridge.io/raw-data/app-real-time-log"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-purple-600 text-white hover:bg-purple-700 mb-3"
+      >
+        Open Real-time Logs <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="bg-amber-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-amber-800">
+            Events may take up to 10 minutes to appear in Real-time Logs.
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={handleVerify}
+          disabled={verifying}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600 flex items-center justify-center gap-2"
+        >
+          {verifying ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Verifying...
+            </>
+          ) : (
+            'Events are showing!'
+          )}
+        </button>
+        <button
+          onClick={onSkip}
+          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          I'll verify later
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Event Taxonomy Summary Component
+function EventTaxonomySummary({
+  events,
+  onContinue,
+  isCompleted = false
+}: {
+  events: EventConfig[];
+  onContinue: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Event Taxonomy Summary</div>
+        <div className="text-xs text-gray-400">Setup completed</div>
+      </div>
+    );
+  }
+
+  const standardEvents = events.filter(e => e.isStandard);
+  const customEvents = events.filter(e => !e.isStandard);
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-center gap-2 text-lg font-semibold mb-4 text-purple-600">
+        <CheckCircle2 className="w-6 h-6" />
+        Event Taxonomy Complete!
+      </div>
+
+      <div className="space-y-4 mb-4">
+        <div>
+          <div className="text-xs text-gray-500 mb-2">Standard Events ({standardEvents.length})</div>
+          <div className="flex flex-wrap gap-2">
+            {standardEvents.map(event => (
+              <span key={event.eventId} className="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-lg">
+                {event.eventName}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {customEvents.length > 0 && (
+          <div>
+            <div className="text-xs text-gray-500 mb-2">Custom Events ({customEvents.length})</div>
+            <div className="flex flex-wrap gap-2">
+              {customEvents.map(event => (
+                <span key={event.eventId} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-lg">
+                  {event.eventName}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-green-50 rounded-lg p-3 mb-4">
+        <div className="flex items-start gap-2">
+          <Lightbulb className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-green-800">
+            Your events are configured. Now let's connect your ad channels to start measuring campaign performance.
+          </div>
+        </div>
+      </div>
+
+      <button
+        onClick={onContinue}
+        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-500 text-white hover:bg-blue-600"
+      >
+        Continue to Ad Channel Integration <ChevronRight className="w-4 h-4" />
       </button>
     </div>
   );
@@ -1512,7 +3466,16 @@ function CompletionSummary({ data }: { data: CompletionData }) {
 }
 
 // Single Select Component
-function SingleSelect({ options, onSelect }: { options: { label: string; value: string; description?: string }[]; onSelect: (value: string) => void }) {
+function SingleSelect({ options, onSelect, isCompleted = false }: { options: { label: string; value: string; description?: string }[]; onSelect: (value: string) => void; isCompleted?: boolean }) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Options</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
       <div className="space-y-2">
@@ -1612,6 +3575,14 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Scroll to bottom when view mode changes
+  useEffect(() => {
+    // Small delay to allow layout to update
+    setTimeout(() => {
+      scrollToBottom();
+    }, 100);
+  }, [viewMode]);
 
   const addBotMessage = (content: MessageContent[]) => {
     setIsTyping(true);
@@ -2334,7 +4305,6 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     addUserMessage(channels.map(c => channelLabels[c] || c).join(', '));
 
     if (currentAppId) {
-      updateAppStepStatus(currentAppId, 'channel-connect', 'completed');
       setRegisteredApps(prev => prev.map(app =>
         app.id === currentAppId ? { ...app, channels } : app
       ));
@@ -2342,16 +4312,355 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '🎊 **Congratulations!** All setup is complete!\n\n📋 Here\'s a summary of your configuration:' },
-        {
-          type: 'completion-summary',
-          data: {
-            appName: setupState.appInfo?.appName || 'MyApp',
-            platforms: setupState.platforms,
-            framework: setupState.framework,
-            channels,
-          }
-        },
+        { type: 'text', text: `Great choices! You've selected ${channels.length} channel(s) for integration.\n\nLet me explain the integration process:` },
+        { type: 'channel-integration-overview', selectedChannels: channels },
+      ]);
+    }, 300);
+  };
+
+  // Channel Integration handlers
+  const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
+  const [currentChannelIndex, setCurrentChannelIndex] = useState(0);
+  const [channelSteps, setChannelSteps] = useState<Record<string, ChannelStep[]>>({});
+  const [configuredEvents, setConfiguredEvents] = useState<EventConfig[]>([]);
+
+  const handleChannelIntegrationStart = (channels: string[]) => {
+    setSelectedChannels(channels);
+    setCurrentChannelIndex(0);
+    addUserMessage('Start Integration');
+
+    const firstChannel = channels[0];
+    const hasIOS = setupState.platforms.includes('ios');
+
+    const initialSteps: ChannelStep[] = [
+      { id: 'channel', label: 'Channel Integration', status: 'in_progress', required: true },
+      { id: 'cost', label: 'Cost Integration', status: 'pending', required: false },
+      { id: 'skan', label: 'SKAN Integration', status: 'pending', required: hasIOS },
+    ];
+
+    setChannelSteps(prev => ({ ...prev, [firstChannel]: initialSteps }));
+
+    setTimeout(() => {
+      startChannelIntegration(firstChannel, hasIOS, initialSteps);
+    }, 300);
+  };
+
+  const startChannelIntegration = (channel: string, hasIOS: boolean, steps: ChannelStep[]) => {
+    const channelNames: Record<string, string> = {
+      meta: 'Meta Ads',
+      google: 'Google Ads',
+      apple: 'Apple Search Ads',
+      tiktok: 'TikTok For Business',
+    };
+
+    const messages: MessageContent[] = [
+      { type: 'text', text: `Let's set up **${channelNames[channel] || channel}**!\n\nThis integration has ${hasIOS ? '3' : '2'} steps:` },
+      { type: 'channel-progress', channel, steps, hasIOS },
+    ];
+
+    if (channel === 'apple') {
+      messages.push({ type: 'apple-version-check' });
+    } else if (channel === 'meta') {
+      messages.push({ type: 'meta-channel-integration' });
+    } else if (channel === 'google') {
+      messages.push({ type: 'google-channel-integration' });
+    } else if (channel === 'tiktok') {
+      messages.push({ type: 'tiktok-channel-integration' });
+    }
+
+    addBotMessage(messages);
+  };
+
+  const handleChannelStepComplete = (channel: string, step: 'channel' | 'cost' | 'skan') => {
+    addUserMessage('Done');
+    const hasIOS = setupState.platforms.includes('ios');
+
+    setChannelSteps(prev => {
+      const steps = [...(prev[channel] || [])];
+      const stepIndex = steps.findIndex(s => s.id === step);
+      if (stepIndex !== -1) {
+        steps[stepIndex] = { ...steps[stepIndex], status: 'completed' };
+        const nextIndex = stepIndex + 1;
+        if (nextIndex < steps.length && (steps[nextIndex].id !== 'skan' || hasIOS)) {
+          steps[nextIndex] = { ...steps[nextIndex], status: 'in_progress' };
+        }
+      }
+      return { ...prev, [channel]: steps };
+    });
+
+    setTimeout(() => {
+      const nextStep = getNextStep(channel, step, hasIOS);
+      if (nextStep) {
+        showNextStepUI(channel, nextStep, hasIOS);
+      } else {
+        showChannelCompletion(channel);
+      }
+    }, 300);
+  };
+
+  const handleChannelStepSkip = (channel: string, step: 'channel' | 'cost' | 'skan') => {
+    addUserMessage('Skip for now');
+    const hasIOS = setupState.platforms.includes('ios');
+
+    setChannelSteps(prev => {
+      const steps = [...(prev[channel] || [])];
+      const stepIndex = steps.findIndex(s => s.id === step);
+      if (stepIndex !== -1) {
+        steps[stepIndex] = { ...steps[stepIndex], status: 'skipped' };
+        const nextIndex = stepIndex + 1;
+        if (nextIndex < steps.length && (steps[nextIndex].id !== 'skan' || hasIOS)) {
+          steps[nextIndex] = { ...steps[nextIndex], status: 'in_progress' };
+        }
+      }
+      return { ...prev, [channel]: steps };
+    });
+
+    setTimeout(() => {
+      const nextStep = getNextStep(channel, step, hasIOS);
+      if (nextStep) {
+        showNextStepUI(channel, nextStep, hasIOS);
+      } else {
+        showChannelCompletion(channel);
+      }
+    }, 300);
+  };
+
+  const getNextStep = (channel: string, currentStep: 'channel' | 'cost' | 'skan', hasIOS: boolean): 'cost' | 'skan' | null => {
+    if (currentStep === 'channel') return 'cost';
+    if (currentStep === 'cost' && hasIOS) return 'skan';
+    return null;
+  };
+
+  const showNextStepUI = (channel: string, step: 'cost' | 'skan', hasIOS: boolean) => {
+    const steps = channelSteps[channel] || [];
+    const updatedSteps = steps.map(s => ({
+      ...s,
+      status: s.id === step ? 'in_progress' as const : s.status
+    }));
+
+    let content: MessageContent;
+    if (step === 'cost') {
+      if (channel === 'meta') content = { type: 'meta-cost-integration' };
+      else if (channel === 'google') content = { type: 'google-cost-integration' };
+      else if (channel === 'apple') content = { type: 'apple-cost-integration' };
+      else content = { type: 'tiktok-cost-integration' };
+    } else {
+      if (channel === 'meta') content = { type: 'meta-skan-integration' };
+      else if (channel === 'google') content = { type: 'google-skan-integration' };
+      else content = { type: 'tiktok-skan-integration' };
+    }
+
+    addBotMessage([
+      { type: 'text', text: step === 'cost' ? 'Great! Now let\'s set up Cost Integration:' : 'Almost done! Let\'s configure SKAN for iOS:' },
+      { type: 'channel-progress', channel, steps: updatedSteps, hasIOS },
+      content,
+    ]);
+  };
+
+  const showChannelCompletion = (channel: string) => {
+    addBotMessage([
+      { type: 'channel-completion', channel },
+    ]);
+  };
+
+  const handleChannelComplete = (channel: string) => {
+    addUserMessage('Continue');
+    const nextIndex = currentChannelIndex + 1;
+    setCurrentChannelIndex(nextIndex);
+
+    setTimeout(() => {
+      if (nextIndex < selectedChannels.length) {
+        const nextChannel = selectedChannels[nextIndex];
+        const hasIOS = setupState.platforms.includes('ios');
+        const initialSteps: ChannelStep[] = [
+          { id: 'channel', label: 'Channel Integration', status: 'in_progress', required: true },
+          { id: 'cost', label: 'Cost Integration', status: 'pending', required: false },
+          { id: 'skan', label: 'SKAN Integration', status: 'pending', required: hasIOS },
+        ];
+        setChannelSteps(prev => ({ ...prev, [nextChannel]: initialSteps }));
+        startChannelIntegration(nextChannel, hasIOS, initialSteps);
+      } else {
+        if (currentAppId) {
+          updateAppStepStatus(currentAppId, 'channel-connect', 'completed');
+        }
+        addBotMessage([
+          { type: 'text', text: '🎊 **Congratulations!** All setup is complete!\n\n📋 Here\'s a summary of your configuration:' },
+          {
+            type: 'completion-summary',
+            data: {
+              appName: setupState.appInfo?.appName || 'MyApp',
+              platforms: setupState.platforms,
+              framework: setupState.framework,
+              channels: selectedChannels,
+            }
+          },
+        ]);
+      }
+    }, 300);
+  };
+
+  const isLastSelectedChannel = (channel: string): boolean => {
+    return selectedChannels.indexOf(channel) === selectedChannels.length - 1;
+  };
+
+  const handleChannelHelp = (channel: string, issue: string) => {
+    addUserMessage('I need help');
+    setTimeout(() => {
+      const helpMessages: Record<string, string> = {
+        'meta-permission': 'For Meta Ads permission issues:\n\n1. Make sure you have **Admin** access to the ad account\n2. Check if your app is added to **Business Manager**\n3. Try disconnecting and reconnecting with a different account',
+        'google-permission': 'For Google Ads permission issues:\n\n1. Verify you have **Admin** access to the Google Ads account\n2. Make sure you\'re signed in with the correct Google account',
+        'apple-api': 'For Apple Search Ads API issues:\n\n1. Generate an API certificate in Apple Search Ads\n2. Download the certificate file (.pem)\n3. Upload it to Airbridge Dashboard',
+        'tiktok-permission': 'For TikTok permission issues:\n\n1. Ensure you have **Admin** access to the TikTok For Business account\n2. Try reconnecting with admin credentials',
+      };
+      addBotMessage([
+        { type: 'text', text: helpMessages[issue] || 'Please contact support for assistance with this issue.' },
+      ]);
+    }, 300);
+  };
+
+  const handleAppleVersionSelect = (version: 'advanced' | 'basic') => {
+    addUserMessage(version === 'advanced' ? 'Advanced' : 'Basic');
+    const hasIOS = setupState.platforms.includes('ios');
+
+    setTimeout(() => {
+      if (version === 'advanced') {
+        addBotMessage([
+          { type: 'text', text: 'Great! Let\'s set up Apple Search Ads Advanced:' },
+          { type: 'apple-channel-integration' },
+        ]);
+      } else {
+        addBotMessage([
+          { type: 'text', text: '😢 Unfortunately, Apple Search Ads Basic is not supported by Airbridge.\n\nBasic version doesn\'t provide the API needed for integration. You can:\n\n• Upgrade to **Apple Search Ads Advanced**\n• Skip this channel and continue with others' },
+          {
+            type: 'single-select',
+            options: [
+              { label: 'Skip Apple Search Ads', value: 'skip_apple' },
+              { label: 'I\'ll upgrade to Advanced', value: 'upgrade_apple' },
+            ],
+          },
+        ]);
+      }
+    }, 300);
+  };
+
+  const handleAppleVersionHelp = () => {
+    addUserMessage('I\'m not sure');
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'To check your Apple Search Ads version:\n\n1. Go to **searchads.apple.com**\n2. Log in to your account\n3. If you see "Campaign Management" with detailed options, you have **Advanced**\n4. If you see a simplified interface, you have **Basic**\n\nAlternatively, check your billing - Advanced typically has monthly spend over $10,000.' },
+        { type: 'apple-version-check' },
+      ]);
+    }, 300);
+  };
+
+  // Event Taxonomy handlers
+  const handleEventTaxonomyStart = () => {
+    addUserMessage('Configure Events');
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'Let\'s configure the events you want to track.\n\nFirst, select the **Standard Events** relevant to your app:' },
+        { type: 'standard-event-select' },
+      ]);
+    }, 300);
+  };
+
+  const handleStandardEventSelect = (eventIds: string[]) => {
+    const eventNames = eventIds.map(id => {
+      const nameMap: Record<string, string> = {
+        install: 'Install', open: 'Open', signup: 'Sign Up', signin: 'Sign In',
+        view_product: 'View Product', add_to_cart: 'Add to Cart', purchase: 'Purchase',
+        view_content: 'View Content', search: 'Search', share: 'Share',
+      };
+      return nameMap[id] || id;
+    });
+
+    addUserMessage(eventNames.join(', '));
+
+    const configs: EventConfig[] = eventIds.map(id => ({
+      eventId: id,
+      eventName: eventNames[eventIds.indexOf(id)],
+      isStandard: true,
+      properties: [],
+    }));
+    setConfiguredEvents(configs);
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: `You've selected ${eventIds.length} standard events.\n\nWould you like to add any **Custom Events** specific to your app?` },
+        { type: 'custom-event-input' },
+      ]);
+    }, 300);
+  };
+
+  const handleCustomEventAdd = (events: { name: string; category: string }[]) => {
+    if (events.length > 0) {
+      addUserMessage(events.map(e => e.name).join(', '));
+      const customConfigs: EventConfig[] = events.map(e => ({
+        eventId: e.name.toLowerCase().replace(/\s/g, '_'),
+        eventName: e.name,
+        isStandard: false,
+        properties: [],
+      }));
+      setConfiguredEvents(prev => [...prev, ...customConfigs]);
+    } else {
+      addUserMessage('Skip Custom Events');
+    }
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'Now let\'s verify that your events are being tracked correctly:' },
+        { type: 'event-verify' },
+      ]);
+    }, 300);
+  };
+
+  const handleCustomEventSkip = () => {
+    addUserMessage('Skip for now');
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'No problem! You can add custom events later.\n\nLet\'s verify that your events are being tracked:' },
+        { type: 'event-verify' },
+      ]);
+    }, 300);
+  };
+
+  const handleEventPropertyComplete = (eventName: string, properties: EventProperty[]) => {
+    setConfiguredEvents(prev =>
+      prev.map(e => e.eventName === eventName ? { ...e, properties } : e)
+    );
+    addUserMessage('Properties configured');
+  };
+
+  const handleEventPropertySkip = (eventName: string) => {
+    addUserMessage('Skip properties');
+  };
+
+  const handleEventVerified = () => {
+    addUserMessage('Events are showing!');
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'Excellent! Your event tracking is working correctly.' },
+        { type: 'event-taxonomy-summary', events: configuredEvents },
+      ]);
+    }, 300);
+  };
+
+  const handleEventVerifySkip = () => {
+    addUserMessage('I\'ll verify later');
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'No problem! You can verify events anytime in the Real-time Logs.\n\nHere\'s a summary of your event configuration:' },
+        { type: 'event-taxonomy-summary', events: configuredEvents },
+      ]);
+    }, 300);
+  };
+
+  const handleEventTaxonomyComplete = () => {
+    addUserMessage('Continue to Ad Channel Integration');
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'Now let\'s connect your ad channels to start measuring campaign performance!\n\nWhich ad platforms would you like to integrate?' },
+        { type: 'channel-select' },
       ]);
     }, 300);
   };
@@ -2389,6 +4698,32 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       ]);
     }, 500);
   };
+
+  // Handle back navigation - removes the last bot message and user response pair
+  const handleBack = () => {
+    // Need at least 2 messages to go back (user + bot pair)
+    if (messages.length < 2) return;
+
+    // Find the last user message index
+    let lastUserIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        lastUserIndex = i;
+        break;
+      }
+    }
+
+    if (lastUserIndex === -1) return;
+
+    // Remove messages from lastUserIndex to the end
+    setMessages(prev => prev.slice(0, lastUserIndex));
+
+    // Reset setup state based on remaining messages
+    // This is a simplified approach - in production, we'd track state more carefully
+  };
+
+  // Check if we can go back
+  const canGoBack = messages.length >= 2 && messages.some(m => m.role === 'user');
 
   // Step order for prerequisite checking
   const stepOrder = ['sdk-install', 'sdk-init', 'deeplink', 'sdk-verify', 'channel-connect'];
@@ -2481,37 +4816,60 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     }
   };
 
-  // Parse markdown bold (**text**) to React elements
-  const parseMarkdownBold = (text: string) => {
-    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  // Parse markdown bold (**text**) and inline code (`code`) to React elements
+  const parseMarkdownText = (text: string) => {
+    // Split by both bold (**text**) and inline code (`code`)
+    const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
     return parts.map((part, index) => {
       if (part.startsWith('**') && part.endsWith('**')) {
         return <strong key={index} style={{ fontWeight: 600 }}>{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith('`') && part.endsWith('`')) {
+        return (
+          <code
+            key={index}
+            style={{
+              backgroundColor: '#f3f4f6',
+              color: '#dc2626',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              fontSize: '0.875em',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            }}
+          >
+            {part.slice(1, -1)}
+          </code>
+        );
       }
       return part;
     });
   };
 
+  // Alias for backward compatibility
+  const parseMarkdownBold = parseMarkdownText;
+
   // Message rendering
-  const renderMessageContent = (content: MessageContent) => {
+  const renderMessageContent = (content: MessageContent, isLastBotMessage: boolean) => {
+    const isCompleted = !isLastBotMessage;
+
     switch (content.type) {
       case 'text':
         return <p className="text-sm leading-relaxed whitespace-pre-line">{parseMarkdownBold(content.text)}</p>;
 
       case 'environment-select':
-        return <EnvironmentSelect onSelect={handleEnvironmentSelect} />;
+        return <EnvironmentSelect onSelect={handleEnvironmentSelect} isCompleted={isCompleted} />;
 
       case 'platform-select':
-        return <PlatformSelect onSelect={handlePlatformSelect} />;
+        return <PlatformSelect onSelect={handlePlatformSelect} isCompleted={isCompleted} />;
 
       case 'platform-multi-select':
-        return <PlatformMultiSelect onSelect={handlePlatformMultiSelect} />;
+        return <PlatformMultiSelect onSelect={handlePlatformMultiSelect} isCompleted={isCompleted} />;
 
       case 'app-name-input':
-        return <AppNameInput onSubmit={handleAppNameSubmit} />;
+        return <AppNameInput onSubmit={handleAppNameSubmit} isCompleted={isCompleted} />;
 
       case 'app-name-input-dev':
-        return <DevAppNameInput onSubmit={handleDevAppNameSubmit} />;
+        return <DevAppNameInput onSubmit={handleDevAppNameSubmit} isCompleted={isCompleted} />;
 
       case 'platform-registration':
         return (
@@ -2521,6 +4879,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
             totalPlatforms={content.totalPlatforms}
             onSearch={(query) => handlePlatformSearch(query, content.platform as 'ios' | 'android')}
             onUrlSubmit={(url) => handlePlatformUrlSubmit(url, content.platform)}
+            isCompleted={isCompleted}
           />
         );
 
@@ -2531,11 +4890,12 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
             currency={content.currency}
             onConfirm={handleTimezoneCurrencyConfirm}
             onEdit={handleTimezoneCurrencyEdit}
+            isCompleted={isCompleted}
           />
         );
 
       case 'timezone-currency-input':
-        return <TimezoneCurrencyInput onSubmit={handleTimezoneCurrencySubmit} />;
+        return <TimezoneCurrencyInput onSubmit={handleTimezoneCurrencySubmit} isCompleted={isCompleted} />;
 
       case 'app-search-loading':
         return <AppSearchLoading query={content.query} />;
@@ -2547,11 +4907,12 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
             query={content.query}
             onSelect={content.platform ? handleProductionAppSelect : handleAppSelect}
             onNotFound={handleAppNotFound}
+            isCompleted={isCompleted}
           />
         );
 
       case 'app-info-form':
-        return <AppInfoForm onSubmit={handleAppInfoSubmit} platforms={setupState.platforms} />;
+        return <AppInfoForm onSubmit={handleAppInfoSubmit} platforms={setupState.platforms} isCompleted={isCompleted} />;
 
       case 'dashboard-action':
         return (
@@ -2560,11 +4921,12 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
             bundleId={content.bundleId}
             packageName={content.packageName}
             onConfirm={handleDashboardConfirm}
+            isCompleted={isCompleted}
           />
         );
 
       case 'sdk-install-choice':
-        return <SdkInstallChoice onSelect={handleSdkInstallChoice} />;
+        return <SdkInstallChoice onSelect={handleSdkInstallChoice} isCompleted={isCompleted} />;
 
       case 'sdk-guide-share':
         return (
@@ -2574,35 +4936,228 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
             framework={content.framework}
             onCopy={() => {}}
             onComplete={handleSdkGuideShareComplete}
+            isCompleted={isCompleted}
           />
         );
 
       case 'framework-select':
-        return <FrameworkSelect onSelect={handleFrameworkSelect} />;
+        return <FrameworkSelect onSelect={handleFrameworkSelect} isCompleted={isCompleted} />;
 
       case 'code-block':
         return <CodeBlock title={content.title} code={content.code} language={content.language} />;
 
       case 'sdk-init-code':
-        return <SDKInitCode appName={content.appName} appToken={content.appToken} onConfirm={handleSDKInitConfirm} />;
+        return <SDKInitCode appName={content.appName} appToken={content.appToken} onConfirm={handleSDKInitConfirm} isCompleted={isCompleted} />;
 
       case 'deeplink-choice':
-        return <DeeplinkChoice onSelect={handleDeeplinkChoice} />;
+        return <DeeplinkChoice onSelect={handleDeeplinkChoice} isCompleted={isCompleted} />;
 
       case 'sdk-verify':
-        return <SDKVerify onConfirm={handleSDKVerifyConfirm} />;
+        return <SDKVerify onConfirm={handleSDKVerifyConfirm} isCompleted={isCompleted} />;
 
       case 'channel-select':
-        return <ChannelSelect onSelect={handleChannelSelect} />;
+        return <ChannelSelect onSelect={handleChannelSelect} isCompleted={isCompleted} />;
+
+      case 'channel-integration-overview':
+        return (
+          <ChannelIntegrationOverview
+            selectedChannels={content.selectedChannels}
+            onStart={() => handleChannelIntegrationStart(content.selectedChannels)}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'channel-progress':
+        return (
+          <ChannelProgress
+            channel={content.channel}
+            steps={content.steps}
+            hasIOS={content.hasIOS}
+            currentStep={content.steps.find(s => s.status === 'in_progress')?.id || 'channel'}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'meta-channel-integration':
+        return (
+          <MetaChannelIntegration
+            onComplete={() => handleChannelStepComplete('meta', 'channel')}
+            onHelp={(issue) => handleChannelHelp('meta', issue)}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'meta-cost-integration':
+        return (
+          <MetaCostIntegration
+            onComplete={() => handleChannelStepComplete('meta', 'cost')}
+            onSkip={() => handleChannelStepSkip('meta', 'cost')}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'meta-skan-integration':
+        return (
+          <MetaSkanIntegration
+            onComplete={() => handleChannelStepComplete('meta', 'skan')}
+            onSkip={() => handleChannelStepSkip('meta', 'skan')}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'google-channel-integration':
+        return (
+          <GoogleChannelIntegration
+            onComplete={() => handleChannelStepComplete('google', 'channel')}
+            onHelp={(issue) => handleChannelHelp('google', issue)}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'google-cost-integration':
+        return (
+          <GoogleCostIntegration
+            onComplete={() => handleChannelStepComplete('google', 'cost')}
+            onSkip={() => handleChannelStepSkip('google', 'cost')}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'google-skan-integration':
+        return (
+          <GoogleSkanIntegration
+            onComplete={() => handleChannelStepComplete('google', 'skan')}
+            onSkip={() => handleChannelStepSkip('google', 'skan')}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'apple-version-check':
+        return (
+          <AppleVersionCheck
+            onAdvanced={() => handleAppleVersionSelect('advanced')}
+            onBasic={() => handleAppleVersionSelect('basic')}
+            onHelp={() => handleAppleVersionHelp()}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'apple-channel-integration':
+        return (
+          <AppleChannelIntegration
+            onComplete={() => handleChannelStepComplete('apple', 'channel')}
+            onHelp={(issue) => handleChannelHelp('apple', issue)}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'apple-cost-integration':
+        return (
+          <AppleCostIntegration
+            onComplete={() => handleChannelStepComplete('apple', 'cost')}
+            onSkip={() => handleChannelStepSkip('apple', 'cost')}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'tiktok-channel-integration':
+        return (
+          <TikTokChannelIntegration
+            onComplete={() => handleChannelStepComplete('tiktok', 'channel')}
+            onHelp={(issue) => handleChannelHelp('tiktok', issue)}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'tiktok-cost-integration':
+        return (
+          <TikTokCostIntegration
+            onComplete={() => handleChannelStepComplete('tiktok', 'cost')}
+            onSkip={() => handleChannelStepSkip('tiktok', 'cost')}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'tiktok-skan-integration':
+        return (
+          <TikTokSkanIntegration
+            onComplete={() => handleChannelStepComplete('tiktok', 'skan')}
+            onSkip={() => handleChannelStepSkip('tiktok', 'skan')}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'channel-completion':
+        return (
+          <ChannelCompletion
+            channel={content.channel}
+            onNext={() => handleChannelComplete(content.channel)}
+            isLastChannel={isLastSelectedChannel(content.channel)}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'event-taxonomy-intro':
+        return (
+          <EventTaxonomyIntro
+            onStart={handleEventTaxonomyStart}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'standard-event-select':
+        return (
+          <StandardEventSelect
+            onSelect={handleStandardEventSelect}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'custom-event-input':
+        return (
+          <CustomEventInput
+            onAdd={handleCustomEventAdd}
+            onSkip={handleCustomEventSkip}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'event-property-config':
+        return (
+          <EventPropertyConfig
+            eventName={content.eventName}
+            onComplete={(properties) => handleEventPropertyComplete(content.eventName, properties)}
+            onSkip={() => handleEventPropertySkip(content.eventName)}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'event-verify':
+        return (
+          <EventVerify
+            onVerified={handleEventVerified}
+            onSkip={handleEventVerifySkip}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'event-taxonomy-summary':
+        return (
+          <EventTaxonomySummary
+            events={content.events}
+            onContinue={handleEventTaxonomyComplete}
+            isCompleted={isCompleted}
+          />
+        );
 
       case 'completion-summary':
         return <CompletionSummary data={content.data} />;
 
       case 'single-select':
-        return <SingleSelect options={content.options} onSelect={handleSingleSelect} />;
+        return <SingleSelect options={content.options} onSelect={handleSingleSelect} isCompleted={isCompleted} />;
 
       case 'token-display':
-        return <TokenDisplay tokens={content.tokens} onContinue={handleTokenDisplayContinue} />;
+        return <TokenDisplay tokens={content.tokens} onContinue={handleTokenDisplayContinue} isCompleted={isCompleted} />;
 
       case 'dev-completion-summary':
         return <DevCompletionSummary appName={content.appName} />;
@@ -2639,29 +5194,29 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     </motion.button>
   );
 
-  // View mode toggle buttons
-  const ViewModeControls = () => (
-    <div className="flex items-center gap-2 p-2 bg-white rounded-xl shadow-lg border border-gray-200">
+  // View mode toggle buttons - compact version for top-right corner
+  const ViewModeControls = ({ compact = false }: { compact?: boolean }) => (
+    <div className={`flex items-center gap-1 ${compact ? 'bg-white/90 backdrop-blur-sm rounded-lg shadow-md border border-gray-200 p-1' : 'bg-white rounded-xl shadow-lg border border-gray-200 p-2 gap-2'}`}>
       <button
         onClick={() => setViewMode('fullscreen')}
-        className={`p-3 rounded-lg transition-colors ${viewMode === 'fullscreen' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'}`}
+        className={`${compact ? 'p-2' : 'p-3'} rounded-lg transition-colors ${viewMode === 'fullscreen' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'}`}
         title="Full Screen"
       >
-        <Maximize2 className="w-5 h-5" />
+        <Maximize2 className={compact ? 'w-4 h-4' : 'w-5 h-5'} />
       </button>
       <button
         onClick={() => setViewMode('module')}
-        className={`p-3 rounded-lg transition-colors ${viewMode === 'module' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'}`}
+        className={`${compact ? 'p-2' : 'p-3'} rounded-lg transition-colors ${viewMode === 'module' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'}`}
         title="Module View"
       >
-        <MessageCircle className="w-5 h-5" />
+        <MessageCircle className={compact ? 'w-4 h-4' : 'w-5 h-5'} />
       </button>
       <button
         onClick={() => setViewMode('minimized')}
-        className={`p-3 rounded-lg transition-colors ${viewMode === 'minimized' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'}`}
+        className={`${compact ? 'p-2' : 'p-3'} rounded-lg transition-colors ${viewMode === 'minimized' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'}`}
         title="Minimize"
       >
-        <Minimize2 className="w-5 h-5" />
+        <X className={compact ? 'w-4 h-4' : 'w-5 h-5'} />
       </button>
     </div>
   );
@@ -2670,38 +5225,19 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
   const chatContent = (
     <div className={`flex bg-gray-50 ${
       viewMode === 'fullscreen'
-        ? 'h-screen'
-        : 'h-[600px] rounded-xl shadow-2xl border border-gray-200'
+        ? 'h-screen w-screen'
+        : 'h-[600px] rounded-xl shadow-2xl border border-gray-200 relative'
     }`} style={viewMode !== 'fullscreen' ? { height: '720px', maxHeight: '85vh' } : undefined}>
+      {/* View Mode Controls - top right corner (fullscreen only, positioned in main area) */}
       {/* Sidebar */}
       <div
         className="bg-white border-r border-gray-200 p-6 flex flex-col overflow-hidden flex-shrink-0"
         style={{ width: viewMode === 'fullscreen' ? '320px' : '288px', minWidth: viewMode === 'fullscreen' ? '320px' : '288px', maxWidth: viewMode === 'fullscreen' ? '320px' : '288px' }}
       >
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-blue-600" />
-              <h2 className="font-semibold">Setup Guide</h2>
-            </div>
-            {viewMode !== 'fullscreen' && (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setViewMode('fullscreen')}
-                  className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                  title="Full Screen"
-                >
-                  <Maximize2 className="w-4 h-4 text-gray-500" />
-                </button>
-                <button
-                  onClick={() => setViewMode('minimized')}
-                  className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                  title="Minimize"
-                >
-                  <Minimize2 className="w-4 h-4 text-gray-500" />
-                </button>
-              </div>
-            )}
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-5 h-5 text-blue-600" />
+            <h2 className="font-semibold">Setup Guide</h2>
           </div>
           <p className="text-sm text-gray-600">
             Complete your Airbridge setup
@@ -2838,14 +5374,66 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
                         </div>
                       </div>
 
-                      {/* Phase 3: Channel Integration - Hidden for Dev mode */}
-                      {app.environment !== 'dev' && (
+                      {/* Phase 3: Event Taxonomy - Hidden for Dev mode */}
+                      {app.environment !== 'dev' && app.steps.filter(s => s.phase === 3).length > 0 && (
                         <div>
                           <div className={`text-sm font-medium mb-3 truncate ${app.currentPhase >= 3 ? 'text-blue-600' : 'text-gray-400'}`}>
-                            Phase 3: Channel Integration
+                            Phase 3: Event Taxonomy
                           </div>
                           <div className="space-y-2">
                             {app.steps.filter(s => s.phase === 3).map((step) => {
+                              const isDisabled = !canStartStep(app, step.id) && step.status === 'pending';
+                              return (
+                                <button
+                                  key={step.id}
+                                  onClick={() => !isDisabled && handleStepClick(app.id, step)}
+                                  disabled={isDisabled}
+                                  className={`w-full p-3 rounded-xl transition-all text-sm text-left ${
+                                    isDisabled
+                                      ? 'bg-gray-50 border border-gray-100 opacity-50 cursor-not-allowed'
+                                      : step.status === 'completed'
+                                      ? 'bg-green-50 border border-green-200 hover:bg-green-100 cursor-pointer hover:shadow-md'
+                                      : step.status === 'in_progress'
+                                      ? 'bg-blue-50 border border-blue-200 hover:bg-blue-100 cursor-pointer hover:shadow-md'
+                                      : 'bg-gray-50 border border-gray-100 hover:bg-gray-100 cursor-pointer hover:shadow-md'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    {step.status === 'completed' ? (
+                                      <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                                    ) : step.status === 'in_progress' ? (
+                                      <Loader2 className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
+                                    ) : (
+                                      <Circle className={`w-5 h-5 flex-shrink-0 ${isDisabled ? 'text-gray-200' : 'text-gray-300'}`} />
+                                    )}
+                                    <span className={`flex-1 truncate ${
+                                      isDisabled ? 'text-gray-400' :
+                                      step.status === 'completed' ? 'text-green-700' :
+                                      step.status === 'in_progress' ? 'text-blue-700' : 'text-gray-500'
+                                    }`}>
+                                      {step.title}
+                                    </span>
+                                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${
+                                      isDisabled ? 'text-gray-200' :
+                                      step.status === 'completed' ? 'text-green-400' :
+                                      step.status === 'in_progress' ? 'text-blue-400' : 'text-gray-300'
+                                    }`} />
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Phase 4: Ad Channel Integration - Hidden for Dev mode */}
+                      {app.environment !== 'dev' && app.steps.filter(s => s.phase === 4).length > 0 && (
+                        <div>
+                          <div className={`text-sm font-medium mb-3 truncate ${app.currentPhase >= 4 ? 'text-blue-600' : 'text-gray-400'}`}>
+                            Phase 4: Ad Channel Integration
+                          </div>
+                          <div className="space-y-2">
+                            {app.steps.filter(s => s.phase === 4).map((step) => {
                               const isDisabled = !canStartStep(app, step.id) && step.status === 'pending';
                               return (
                                 <button
@@ -2920,43 +5508,67 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 p-6 flex-shrink-0">
-          <h1 className="font-semibold text-lg">Airbridge Setup</h1>
-          <p className="text-gray-600 text-sm mt-1">
-            Airbridge Onboarding Manager is here to help
-          </p>
+          <div className="flex items-center gap-3">
+            {canGoBack && (
+              <button
+                onClick={handleBack}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-1 text-gray-500 hover:text-gray-700"
+                title="Go back to previous step"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                <span className="text-sm">Back</span>
+              </button>
+            )}
+            <div className="flex-1">
+              <h1 className="font-semibold text-lg">Airbridge Setup</h1>
+              <p className="text-gray-600 text-sm mt-1">
+                Airbridge Onboarding Manager is here to help
+              </p>
+            </div>
+            {/* View Mode Controls */}
+            <div className="self-start">
+              <ViewModeControls compact />
+            </div>
+          </div>
         </div>
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-3xl mx-auto space-y-4">
             <AnimatePresence>
-              {messages.map(message => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div>
-                    {message.content.map((content, idx) => (
-                      <div
-                        key={idx}
-                        className={content.type === 'text' ? (message.role === 'user' ? 'rounded-2xl px-4 py-3' : 'py-1') : ''}
-                        style={
-                          content.type === 'text'
-                            ? message.role === 'user'
-                              ? { backgroundColor: '#3b82f6', color: '#ffffff' }
-                              : { color: '#374151' }
-                            : {}
-                        }
-                      >
-                        {renderMessageContent(content)}
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              ))}
+              {messages.map((message, messageIndex) => {
+                // Find the last bot message index
+                const lastBotMessageIndex = messages.map((m, i) => m.role === 'bot' ? i : -1).filter(i => i !== -1).pop() ?? -1;
+                const isLastBotMessage = message.role === 'bot' && messageIndex === lastBotMessageIndex;
+
+                return (
+                  <motion.div
+                    key={message.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div>
+                      {message.content.map((content, idx) => (
+                        <div
+                          key={idx}
+                          className={content.type === 'text' ? (message.role === 'user' ? 'rounded-2xl px-4 py-3' : 'py-1') : ''}
+                          style={
+                            content.type === 'text'
+                              ? message.role === 'user'
+                                ? { backgroundColor: '#3b82f6', color: '#ffffff' }
+                                : { color: '#374151' }
+                              : {}
+                          }
+                        >
+                          {renderMessageContent(content, isLastBotMessage)}
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
 
             {isTyping && (
@@ -3064,14 +5676,6 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     );
   }
 
-  // Fullscreen mode - render with view mode controls
-  return (
-    <div className="relative">
-      {/* View Mode Controls - Fixed position */}
-      <div className="fixed top-4 right-4 z-50">
-        <ViewModeControls />
-      </div>
-      {chatContent}
-    </div>
-  );
+  // Fullscreen mode
+  return chatContent;
 }
