@@ -39,13 +39,10 @@ type PlatformInfo = {
 type MessageContent =
   | { type: 'text'; text: string }
   | { type: 'environment-select' }
-  | { type: 'platform-select'; platforms: string[] }
   | { type: 'platform-multi-select' }
   | { type: 'app-name-input' }
   | { type: 'app-name-input-dev' }
   | { type: 'platform-registration'; platform: 'ios' | 'android' | 'web'; platformIndex: number; totalPlatforms: number }
-  | { type: 'store-url-input'; platform: 'ios' | 'android' }
-  | { type: 'web-url-input' }
   | { type: 'app-search-loading'; query: string; platform?: 'ios' | 'android' }
   | { type: 'app-search-results'; results: AppSearchResult[]; query: string; platform?: 'ios' | 'android' }
   | { type: 'timezone-currency-confirm'; timezone: string; currency: string }
@@ -58,7 +55,6 @@ type MessageContent =
   | { type: 'deeplink-choice' }
   | { type: 'sdk-verify' }
   | { type: 'channel-select' }
-  | { type: 'channel-integration'; channel: string; step: number }
   | { type: 'channel-integration-overview'; selectedChannels: string[] }
   | { type: 'channel-progress'; channel: string; steps: ChannelStep[]; hasIOS: boolean }
   | { type: 'meta-channel-integration' }
@@ -74,10 +70,8 @@ type MessageContent =
   | { type: 'tiktok-cost-integration' }
   | { type: 'tiktok-skan-integration' }
   | { type: 'channel-completion'; channel: string }
-  | { type: 'event-taxonomy-intro' }
   | { type: 'standard-event-select' }
   | { type: 'custom-event-input' }
-  | { type: 'event-property-config'; eventName: string }
   | { type: 'event-verify' }
   | { type: 'event-taxonomy-summary'; events: EventConfig[] }
   | { type: 'completion-summary'; data: CompletionData }
@@ -86,7 +80,31 @@ type MessageContent =
   | { type: 'token-display'; tokens: { appSdkToken: string; webSdkToken: string; apiToken: string } }
   | { type: 'dev-completion-summary'; appName: string }
   | { type: 'sdk-install-choice' }
-  | { type: 'sdk-guide-share'; appName: string; platforms: string[]; framework?: string };
+  | { type: 'sdk-guide-share'; appName: string; platforms: string[]; framework?: string }
+  // GitHub Automation types
+  | { type: 'sdk-install-method-select' }
+  | { type: 'github-connect' }
+  | { type: 'github-repo-select'; repos: GitHubRepo[] }
+  | { type: 'github-permissions' }
+  | { type: 'github-pr-confirm'; step: 'sdk-install' | 'sdk-init' | 'deeplink' | 'event-tracking' }
+  | { type: 'github-pr-waiting'; prUrl?: string; step: string }
+  | { type: 'github-pr-complete'; prUrl: string; prNumber: number; step: string }
+  | { type: 'github-pr-review'; prUrl: string; prNumber: number; step: string }
+  // SDK Test & Verification types
+  | { type: 'sdk-test' }
+  | { type: 'sdk-test-result'; passed: boolean; details: { install: boolean; init: boolean; events: boolean } }
+  // Tracking Link types
+  | { type: 'tracking-link-create'; channel: string }
+  | { type: 'tracking-link-form'; channel: string }
+  | { type: 'tracking-link-complete'; links: TrackingLink[] }
+  // Verification types
+  | { type: 'deeplink-test' }
+  | { type: 'deeplink-test-result'; scenarios: DeeplinkTestScenario[] }
+  | { type: 'attribution-test' }
+  | { type: 'attribution-test-result'; passed: boolean }
+  | { type: 'data-verify' }
+  | { type: 'data-verify-result'; metrics: DataVerifyMetrics }
+  | { type: 'onboarding-complete' };
 
 type Message = {
   id: string;
@@ -146,6 +164,53 @@ type EventProperty = {
   isSemantic: boolean;
 };
 
+// GitHub Automation Types
+type GitHubRepo = {
+  id: string;
+  name: string;
+  fullName: string;
+  owner: string;
+  defaultBranch: string;
+  isPrivate: boolean;
+};
+
+type GitHubAutomationState = {
+  isConnected: boolean;
+  selectedRepo?: GitHubRepo;
+  currentStep: 'sdk-install' | 'sdk-init' | 'deeplink' | 'event-tracking' | null;
+  pendingPR?: {
+    url: string;
+    number: number;
+    step: string;
+  };
+};
+
+// Tracking Link Types
+type TrackingLink = {
+  id: string;
+  name: string;
+  channel: string;
+  url: string;
+  shortUrl: string;
+  createdAt: Date;
+};
+
+// Deeplink Test Types
+type DeeplinkTestScenario = {
+  id: string;
+  name: string;
+  description: string;
+  status: 'pending' | 'testing' | 'passed' | 'failed';
+};
+
+// Data Verification Types
+type DataVerifyMetrics = {
+  eventsReceived: number;
+  lastEventTime: Date | null;
+  attributionVerified: boolean;
+  deeplinkVerified: boolean;
+};
+
 type AppInfo = {
   appName: string;
   storeUrl: string;
@@ -170,11 +235,11 @@ type RegisteredApp = {
 };
 
 const createAppSteps = (): OnboardingStep[] => [
-  // Phase 2: SDK Installation
-  { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install packages and initialize', status: 'pending' },
+  // Phase 2: SDK Installation & Setup
+  { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install SDK packages', status: 'pending' },
   { id: 'sdk-init', phase: 2, title: 'SDK Initialization', description: 'Add SDK code to your app', status: 'pending' },
-  { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links (optional)', status: 'pending' },
-  { id: 'sdk-verify', phase: 2, title: 'SDK Verification', description: 'Verify event reception', status: 'pending' },
+  { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links', status: 'pending' },
+  { id: 'sdk-test', phase: 2, title: 'SDK Test', description: 'Test SDK integration', status: 'pending' },
   // Phase 3: Event Taxonomy
   { id: 'event-taxonomy', phase: 3, title: 'Event Taxonomy', description: 'Define events to track', status: 'pending' },
   // Phase 4: Ad Channel Integration
@@ -182,7 +247,652 @@ const createAppSteps = (): OnboardingStep[] => [
   { id: 'channel-integration', phase: 4, title: 'Channel Integration', description: 'Connect to ad platforms', status: 'pending' },
   { id: 'cost-integration', phase: 4, title: 'Cost Integration', description: 'Enable cost data import', status: 'pending' },
   { id: 'skan-integration', phase: 4, title: 'SKAN Integration', description: 'iOS attribution setup', status: 'pending' },
+  { id: 'tracking-link', phase: 4, title: 'Tracking Link', description: 'Create tracking links', status: 'pending' },
+  // Phase 5: Verification
+  { id: 'deeplink-test', phase: 5, title: 'Deep Link Test', description: 'Test deep link functionality', status: 'pending' },
+  { id: 'attribution-test', phase: 5, title: 'Attribution Test', description: 'Verify attribution setup', status: 'pending' },
+  { id: 'data-verify', phase: 5, title: 'Data Verification', description: 'Confirm data collection', status: 'pending' },
 ];
+
+// GitHub Icon Component
+function GitHubIcon({ className, fill = "currentColor" }: { className?: string; fill?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill={fill}>
+      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+    </svg>
+  );
+}
+
+// SDK Install Method Select Component (Automation vs Manual)
+function SdkInstallMethodSelect({ onSelect, isCompleted = false }: {
+  onSelect: (method: 'automation' | 'manual') => void;
+  isCompleted?: boolean
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Installation Method</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="text-sm font-medium text-gray-700 mb-3">How would you like to install the SDK?</div>
+      <div className="space-y-3">
+        {/* Automation Option */}
+        <button
+          onClick={() => onSelect('automation')}
+          className="w-full flex items-start gap-3 p-4 rounded-lg border-2 border-blue-200 bg-blue-50 hover:border-blue-500 hover:bg-blue-100 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-600 flex-shrink-0">
+            <GitHubIcon className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-900">GitHub Automation</span>
+              <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">Recommended</span>
+            </div>
+            <div className="text-sm text-gray-600 mt-1">Connect your GitHub repository and let us handle the SDK setup automatically</div>
+            <div className="mt-3 space-y-1">
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Automatic SDK installation via PR</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Event taxonomy setup & debugging included</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Deep link configuration automated</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Review PRs before merging</span>
+              </div>
+            </div>
+          </div>
+        </button>
+
+        {/* Manual Option */}
+        <button
+          onClick={() => onSelect('manual')}
+          className="w-full flex items-start gap-3 p-4 rounded-lg border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-gray-100 flex-shrink-0">
+            <Code className="w-5 h-5 text-gray-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-gray-900">Manual Installation</div>
+            <div className="text-sm text-gray-500 mt-1">Follow step-by-step instructions to integrate the SDK yourself</div>
+            <div className="mt-2 text-xs text-gray-400">
+              Best for: Custom setups, monorepos, or restricted GitHub access
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// GitHub Connect Component
+function GitHubConnect({ onConnect, onSkip, isCompleted = false }: {
+  onConnect: () => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  const [connectState, setConnectState] = useState<'idle' | 'connecting' | 'authorizing' | 'connected'>('idle');
+
+  const handleConnect = () => {
+    setConnectState('connecting');
+    // Simulate OAuth popup opening
+    setTimeout(() => {
+      setConnectState('authorizing');
+      // Simulate authorization completing
+      setTimeout(() => {
+        setConnectState('connected');
+        // Trigger the parent callback after showing success
+        setTimeout(() => {
+          onConnect();
+        }, 1000);
+      }, 1500);
+    }, 1000);
+  };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: '#171717' }}
+          >
+            <GitHubIcon className="w-5 h-5" fill="#ffffff" />
+          </div>
+          <div>
+            <div className="text-sm font-medium text-gray-700">GitHub Connected</div>
+            <div className="text-xs text-gray-500">@airbridge-user</div>
+          </div>
+          <CheckCircle2 className="w-5 h-5 text-green-600 ml-auto" />
+        </div>
+      </div>
+    );
+  }
+
+  // Connecting state - showing OAuth flow
+  if (connectState !== 'idle') {
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+        <div className="flex items-center gap-3 mb-6">
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center"
+            style={{ backgroundColor: '#171717' }}
+          >
+            <GitHubIcon className="w-7 h-7" fill="#ffffff" />
+          </div>
+          <div>
+            <div className="font-medium text-gray-900">Connecting to GitHub</div>
+            <div className="text-sm text-gray-500">Please complete authorization in the popup window</div>
+          </div>
+        </div>
+
+        {/* Connection Steps */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+            {connectState === 'connecting' ? (
+              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            )}
+            <div className="flex-1">
+              <div className="text-sm font-medium text-gray-700">Opening GitHub authorization</div>
+              <div className="text-xs text-gray-500">Redirecting to github.com...</div>
+            </div>
+          </div>
+
+          <div className={`flex items-center gap-3 p-3 rounded-lg ${connectState === 'connecting' ? 'bg-gray-50 opacity-50' : 'bg-gray-50'}`}>
+            {connectState === 'connecting' ? (
+              <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
+            ) : connectState === 'authorizing' ? (
+              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            )}
+            <div className="flex-1">
+              <div className="text-sm font-medium text-gray-700">Waiting for authorization</div>
+              <div className="text-xs text-gray-500">Grant Airbridge access to your repositories</div>
+            </div>
+          </div>
+
+          <div className={`flex items-center gap-3 p-3 rounded-lg ${connectState !== 'connected' ? 'bg-gray-50 opacity-50' : 'bg-green-50 border border-green-200'}`}>
+            {connectState === 'connected' ? (
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            ) : (
+              <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
+            )}
+            <div className="flex-1">
+              <div className={`text-sm font-medium ${connectState === 'connected' ? 'text-green-700' : 'text-gray-700'}`}>
+                {connectState === 'connected' ? 'Successfully connected!' : 'Connection complete'}
+              </div>
+              <div className={`text-xs ${connectState === 'connected' ? 'text-green-600' : 'text-gray-500'}`}>
+                {connectState === 'connected' ? 'Fetching your repositories...' : 'Ready to select repository'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {connectState !== 'connected' && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setConnectState('idle')}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="flex items-center gap-3 mb-4">
+        <div
+          className="w-12 h-12 rounded-xl flex items-center justify-center"
+          style={{ backgroundColor: '#171717' }}
+        >
+          <GitHubIcon className="w-7 h-7" fill="#ffffff" />
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">Connect GitHub</div>
+          <div className="text-sm text-gray-500">Authorize Airbridge to access your repository</div>
+        </div>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+        <div className="text-sm font-medium text-gray-700 mb-2">What we'll be able to do:</div>
+        <ul className="space-y-2 text-sm text-gray-600">
+          <li className="flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+            <span>Read repository contents to analyze your project structure</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+            <span>Create branches and pull requests for SDK integration</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+            <span>Add comments to PRs with setup instructions</span>
+          </li>
+        </ul>
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={handleConnect}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg hover:opacity-90 transition-opacity font-medium"
+          style={{ backgroundColor: '#171717', color: '#ffffff' }}
+        >
+          <GitHubIcon className="w-5 h-5" fill="#ffffff" />
+          <span>Connect with GitHub</span>
+        </button>
+        <button
+          onClick={onSkip}
+          className="px-4 py-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          Skip
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// GitHub Repo Select Component
+function GitHubRepoSelect({ repos, onSelect, isCompleted = false }: {
+  repos: GitHubRepo[];
+  onSelect: (repo: GitHubRepo) => void;
+  isCompleted?: boolean;
+}) {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Repository Selection</div>
+        <div className="text-xs text-gray-400">Repository selected</div>
+      </div>
+    );
+  }
+
+  const filteredRepos = repos.filter(repo =>
+    repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    repo.fullName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="text-sm font-medium text-gray-700 mb-3">Select your repository</div>
+
+      {/* Search */}
+      <div className="mb-3">
+        <input
+          type="text"
+          placeholder="Search repositories..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 transition-colors text-sm"
+        />
+      </div>
+
+      {/* Repo List */}
+      <div className="max-h-64 overflow-y-auto space-y-2">
+        {filteredRepos.map((repo) => (
+          <button
+            key={repo.id}
+            onClick={() => onSelect(repo)}
+            className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+          >
+            <GitHubIcon className="w-5 h-5 text-gray-700 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-gray-900 truncate">{repo.name}</div>
+              <div className="text-xs text-gray-500 truncate">{repo.fullName}</div>
+            </div>
+            {repo.isPrivate && (
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Private</span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// GitHub Permissions Component
+function GitHubPermissions({ onGranted, isCompleted = false }: {
+  onGranted: () => void;
+  isCompleted?: boolean;
+}) {
+  const [isGranting, setIsGranting] = useState(false);
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Permissions</div>
+        <div className="text-xs text-gray-400">Permissions granted</div>
+      </div>
+    );
+  }
+
+  const handleGrant = () => {
+    setIsGranting(true);
+    // Simulate permission granting
+    setTimeout(() => {
+      setIsGranting(false);
+      onGranted();
+    }, 1500);
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <AlertCircle className="w-5 h-5 text-amber-500" />
+        <div className="font-medium text-gray-900">Additional Permissions Required</div>
+      </div>
+
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+        <div className="text-sm text-amber-800">
+          To create pull requests, we need write access to your repository. This permission is only used for:
+        </div>
+        <ul className="mt-2 space-y-1 text-sm text-amber-700">
+          <li>• Creating feature branches for SDK integration</li>
+          <li>• Opening pull requests with SDK code changes</li>
+          <li>• Adding review comments and documentation</li>
+        </ul>
+      </div>
+
+      <button
+        onClick={handleGrant}
+        disabled={isGranting}
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+      >
+        {isGranting ? (
+          <>
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span>Granting permissions...</span>
+          </>
+        ) : (
+          <>
+            <CheckCircle2 className="w-5 h-5" />
+            <span>Grant Write Access</span>
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
+// GitHub PR Confirm Component
+function GitHubPRConfirm({ step, onConfirm, onSkip, isCompleted = false }: {
+  step: 'sdk-install' | 'sdk-init' | 'deeplink' | 'event-tracking';
+  onConfirm: () => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  const stepInfo = {
+    'sdk-install': {
+      title: 'SDK Installation',
+      description: 'Install Airbridge SDK packages and configure dependencies',
+      changes: [
+        'Add Airbridge SDK to package.json / Podfile / build.gradle',
+        'Configure build settings for your platform',
+        'Set up required native modules'
+      ]
+    },
+    'sdk-init': {
+      title: 'SDK Initialization',
+      description: 'Add SDK initialization code to your app entry point',
+      changes: [
+        'Import Airbridge SDK in your main app file',
+        'Initialize SDK with your app token',
+        'Configure SDK options (logging, etc.)'
+      ]
+    },
+    'deeplink': {
+      title: 'Deep Link Setup',
+      description: 'Configure deep linking for attribution tracking',
+      changes: [
+        'Add URL scheme configuration',
+        'Set up Universal Links / App Links',
+        'Add deep link handling code'
+      ]
+    },
+    'event-tracking': {
+      title: 'Event Tracking Setup',
+      description: 'Implement event tracking based on your taxonomy',
+      changes: [
+        'Add event tracking code for selected events',
+        'Configure event properties and attributes',
+        'Set up automatic event collection'
+      ]
+    }
+  };
+
+  const info = stepInfo[step];
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">{info.title} PR</div>
+        <div className="text-xs text-gray-400">PR created</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-100">
+          <GitHubIcon className="w-5 h-5 text-blue-600" />
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">{info.title} PR</div>
+          <div className="text-sm text-gray-500">{info.description}</div>
+        </div>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+        <div className="text-sm font-medium text-gray-700 mb-2">Changes to be made:</div>
+        <ul className="space-y-2">
+          {info.changes.map((change, index) => (
+            <li key={index} className="flex items-start gap-2 text-sm text-gray-600">
+              <Code className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+              <span>{change}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={onConfirm}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+        >
+          <Plus className="w-5 h-5" />
+          <span>Create PR</span>
+        </button>
+        <button
+          onClick={onSkip}
+          className="px-4 py-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          Skip this step
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// GitHub PR Waiting Component
+function GitHubPRWaiting({ prUrl, step, isCompleted = false }: {
+  prUrl?: string;
+  step: string;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Creating PR</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="flex items-center gap-4">
+        <div className="relative">
+          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+          </div>
+          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-sm">
+            <GitHubIcon className="w-3 h-3 text-gray-700" />
+          </div>
+        </div>
+        <div className="flex-1">
+          <div className="font-medium text-gray-900">Creating Pull Request...</div>
+          <div className="text-sm text-gray-500 mt-1">
+            Analyzing your codebase and generating changes for {step}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 bg-gray-50 rounded-lg p-3">
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+          <span>This usually takes 30-60 seconds</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// GitHub PR Complete Component
+function GitHubPRComplete({ prUrl, prNumber, step, onReview, isCompleted = false }: {
+  prUrl: string;
+  prNumber: number;
+  step: string;
+  onReview: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">PR #{prNumber}</div>
+        <div className="text-xs text-gray-400">Created successfully</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+          <CheckCircle2 className="w-6 h-6 text-green-600" />
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">Pull Request Created!</div>
+          <div className="text-sm text-gray-500">PR #{prNumber} is ready for review</div>
+        </div>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+        <div className="flex items-center gap-2 text-sm">
+          <GitHubIcon className="w-4 h-4 text-gray-600" />
+          <a
+            href={prUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:underline font-mono text-xs truncate"
+          >
+            {prUrl}
+          </a>
+        </div>
+      </div>
+
+      <button
+        onClick={onReview}
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+      >
+        <ExternalLink className="w-5 h-5" />
+        <span>Review Pull Request</span>
+      </button>
+    </div>
+  );
+}
+
+// GitHub PR Review Component
+function GitHubPRReview({ prUrl, prNumber, step, onMerged, onContinue, isCompleted = false }: {
+  prUrl: string;
+  prNumber: number;
+  step: string;
+  onMerged: () => void;
+  onContinue: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">PR Review</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="text-sm font-medium text-gray-700 mb-3">What would you like to do?</div>
+
+      <div className="space-y-3">
+        <a
+          href={prUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all"
+        >
+          <ExternalLink className="w-5 h-5 text-gray-600" />
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">View PR on GitHub</div>
+            <div className="text-sm text-gray-500">Review the changes in detail</div>
+          </div>
+        </a>
+
+        <button
+          onClick={onMerged}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-green-200 bg-green-50 hover:border-green-500 hover:bg-green-100 transition-all text-left"
+        >
+          <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">I've merged the PR</div>
+            <div className="text-sm text-gray-500">Continue to the next step</div>
+          </div>
+        </button>
+
+        <button
+          onClick={onContinue}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition-all text-left"
+        >
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">Continue without merging</div>
+            <div className="text-sm text-gray-500">I'll merge later, proceed with next automation</div>
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // SDK Install Choice Component
 function SdkInstallChoice({ onSelect, isCompleted = false }: { onSelect: (choice: 'self' | 'share') => void; isCompleted?: boolean }) {
@@ -320,6 +1030,730 @@ Please complete the SDK installation and let me know when it's done!
         <p className="text-xs text-gray-400 mt-2 text-center">
           See how Airbridge works with sample data
         </p>
+      </div>
+    </div>
+  );
+}
+
+// SDK Test Component
+function SdkTest({ onRunTest, isCompleted = false }: {
+  onRunTest: () => void;
+  isCompleted?: boolean;
+}) {
+  const [testState, setTestState] = useState<'idle' | 'testing' | 'complete'>('idle');
+  const [testResults, setTestResults] = useState({
+    install: false,
+    init: false,
+    events: false
+  });
+
+  const handleRunTest = () => {
+    setTestState('testing');
+    // Simulate test progression
+    setTimeout(() => {
+      setTestResults(prev => ({ ...prev, install: true }));
+      setTimeout(() => {
+        setTestResults(prev => ({ ...prev, init: true }));
+        setTimeout(() => {
+          setTestResults(prev => ({ ...prev, events: true }));
+          setTestState('complete');
+          setTimeout(() => onRunTest(), 1000);
+        }, 800);
+      }, 800);
+    }, 800);
+  };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <span className="text-sm font-medium text-gray-700">SDK Test Passed</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+          <Code className="w-5 h-5 text-blue-600" />
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">SDK Integration Test</div>
+          <div className="text-sm text-gray-500">Verify your SDK is properly integrated</div>
+        </div>
+      </div>
+
+      {testState === 'idle' && (
+        <>
+          <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <div className="text-sm font-medium text-gray-700 mb-2">This test will verify:</div>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-center gap-2">
+                <Circle className="w-4 h-4 text-gray-400" />
+                <span>SDK package is installed correctly</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Circle className="w-4 h-4 text-gray-400" />
+                <span>SDK initialization is successful</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Circle className="w-4 h-4 text-gray-400" />
+                <span>Events are being sent to Airbridge</span>
+              </li>
+            </ul>
+          </div>
+
+          <button
+            onClick={handleRunTest}
+            className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            Run SDK Test
+          </button>
+        </>
+      )}
+
+      {testState !== 'idle' && (
+        <div className="space-y-3">
+          <div className={`flex items-center gap-3 p-3 rounded-lg ${testResults.install ? 'bg-green-50' : 'bg-gray-50'}`}>
+            {!testResults.install && testState === 'testing' ? (
+              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+            ) : testResults.install ? (
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            ) : (
+              <Circle className="w-5 h-5 text-gray-400" />
+            )}
+            <div className="flex-1">
+              <div className="text-sm font-medium text-gray-700">SDK Installation</div>
+              <div className="text-xs text-gray-500">Checking package installation...</div>
+            </div>
+            {testResults.install && <span className="text-xs text-green-600 font-medium">Passed</span>}
+          </div>
+
+          <div className={`flex items-center gap-3 p-3 rounded-lg ${testResults.init ? 'bg-green-50' : testResults.install ? 'bg-gray-50' : 'bg-gray-50 opacity-50'}`}>
+            {testResults.install && !testResults.init && testState === 'testing' ? (
+              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+            ) : testResults.init ? (
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            ) : (
+              <Circle className="w-5 h-5 text-gray-400" />
+            )}
+            <div className="flex-1">
+              <div className="text-sm font-medium text-gray-700">SDK Initialization</div>
+              <div className="text-xs text-gray-500">Verifying SDK startup...</div>
+            </div>
+            {testResults.init && <span className="text-xs text-green-600 font-medium">Passed</span>}
+          </div>
+
+          <div className={`flex items-center gap-3 p-3 rounded-lg ${testResults.events ? 'bg-green-50' : testResults.init ? 'bg-gray-50' : 'bg-gray-50 opacity-50'}`}>
+            {testResults.init && !testResults.events && testState === 'testing' ? (
+              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+            ) : testResults.events ? (
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            ) : (
+              <Circle className="w-5 h-5 text-gray-400" />
+            )}
+            <div className="flex-1">
+              <div className="text-sm font-medium text-gray-700">Event Tracking</div>
+              <div className="text-xs text-gray-500">Checking event transmission...</div>
+            </div>
+            {testResults.events && <span className="text-xs text-green-600 font-medium">Passed</span>}
+          </div>
+
+          {testState === 'complete' && (
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2 text-green-700 font-medium">
+                <CheckCircle2 className="w-5 h-5" />
+                All tests passed! Your SDK is properly integrated.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Tracking Link Form Component
+function TrackingLinkForm({ channel, onCreate, isCompleted = false }: {
+  channel: string;
+  onCreate: (link: TrackingLink) => void;
+  isCompleted?: boolean;
+}) {
+  const [linkName, setLinkName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <span className="text-sm font-medium text-gray-700">Tracking Link Created</span>
+        </div>
+      </div>
+    );
+  }
+
+  const handleCreate = () => {
+    if (!linkName.trim()) return;
+    setIsCreating(true);
+    setTimeout(() => {
+      const newLink: TrackingLink = {
+        id: Date.now().toString(),
+        name: linkName,
+        channel,
+        url: `https://abr.ge/${linkName.toLowerCase().replace(/\s/g, '-')}`,
+        shortUrl: `https://abr.ge/a1b2c3`,
+        createdAt: new Date()
+      };
+      onCreate(newLink);
+      setIsCreating(false);
+    }, 1000);
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+          <Share2 className="w-5 h-5 text-purple-600" />
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">Create Tracking Link</div>
+          <div className="text-sm text-gray-500">For {channel} campaign tracking</div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Link Name</label>
+          <input
+            type="text"
+            value={linkName}
+            onChange={(e) => setLinkName(e.target.value)}
+            placeholder="e.g., Summer Campaign 2024"
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
+          />
+        </div>
+
+        <div className="bg-gray-50 rounded-lg p-4">
+          <div className="text-sm font-medium text-gray-700 mb-2">Link Settings</div>
+          <div className="space-y-2 text-sm text-gray-600">
+            <div className="flex justify-between">
+              <span>Channel</span>
+              <span className="font-medium">{channel}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Deep Link</span>
+              <span className="font-medium text-green-600">Enabled</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Fallback URL</span>
+              <span className="font-medium">App Store / Play Store</span>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={handleCreate}
+          disabled={!linkName.trim() || isCreating}
+          className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          {isCreating ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Creating...
+            </>
+          ) : (
+            'Create Tracking Link'
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Tracking Link Complete Component
+function TrackingLinkComplete({ links, onContinue, isCompleted = false }: {
+  links: TrackingLink[];
+  onContinue: () => void;
+  isCompleted?: boolean;
+}) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500">Tracking Links: {links.length} created</div>
+      </div>
+    );
+  }
+
+  const handleCopy = (link: TrackingLink) => {
+    navigator.clipboard.writeText(link.shortUrl);
+    setCopiedId(link.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+          <CheckCircle2 className="w-5 h-5 text-green-600" />
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">Tracking Links Created</div>
+          <div className="text-sm text-gray-500">{links.length} link(s) ready to use</div>
+        </div>
+      </div>
+
+      <div className="space-y-3 mb-4">
+        {links.map((link) => (
+          <div key={link.id} className="bg-gray-50 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium text-gray-900">{link.name}</span>
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">{link.channel}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={link.shortUrl}
+                readOnly
+                className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-600"
+              />
+              <button
+                onClick={() => handleCopy(link)}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                {copiedId === link.id ? (
+                  <Check className="w-4 h-4 text-green-600" />
+                ) : (
+                  <Copy className="w-4 h-4 text-gray-600" />
+                )}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={onContinue}
+        className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+      >
+        Continue to Verification
+      </button>
+    </div>
+  );
+}
+
+// Deep Link Test Component
+function DeeplinkTest({ onComplete, isCompleted = false }: {
+  onComplete: (scenarios: DeeplinkTestScenario[]) => void;
+  isCompleted?: boolean;
+}) {
+  const [scenarios, setScenarios] = useState<DeeplinkTestScenario[]>([
+    { id: '1', name: 'App Installed - Direct Open', description: 'Deep link opens app directly', status: 'pending' },
+    { id: '2', name: 'App Not Installed - Store Fallback', description: 'Redirects to app store', status: 'pending' },
+    { id: '3', name: 'Deferred Deep Link', description: 'Deep link works after install', status: 'pending' }
+  ]);
+  const [testState, setTestState] = useState<'idle' | 'testing' | 'complete'>('idle');
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <span className="text-sm font-medium text-gray-700">Deep Link Test Completed</span>
+        </div>
+      </div>
+    );
+  }
+
+  const handleRunTest = () => {
+    setTestState('testing');
+    let index = 0;
+    const interval = setInterval(() => {
+      if (index < scenarios.length) {
+        setScenarios(prev => prev.map((s, i) =>
+          i === index ? { ...s, status: 'testing' } : s
+        ));
+        setTimeout(() => {
+          setScenarios(prev => prev.map((s, i) =>
+            i === index ? { ...s, status: 'passed' } : s
+          ));
+        }, 800);
+        index++;
+      } else {
+        clearInterval(interval);
+        setTestState('complete');
+        setTimeout(() => {
+          onComplete(scenarios.map(s => ({ ...s, status: 'passed' })));
+        }, 500);
+      }
+    }, 1200);
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+          <Share2 className="w-5 h-5 text-indigo-600" />
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">Deep Link Test</div>
+          <div className="text-sm text-gray-500">Verify deep link functionality</div>
+        </div>
+      </div>
+
+      <div className="space-y-3 mb-4">
+        {scenarios.map((scenario) => (
+          <div key={scenario.id} className={`flex items-center gap-3 p-3 rounded-lg ${
+            scenario.status === 'passed' ? 'bg-green-50' :
+            scenario.status === 'testing' ? 'bg-blue-50' : 'bg-gray-50'
+          }`}>
+            {scenario.status === 'testing' ? (
+              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+            ) : scenario.status === 'passed' ? (
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            ) : (
+              <Circle className="w-5 h-5 text-gray-400" />
+            )}
+            <div className="flex-1">
+              <div className="text-sm font-medium text-gray-700">{scenario.name}</div>
+              <div className="text-xs text-gray-500">{scenario.description}</div>
+            </div>
+            {scenario.status === 'passed' && (
+              <span className="text-xs text-green-600 font-medium">Passed</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {testState === 'idle' && (
+        <button
+          onClick={handleRunTest}
+          className="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+        >
+          Run Deep Link Test
+        </button>
+      )}
+
+      {testState === 'complete' && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center gap-2 text-green-700 font-medium">
+            <CheckCircle2 className="w-5 h-5" />
+            All deep link scenarios passed!
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Attribution Test Component
+function AttributionTest({ onComplete, isCompleted = false }: {
+  onComplete: (passed: boolean) => void;
+  isCompleted?: boolean;
+}) {
+  const [testState, setTestState] = useState<'idle' | 'testing' | 'complete'>('idle');
+  const [steps, setSteps] = useState([
+    { id: '1', name: 'Click Tracking Link', status: 'pending' },
+    { id: '2', name: 'Install/Open App', status: 'pending' },
+    { id: '3', name: 'Verify Attribution', status: 'pending' }
+  ]);
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <span className="text-sm font-medium text-gray-700">Attribution Test Passed</span>
+        </div>
+      </div>
+    );
+  }
+
+  const handleRunTest = () => {
+    setTestState('testing');
+    let index = 0;
+    const interval = setInterval(() => {
+      if (index < steps.length) {
+        setSteps(prev => prev.map((s, i) => ({
+          ...s,
+          status: i === index ? 'testing' : i < index ? 'passed' : 'pending'
+        })));
+        setTimeout(() => {
+          setSteps(prev => prev.map((s, i) => ({
+            ...s,
+            status: i <= index ? 'passed' : 'pending'
+          })));
+        }, 600);
+        index++;
+      } else {
+        clearInterval(interval);
+        setTestState('complete');
+        setTimeout(() => onComplete(true), 500);
+      }
+    }, 1000);
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
+          <Sparkles className="w-5 h-5 text-orange-600" />
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">Attribution Test</div>
+          <div className="text-sm text-gray-500">Verify attribution is working correctly</div>
+        </div>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+        <div className="text-sm text-gray-600">
+          This test simulates a user journey from ad click to app install to verify attribution tracking.
+        </div>
+      </div>
+
+      <div className="space-y-3 mb-4">
+        {steps.map((step, index) => (
+          <div key={step.id} className={`flex items-center gap-3 p-3 rounded-lg ${
+            step.status === 'passed' ? 'bg-green-50' :
+            step.status === 'testing' ? 'bg-orange-50' : 'bg-gray-50'
+          }`}>
+            {step.status === 'testing' ? (
+              <Loader2 className="w-5 h-5 text-orange-600 animate-spin" />
+            ) : step.status === 'passed' ? (
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            ) : (
+              <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-600">
+                {index + 1}
+              </div>
+            )}
+            <span className="text-sm font-medium text-gray-700">{step.name}</span>
+            {step.status === 'passed' && (
+              <span className="ml-auto text-xs text-green-600 font-medium">Done</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {testState === 'idle' && (
+        <button
+          onClick={handleRunTest}
+          className="w-full py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors"
+        >
+          Run Attribution Test
+        </button>
+      )}
+
+      {testState === 'complete' && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center gap-2 text-green-700 font-medium">
+            <CheckCircle2 className="w-5 h-5" />
+            Attribution is working correctly!
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Data Verification Component
+function DataVerify({ onComplete, isCompleted = false }: {
+  onComplete: (metrics: DataVerifyMetrics) => void;
+  isCompleted?: boolean;
+}) {
+  const [verifyState, setVerifyState] = useState<'idle' | 'verifying' | 'complete'>('idle');
+  const [metrics, setMetrics] = useState<DataVerifyMetrics>({
+    eventsReceived: 0,
+    lastEventTime: null,
+    attributionVerified: false,
+    deeplinkVerified: false
+  });
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <span className="text-sm font-medium text-gray-700">Data Verification Complete</span>
+        </div>
+      </div>
+    );
+  }
+
+  const handleVerify = () => {
+    setVerifyState('verifying');
+    // Simulate data verification
+    setTimeout(() => {
+      setMetrics({
+        eventsReceived: 127,
+        lastEventTime: new Date(),
+        attributionVerified: true,
+        deeplinkVerified: true
+      });
+      setVerifyState('complete');
+      setTimeout(() => {
+        onComplete({
+          eventsReceived: 127,
+          lastEventTime: new Date(),
+          attributionVerified: true,
+          deeplinkVerified: true
+        });
+      }, 1000);
+    }, 2000);
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">Data Verification</div>
+          <div className="text-sm text-gray-500">Confirm data is being collected correctly</div>
+        </div>
+      </div>
+
+      {verifyState === 'idle' && (
+        <>
+          <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <div className="text-sm text-gray-600">
+              This will verify that events are being received in Airbridge and check:
+            </div>
+            <ul className="mt-2 space-y-1 text-sm text-gray-600">
+              <li className="flex items-center gap-2">
+                <Circle className="w-3 h-3 text-gray-400" />
+                Real-time event logs
+              </li>
+              <li className="flex items-center gap-2">
+                <Circle className="w-3 h-3 text-gray-400" />
+                Attribution data
+              </li>
+              <li className="flex items-center gap-2">
+                <Circle className="w-3 h-3 text-gray-400" />
+                Deep link tracking
+              </li>
+            </ul>
+          </div>
+
+          <button
+            onClick={handleVerify}
+            className="w-full py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors"
+          >
+            Verify Data Collection
+          </button>
+        </>
+      )}
+
+      {verifyState === 'verifying' && (
+        <div className="flex flex-col items-center justify-center py-8">
+          <Loader2 className="w-10 h-10 text-emerald-600 animate-spin mb-4" />
+          <div className="text-sm text-gray-600">Checking Real-time Logs and Reports...</div>
+        </div>
+      )}
+
+      {verifyState === 'complete' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-emerald-50 rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-emerald-700">{metrics.eventsReceived}</div>
+              <div className="text-xs text-emerald-600">Events Received</div>
+            </div>
+            <div className="bg-emerald-50 rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-emerald-700">
+                {metrics.lastEventTime ? 'Just now' : '-'}
+              </div>
+              <div className="text-xs text-emerald-600">Last Event</div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+              <span className="text-sm text-gray-700">Attribution Verified</span>
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+              <span className="text-sm text-gray-700">Deep Link Verified</span>
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            </div>
+          </div>
+
+          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center gap-2 text-green-700 font-medium">
+              <CheckCircle2 className="w-5 h-5" />
+              All data verification checks passed!
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Onboarding Complete Component
+function OnboardingComplete({ appName, onViewDashboard }: {
+  appName: string;
+  onViewDashboard: () => void;
+}) {
+  return (
+    <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 mt-4">
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+          <CheckCircle2 className="w-8 h-8 text-green-600" />
+        </div>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">Onboarding Complete!</h3>
+        <p className="text-gray-600">
+          Congratulations! Your app "{appName}" is now fully set up with Airbridge.
+        </p>
+      </div>
+
+      <div className="bg-white rounded-lg p-4 mb-4">
+        <div className="text-sm font-medium text-gray-700 mb-3">What's been set up:</div>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+            <span>SDK Integration</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+            <span>Deep Link Configuration</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+            <span>Event Tracking</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+            <span>Ad Channel Integration</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+            <span>Attribution & Data Verification</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <button
+          onClick={onViewDashboard}
+          className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+        >
+          <ExternalLink className="w-4 h-4" />
+          View Dashboard
+        </button>
+        <a
+          href="https://help.airbridge.io"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full py-3 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+        >
+          <Lightbulb className="w-4 h-4" />
+          Explore Advanced Features
+        </a>
       </div>
     </div>
   );
@@ -530,52 +1964,6 @@ function AppSearchResults({
       >
         My app is not listed
       </button>
-    </div>
-  );
-}
-
-// Platform Select Component - Single choice with large buttons
-function PlatformSelect({ onSelect, isCompleted = false }: { onSelect: (platforms: string[]) => void; isCompleted?: boolean }) {
-  const platforms = [
-    { id: 'ios', label: 'iOS', description: 'iPhone & iPad apps', icon: <Smartphone className="w-8 h-8" /> },
-    { id: 'android', label: 'Android', description: 'Google Play apps', icon: <Smartphone className="w-8 h-8" /> },
-    { id: 'web', label: 'Web', description: 'Web applications', icon: <Tv className="w-8 h-8" /> },
-  ];
-
-  const handleSelect = (id: string) => {
-    onSelect([id]);
-  };
-
-  if (isCompleted) {
-    return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">Select Platform</div>
-        <div className="text-xs text-gray-400">Selection completed</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-2">Select Platform</div>
-      <div className="text-xs text-gray-500 mb-4">
-        Apps are registered one platform at a time. You can add more platforms later.
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        {platforms.map(platform => (
-          <button
-            key={platform.id}
-            onClick={() => handleSelect(platform.id)}
-            className="flex flex-col items-center justify-center p-4 rounded-xl border border-gray-200 bg-white transition-all hover:border-blue-500 hover:bg-blue-50 min-h-[120px]"
-          >
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-2 bg-gray-100 text-gray-700">
-              {platform.icon}
-            </div>
-            <span className="font-semibold text-gray-900 text-sm">{platform.label}</span>
-            <span className="text-[0.625rem] text-gray-400 mt-1">{platform.description}</span>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
@@ -2779,70 +4167,6 @@ function TokenDisplay({ tokens, onContinue, isCompleted = false }: { tokens: { a
   );
 }
 
-// Event Taxonomy Intro Component
-function EventTaxonomyIntro({
-  onStart,
-  isCompleted = false
-}: {
-  onStart: () => void;
-  isCompleted?: boolean;
-}) {
-  if (isCompleted) {
-    return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">Event Taxonomy</div>
-        <div className="text-xs text-gray-400">Introduction viewed</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="flex items-center gap-2 mb-4">
-        <Sparkles className="w-5 h-5 text-purple-500" />
-        <div className="text-sm font-medium text-gray-700">Event Taxonomy Setup</div>
-      </div>
-
-      <div className="space-y-4 mb-4">
-        <p className="text-sm text-gray-600">
-          Events are the foundation of your analytics. They help you understand user behavior and measure campaign effectiveness.
-        </p>
-
-        <div className="bg-purple-50 rounded-lg p-4">
-          <div className="text-sm font-medium text-purple-800 mb-2">Two types of events:</div>
-          <div className="space-y-2 text-xs text-purple-700">
-            <div className="flex items-start gap-2">
-              <span className="font-medium">Standard Events:</span>
-              <span>Pre-defined events like Install, Sign Up, Purchase. Recognized by ad platforms for optimization.</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="font-medium">Custom Events:</span>
-              <span>Events specific to your app's unique features and user flows.</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-blue-50 rounded-lg p-3">
-          <div className="flex items-start gap-2">
-            <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-            <div className="text-xs text-blue-800">
-              <p className="font-medium">Tip:</p>
-              <p>Start with Standard Events. They're automatically recognized by ad platforms like Meta and Google for campaign optimization.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <button
-        onClick={onStart}
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-purple-500 text-white hover:bg-purple-600"
-      >
-        Configure Events <ChevronRight className="w-4 h-4" />
-      </button>
-    </div>
-  );
-}
-
 // Standard Event Select Component
 function StandardEventSelect({
   onSelect,
@@ -3071,119 +4395,6 @@ function CustomEventInput({
             Skip for now
           </button>
         )}
-      </div>
-    </div>
-  );
-}
-
-// Event Property Config Component
-function EventPropertyConfig({
-  eventName,
-  onComplete,
-  onSkip,
-  isCompleted = false
-}: {
-  eventName: string;
-  onComplete: (properties: EventProperty[]) => void;
-  onSkip: () => void;
-  isCompleted?: boolean;
-}) {
-  const [selectedProperties, setSelectedProperties] = useState<string[]>([]);
-
-  const semanticProperties = [
-    { id: 'value', name: 'Value', type: 'number', description: 'Monetary value of the event' },
-    { id: 'currency', name: 'Currency', type: 'string', description: 'Currency code (e.g., USD, KRW)' },
-    { id: 'products', name: 'Products', type: 'string', description: 'Product information array' },
-    { id: 'quantity', name: 'Quantity', type: 'number', description: 'Number of items' },
-    { id: 'transactionId', name: 'Transaction ID', type: 'string', description: 'Unique transaction identifier' },
-  ];
-
-  if (isCompleted) {
-    return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">Event Properties: {eventName}</div>
-        <div className="text-xs text-gray-400">Configuration completed</div>
-      </div>
-    );
-  }
-
-  const toggle = (id: string) => {
-    setSelectedProperties(prev =>
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
-    );
-  };
-
-  const handleComplete = () => {
-    const properties: EventProperty[] = selectedProperties.map(id => {
-      const prop = semanticProperties.find(p => p.id === id)!;
-      return {
-        name: prop.name,
-        type: prop.type as 'string' | 'number' | 'boolean',
-        isSemantic: true,
-      };
-    });
-    onComplete(properties);
-  };
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">
-        Configure Properties for "{eventName}"
-      </div>
-
-      <div className="bg-blue-50 rounded-lg p-3 mb-4">
-        <div className="flex items-start gap-2">
-          <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-          <div className="text-xs text-blue-800">
-            Semantic attributes are recognized by Airbridge and ad platforms for advanced analytics and optimization.
-          </div>
-        </div>
-      </div>
-
-      <div className="text-xs text-gray-500 mb-2">Semantic Attributes</div>
-      <div className="space-y-2 mb-4">
-        {semanticProperties.map(prop => {
-          const isSelected = selectedProperties.includes(prop.id);
-          return (
-            <button
-              key={prop.id}
-              onClick={() => toggle(prop.id)}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
-                isSelected ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white hover:border-purple-300'
-              }`}
-            >
-              <div
-                className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                  isSelected ? 'bg-purple-500 border-purple-500' : 'bg-white border-gray-300'
-                }`}
-              >
-                {isSelected && <Check className="w-3 h-3 text-white" />}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-900">{prop.name}</span>
-                  <span className="px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-600 rounded">{prop.type}</span>
-                </div>
-                <div className="text-xs text-gray-500">{prop.description}</div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="flex gap-2">
-        <button
-          onClick={handleComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-purple-500 text-white hover:bg-purple-600"
-        >
-          Continue
-        </button>
-        <button
-          onClick={onSkip}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          Skip properties
-        </button>
       </div>
     </div>
   );
@@ -3904,20 +5115,6 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     }, 300);
   };
 
-  // Legacy platform select handler (for backward compatibility)
-  const handlePlatformSelect = (platforms: string[]) => {
-    setSetupState(prev => ({ ...prev, platforms }));
-    const platformLabel = platforms[0] === 'ios' ? 'iOS' : platforms[0] === 'android' ? 'Android' : 'Web';
-    addUserMessage(platformLabel);
-
-    setTimeout(() => {
-      addBotMessage([
-        { type: 'text', text: `✅ **${platformLabel}**! Great choice.\n\n📝 What's the name of your app?` },
-        { type: 'app-name-input' },
-      ]);
-    }, 300);
-  };
-
   // App name submit handler - now triggers search
   const handleAppNameSubmit = (appName: string) => {
     addUserMessage(appName);
@@ -4081,8 +5278,8 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       addUserMessage("I'll install it myself");
       setTimeout(() => {
         addBotMessage([
-          { type: 'text', text: '👨‍💻 Great! Let\'s set up the SDK together.\n\nFirst, select your development framework:' },
-          { type: 'framework-select' },
+          { type: 'text', text: '👨‍💻 Great! Let\'s set up the SDK.\n\nWe offer two installation methods:' },
+          { type: 'sdk-install-method-select' },
         ]);
       }, 300);
     } else {
@@ -4100,6 +5297,267 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
         ]);
       }, 300);
     }
+  };
+
+  // SDK Install Method handler (Automation vs Manual)
+  const handleSdkInstallMethodSelect = (method: 'automation' | 'manual') => {
+    if (method === 'automation') {
+      addUserMessage('GitHub Automation');
+      setIsAutomationMode(true);
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: '🚀 Excellent choice! GitHub Automation will handle:\n\n• **SDK Installation** - Package dependencies and build config\n• **SDK Initialization** - Entry point setup with your tokens\n• **Deep Link Config** - URL schemes and universal links\n• **Event Taxonomy** - Event tracking code and debugging\n\nLet\'s connect your GitHub repository to get started.' },
+          { type: 'github-connect' },
+        ]);
+      }, 300);
+    } else {
+      addUserMessage('Manual Installation');
+      setIsAutomationMode(false);
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: '👨‍💻 No problem! I\'ll guide you through the manual setup.\n\nFirst, select your development framework:' },
+          { type: 'framework-select' },
+        ]);
+      }, 300);
+    }
+  };
+
+  // GitHub Connect handler
+  const handleGitHubConnect = () => {
+    addUserMessage('Connect with GitHub');
+
+    // Simulate GitHub OAuth flow
+    setTimeout(() => {
+      // Show loading then repo selection
+      addBotMessage([
+        { type: 'text', text: '✅ GitHub connected successfully!\n\nNow select the repository where your app code lives:' },
+        {
+          type: 'github-repo-select',
+          repos: [
+            { id: '1', name: 'my-awesome-app', fullName: 'mycompany/my-awesome-app', owner: 'mycompany', defaultBranch: 'main', isPrivate: true },
+            { id: '2', name: 'mobile-app-ios', fullName: 'mycompany/mobile-app-ios', owner: 'mycompany', defaultBranch: 'develop', isPrivate: true },
+            { id: '3', name: 'android-app', fullName: 'mycompany/android-app', owner: 'mycompany', defaultBranch: 'main', isPrivate: false },
+            { id: '4', name: 'react-native-app', fullName: 'mycompany/react-native-app', owner: 'mycompany', defaultBranch: 'main', isPrivate: true },
+          ]
+        },
+      ]);
+    }, 1000);
+  };
+
+  // GitHub Skip handler
+  const handleGitHubSkip = () => {
+    addUserMessage('Skip GitHub connection');
+    setIsAutomationMode(false);
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'No problem! Let\'s proceed with manual installation.\n\nSelect your development framework:' },
+        { type: 'framework-select' },
+      ]);
+    }, 300);
+  };
+
+  // GitHub Repo Select handler
+  const handleGitHubRepoSelect = (repo: GitHubRepo) => {
+    addUserMessage(`Selected: ${repo.fullName}`);
+    setGitHubState(prev => ({
+      ...prev,
+      isConnected: true,
+      selectedRepo: repo,
+    }));
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: `📁 Repository **${repo.fullName}** selected.\n\nTo create pull requests, we need write access to your repository:` },
+        { type: 'github-permissions' },
+      ]);
+    }, 300);
+  };
+
+  // GitHub Permissions handler
+  const handleGitHubPermissionsGranted = () => {
+    addUserMessage('Permissions granted');
+    setGitHubState(prev => ({
+      ...prev,
+      currentStep: 'sdk-install',
+    }));
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '✅ Perfect! All permissions are set.\n\nLet\'s start with the first automation step - **SDK Installation**.\n\nShall I create a pull request for SDK installation?' },
+        { type: 'github-pr-confirm', step: 'sdk-install' },
+      ]);
+    }, 300);
+  };
+
+  // GitHub PR Confirm handler
+  const handleGitHubPRConfirm = (step: 'sdk-install' | 'sdk-init' | 'deeplink' | 'event-tracking') => {
+    const stepNames: Record<string, string> = {
+      'sdk-install': 'SDK Installation',
+      'sdk-init': 'SDK Initialization',
+      'deeplink': 'Deep Link Setup',
+      'event-tracking': 'Event Tracking',
+    };
+
+    addUserMessage(`Create ${stepNames[step]} PR`);
+
+    // Show waiting state
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'github-pr-waiting', step: stepNames[step] },
+      ]);
+    }, 300);
+
+    // Simulate PR creation (webhook response)
+    const prNumber = Math.floor(Math.random() * 100) + 1;
+    const prUrl = `https://github.com/${gitHubState.selectedRepo?.fullName || 'mycompany/my-app'}/pull/${prNumber}`;
+
+    setTimeout(() => {
+      setGitHubState(prev => ({
+        ...prev,
+        pendingPR: { url: prUrl, number: prNumber, step },
+      }));
+
+      addBotMessage([
+        { type: 'github-pr-complete', prUrl, prNumber, step: stepNames[step] },
+      ]);
+    }, 3000);
+  };
+
+  // GitHub PR Skip handler
+  const handleGitHubPRSkip = (step: 'sdk-install' | 'sdk-init' | 'deeplink' | 'event-tracking') => {
+    const nextStep = getNextAutomationStep(step);
+    addUserMessage('Skip this step');
+
+    if (nextStep) {
+      const stepNames: Record<string, string> = {
+        'sdk-install': 'SDK Installation',
+        'sdk-init': 'SDK Initialization',
+        'deeplink': 'Deep Link Setup',
+        'event-tracking': 'Event Tracking',
+      };
+
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: `Skipped. Let's proceed with **${stepNames[nextStep]}**.` },
+          { type: 'github-pr-confirm', step: nextStep },
+        ]);
+      }, 300);
+    } else {
+      handleAutomationComplete();
+    }
+  };
+
+  // Get next automation step
+  const getNextAutomationStep = (currentStep: string): 'sdk-install' | 'sdk-init' | 'deeplink' | 'event-tracking' | null => {
+    const steps = ['sdk-install', 'sdk-init', 'deeplink', 'event-tracking'];
+    const currentIndex = steps.indexOf(currentStep);
+    if (currentIndex < steps.length - 1) {
+      return steps[currentIndex + 1] as 'sdk-install' | 'sdk-init' | 'deeplink' | 'event-tracking';
+    }
+    return null;
+  };
+
+  // GitHub PR Review handler
+  const handleGitHubPRReview = () => {
+    const pr = gitHubState.pendingPR;
+    if (!pr) return;
+
+    addBotMessage([
+      { type: 'text', text: `Would you like to review PR #${pr.number}?` },
+      { type: 'github-pr-review', prUrl: pr.url, prNumber: pr.number, step: pr.step },
+    ]);
+  };
+
+  // GitHub PR Merged handler
+  const handleGitHubPRMerged = () => {
+    addUserMessage("I've merged the PR");
+    const currentStep = gitHubState.currentStep;
+
+    // Update sidebar step status
+    if (currentAppId && currentStep) {
+      const stepIdMap: Record<string, string> = {
+        'sdk-install': 'sdk-install',
+        'sdk-init': 'sdk-init',
+        'deeplink': 'deeplink',
+        'event-tracking': 'event-taxonomy',
+      };
+      updateAppStepStatus(currentAppId, stepIdMap[currentStep], 'completed');
+    }
+
+    const nextStep = getNextAutomationStep(currentStep || 'sdk-install');
+
+    if (nextStep) {
+      setGitHubState(prev => ({
+        ...prev,
+        currentStep: nextStep,
+        pendingPR: undefined,
+      }));
+
+      const stepNames: Record<string, string> = {
+        'sdk-install': 'SDK Installation',
+        'sdk-init': 'SDK Initialization',
+        'deeplink': 'Deep Link Setup',
+        'event-tracking': 'Event Tracking',
+      };
+
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: `✅ Great! ${stepNames[currentStep || 'sdk-install']} is complete.\n\nLet\'s continue with **${stepNames[nextStep]}**.` },
+          { type: 'github-pr-confirm', step: nextStep },
+        ]);
+      }, 300);
+    } else {
+      handleAutomationComplete();
+    }
+  };
+
+  // GitHub PR Continue (without merging)
+  const handleGitHubPRContinue = () => {
+    addUserMessage('Continue without merging');
+    const nextStep = getNextAutomationStep(gitHubState.currentStep || 'sdk-install');
+
+    if (nextStep) {
+      setGitHubState(prev => ({
+        ...prev,
+        currentStep: nextStep,
+        pendingPR: undefined,
+      }));
+
+      const stepNames: Record<string, string> = {
+        'sdk-install': 'SDK Installation',
+        'sdk-init': 'SDK Initialization',
+        'deeplink': 'Deep Link Setup',
+        'event-tracking': 'Event Tracking',
+      };
+
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: `Got it! You can merge the previous PR later.\n\nLet\'s proceed with **${stepNames[nextStep]}**.` },
+          { type: 'github-pr-confirm', step: nextStep },
+        ]);
+      }, 300);
+    } else {
+      handleAutomationComplete();
+    }
+  };
+
+  // Automation Complete handler
+  const handleAutomationComplete = () => {
+    // Mark all SDK steps as completed
+    if (currentAppId) {
+      updateAppStepStatus(currentAppId, 'sdk-install', 'completed');
+      updateAppStepStatus(currentAppId, 'sdk-init', 'completed');
+      updateAppStepStatus(currentAppId, 'deeplink', 'completed');
+      updateAppStepStatus(currentAppId, 'sdk-verify', 'completed');
+      updateAppStepStatus(currentAppId, 'event-taxonomy', 'completed');
+    }
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '🎉 **GitHub Automation Complete!**\n\nAll SDK setup steps have been automated:\n• SDK Installation\n• SDK Initialization\n• Deep Link Configuration\n• Event Tracking Setup\n\nYour PRs are ready for review and merge.\n\nNow let\'s set up **Ad Channel Integration** to start tracking your marketing campaigns!' },
+        { type: 'channel-select' },
+      ]);
+    }, 300);
   };
 
   // SDK Guide Share completion handler
@@ -4207,13 +5665,13 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     addUserMessage(choice === 'now' ? 'Set up now' : 'Later');
     if (currentAppId) {
       updateAppStepStatus(currentAppId, 'deeplink', 'completed');
-      updateAppStepStatus(currentAppId, 'sdk-verify', 'in_progress');
+      updateAppStepStatus(currentAppId, 'sdk-test', 'in_progress');
     }
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '✅ SDK setup is complete!\n\n🔍 Let\'s **verify** it\'s working properly.\n\nRun your app and click the button below to check **Real-time Logs**.\n\n💡 If you see **\'Install\'** or **\'Open\'** events, you\'re all set!' },
-        { type: 'sdk-verify' },
+        { type: 'text', text: '✅ Deep link setup is complete!\n\n🧪 Now let\'s **test** your SDK integration to make sure everything is working properly.' },
+        { type: 'sdk-test' },
       ]);
     }, 300);
   };
@@ -4323,6 +5781,15 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
   const [currentChannelIndex, setCurrentChannelIndex] = useState(0);
   const [channelSteps, setChannelSteps] = useState<Record<string, ChannelStep[]>>({});
   const [configuredEvents, setConfiguredEvents] = useState<EventConfig[]>([]);
+
+  // GitHub Automation State
+  const [gitHubState, setGitHubState] = useState<GitHubAutomationState>({
+    isConnected: false,
+    selectedRepo: undefined,
+    currentStep: null,
+    pendingPR: undefined,
+  });
+  const [isAutomationMode, setIsAutomationMode] = useState(false);
 
   const handleChannelIntegrationStart = (channels: string[]) => {
     setSelectedChannels(channels);
@@ -4481,20 +5948,19 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
         startChannelIntegration(nextChannel, hasIOS, initialSteps);
       } else {
         if (currentAppId) {
-          updateAppStepStatus(currentAppId, 'channel-connect', 'completed');
+          updateAppStepStatus(currentAppId, 'channel-integration', 'completed');
+          updateAppStepStatus(currentAppId, 'cost-integration', 'completed');
+          updateAppStepStatus(currentAppId, 'skan-integration', 'completed');
         }
+        // After all channels are complete, proceed to tracking link creation
+        const firstChannel = selectedChannels[0] || 'Meta Ads';
         addBotMessage([
-          { type: 'text', text: '🎊 **Congratulations!** All setup is complete!\n\n📋 Here\'s a summary of your configuration:' },
-          {
-            type: 'completion-summary',
-            data: {
-              appName: setupState.appInfo?.appName || 'MyApp',
-              platforms: setupState.platforms,
-              framework: setupState.framework,
-              channels: selectedChannels,
-            }
-          },
+          { type: 'text', text: `**Channel integration complete!** All ${selectedChannels.length} channel(s) have been connected.\n\nNow let's create a tracking link to measure your campaign performance.` },
+          { type: 'tracking-link-form', channel: firstChannel },
         ]);
+        if (currentAppId) {
+          updateAppStepStatus(currentAppId, 'tracking-link', 'in_progress');
+        }
       }
     }, 300);
   };
@@ -4554,16 +6020,6 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
   };
 
   // Event Taxonomy handlers
-  const handleEventTaxonomyStart = () => {
-    addUserMessage('Configure Events');
-    setTimeout(() => {
-      addBotMessage([
-        { type: 'text', text: 'Let\'s configure the events you want to track.\n\nFirst, select the **Standard Events** relevant to your app:' },
-        { type: 'standard-event-select' },
-      ]);
-    }, 300);
-  };
-
   const handleStandardEventSelect = (eventIds: string[]) => {
     const eventNames = eventIds.map(id => {
       const nameMap: Record<string, string> = {
@@ -4624,17 +6080,6 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     }, 300);
   };
 
-  const handleEventPropertyComplete = (eventName: string, properties: EventProperty[]) => {
-    setConfiguredEvents(prev =>
-      prev.map(e => e.eventName === eventName ? { ...e, properties } : e)
-    );
-    addUserMessage('Properties configured');
-  };
-
-  const handleEventPropertySkip = (eventName: string) => {
-    addUserMessage('Skip properties');
-  };
-
   const handleEventVerified = () => {
     addUserMessage('Events are showing!');
     setTimeout(() => {
@@ -4663,6 +6108,115 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
         { type: 'channel-select' },
       ]);
     }, 300);
+  };
+
+  // SDK Test handler
+  const handleSdkTestComplete = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('SDK test completed successfully');
+    updateStepStatus(app.id, 'sdk-test', 'completed');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '**SDK test passed!** Your SDK integration is working correctly.\n\nNow let\'s set up event tracking to measure user actions in your app.' },
+        { type: 'standard-event-select' },
+      ]);
+      updateStepStatus(app.id, 'event-taxonomy', 'in_progress');
+    }, 300);
+  };
+
+  // Tracking Link handlers
+  const [trackingLinks, setTrackingLinks] = useState<TrackingLink[]>([]);
+
+  const handleTrackingLinkCreate = (link: TrackingLink) => {
+    const app = currentApp;
+    if (!app) return;
+
+    setTrackingLinks(prev => [...prev, link]);
+    addUserMessage(`Created tracking link: ${link.name}`);
+
+    setTimeout(() => {
+      const updatedLinks = [...trackingLinks, link];
+      addBotMessage([
+        { type: 'text', text: `**Tracking link created!**\n\nYour link "${link.name}" is ready to use.` },
+        { type: 'tracking-link-complete', links: updatedLinks },
+      ]);
+    }, 300);
+  };
+
+  const handleTrackingLinkContinue = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('Continue to Verification');
+    updateStepStatus(app.id, 'tracking-link', 'completed');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '**Phase 5: Verification**\n\nLet\'s verify that everything is working correctly.\n\nFirst, we\'ll test your deep link configuration.' },
+        { type: 'deeplink-test' },
+      ]);
+      updateStepStatus(app.id, 'deeplink-test', 'in_progress');
+    }, 300);
+  };
+
+  // Deep Link Test handler
+  const handleDeeplinkTestComplete = (scenarios: DeeplinkTestScenario[]) => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('Deep link test completed');
+    updateStepStatus(app.id, 'deeplink-test', 'completed');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '**Deep link test passed!** All scenarios verified.\n\nNow let\'s verify your attribution setup.' },
+        { type: 'attribution-test' },
+      ]);
+      updateStepStatus(app.id, 'attribution-test', 'in_progress');
+    }, 300);
+  };
+
+  // Attribution Test handler
+  const handleAttributionTestComplete = (passed: boolean) => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('Attribution test completed');
+    updateStepStatus(app.id, 'attribution-test', 'completed');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '**Attribution test passed!** Your attribution tracking is working correctly.\n\nFinally, let\'s verify that data is being collected properly.' },
+        { type: 'data-verify' },
+      ]);
+      updateStepStatus(app.id, 'data-verify', 'in_progress');
+    }, 300);
+  };
+
+  // Data Verify handler
+  const handleDataVerifyComplete = (metrics: DataVerifyMetrics) => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('Data verification completed');
+    updateStepStatus(app.id, 'data-verify', 'completed');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: `**Congratulations!** Your Airbridge setup is complete.\n\nYou're now tracking ${metrics.eventsReceived} events and attribution is working correctly.` },
+        { type: 'onboarding-complete' },
+      ]);
+    }, 300);
+  };
+
+  // View Dashboard handler
+  const handleViewDashboard = () => {
+    const app = currentApp;
+    const appSlug = app?.appInfo.appName?.toLowerCase().replace(/\s/g, '') || 'myapp';
+    window.open(`/app/${appSlug}`, '_blank');
   };
 
   // Single select handler
@@ -4726,7 +6280,12 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
   const canGoBack = messages.length >= 2 && messages.some(m => m.role === 'user');
 
   // Step order for prerequisite checking
-  const stepOrder = ['sdk-install', 'sdk-init', 'deeplink', 'sdk-verify', 'channel-connect'];
+  const stepOrder = [
+    'sdk-install', 'sdk-init', 'deeplink', 'sdk-test',  // Phase 2: SDK
+    'event-taxonomy',  // Phase 3: Event Taxonomy
+    'channel-select', 'channel-integration', 'cost-integration', 'skan-integration', 'tracking-link',  // Phase 4: Channels
+    'deeplink-test', 'attribution-test', 'data-verify'  // Phase 5: Verification
+  ];
 
   // Check if a step can be started (prerequisite steps completed)
   const canStartStep = (app: RegisteredApp, stepId: string): boolean => {
@@ -4799,10 +6358,66 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
         break;
 
       case 'channel-connect':
+      case 'channel-select':
         setTimeout(() => {
           addBotMessage([
             { type: 'text', text: `📊 **Ad Channel Integration** for **${app.appInfo.appName}**\n\nConnect your ad platforms to track attribution.\n\nWhich channels would you like to integrate?` },
             { type: 'channel-select' },
+          ]);
+        }, 300);
+        break;
+
+      case 'sdk-test':
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `🧪 **SDK Test** for **${app.appInfo.appName}**\n\nLet's verify your SDK integration is working correctly.` },
+            { type: 'sdk-test' },
+          ]);
+        }, 300);
+        break;
+
+      case 'event-taxonomy':
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `📊 **Event Taxonomy** for **${app.appInfo.appName}**\n\nLet's set up the events you want to track in your app.` },
+            { type: 'standard-event-select' },
+          ]);
+        }, 300);
+        break;
+
+      case 'tracking-link':
+        setTimeout(() => {
+          const channel = setupState.channels?.[0] || 'Meta Ads';
+          addBotMessage([
+            { type: 'text', text: `🔗 **Create Tracking Link** for **${app.appInfo.appName}**\n\nCreate a tracking link to measure your campaign performance.` },
+            { type: 'tracking-link-form', channel },
+          ]);
+        }, 300);
+        break;
+
+      case 'deeplink-test':
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `🔗 **Deep Link Test** for **${app.appInfo.appName}**\n\nVerify that deep links are working correctly.` },
+            { type: 'deeplink-test' },
+          ]);
+        }, 300);
+        break;
+
+      case 'attribution-test':
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `📈 **Attribution Test** for **${app.appInfo.appName}**\n\nVerify that attribution tracking is working correctly.` },
+            { type: 'attribution-test' },
+          ]);
+        }, 300);
+        break;
+
+      case 'data-verify':
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `✅ **Data Verification** for **${app.appInfo.appName}**\n\nConfirm that data is being collected correctly.` },
+            { type: 'data-verify' },
           ]);
         }, 300);
         break;
@@ -4858,9 +6473,6 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
       case 'environment-select':
         return <EnvironmentSelect onSelect={handleEnvironmentSelect} isCompleted={isCompleted} />;
-
-      case 'platform-select':
-        return <PlatformSelect onSelect={handlePlatformSelect} isCompleted={isCompleted} />;
 
       case 'platform-multi-select':
         return <PlatformMultiSelect onSelect={handlePlatformMultiSelect} isCompleted={isCompleted} />;
@@ -4927,6 +6539,54 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
       case 'sdk-install-choice':
         return <SdkInstallChoice onSelect={handleSdkInstallChoice} isCompleted={isCompleted} />;
+
+      case 'sdk-install-method-select':
+        return <SdkInstallMethodSelect onSelect={handleSdkInstallMethodSelect} isCompleted={isCompleted} />;
+
+      case 'github-connect':
+        return <GitHubConnect onConnect={handleGitHubConnect} onSkip={handleGitHubSkip} isCompleted={isCompleted} />;
+
+      case 'github-repo-select':
+        return <GitHubRepoSelect repos={content.repos} onSelect={handleGitHubRepoSelect} isCompleted={isCompleted} />;
+
+      case 'github-permissions':
+        return <GitHubPermissions onGranted={handleGitHubPermissionsGranted} isCompleted={isCompleted} />;
+
+      case 'github-pr-confirm':
+        return (
+          <GitHubPRConfirm
+            step={content.step}
+            onConfirm={() => handleGitHubPRConfirm(content.step)}
+            onSkip={() => handleGitHubPRSkip(content.step)}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'github-pr-waiting':
+        return <GitHubPRWaiting prUrl={content.prUrl} step={content.step} isCompleted={isCompleted} />;
+
+      case 'github-pr-complete':
+        return (
+          <GitHubPRComplete
+            prUrl={content.prUrl}
+            prNumber={content.prNumber}
+            step={content.step}
+            onReview={handleGitHubPRReview}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'github-pr-review':
+        return (
+          <GitHubPRReview
+            prUrl={content.prUrl}
+            prNumber={content.prNumber}
+            step={content.step}
+            onMerged={handleGitHubPRMerged}
+            onContinue={handleGitHubPRContinue}
+            isCompleted={isCompleted}
+          />
+        );
 
       case 'sdk-guide-share':
         return (
@@ -5097,14 +6757,6 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
           />
         );
 
-      case 'event-taxonomy-intro':
-        return (
-          <EventTaxonomyIntro
-            onStart={handleEventTaxonomyStart}
-            isCompleted={isCompleted}
-          />
-        );
-
       case 'standard-event-select':
         return (
           <StandardEventSelect
@@ -5118,16 +6770,6 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
           <CustomEventInput
             onAdd={handleCustomEventAdd}
             onSkip={handleCustomEventSkip}
-            isCompleted={isCompleted}
-          />
-        );
-
-      case 'event-property-config':
-        return (
-          <EventPropertyConfig
-            eventName={content.eventName}
-            onComplete={(properties) => handleEventPropertyComplete(content.eventName, properties)}
-            onSkip={() => handleEventPropertySkip(content.eventName)}
             isCompleted={isCompleted}
           />
         );
@@ -5161,6 +6803,30 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
       case 'dev-completion-summary':
         return <DevCompletionSummary appName={content.appName} />;
+
+      // SDK Test
+      case 'sdk-test':
+        return <SdkTest onRunTest={handleSdkTestComplete} isCompleted={isCompleted} />;
+
+      // Tracking Link
+      case 'tracking-link-form':
+        return <TrackingLinkForm channel={content.channel} onCreate={handleTrackingLinkCreate} isCompleted={isCompleted} />;
+
+      case 'tracking-link-complete':
+        return <TrackingLinkComplete links={content.links} onContinue={handleTrackingLinkContinue} isCompleted={isCompleted} />;
+
+      // Verification Phase
+      case 'deeplink-test':
+        return <DeeplinkTest onComplete={handleDeeplinkTestComplete} isCompleted={isCompleted} />;
+
+      case 'attribution-test':
+        return <AttributionTest onComplete={handleAttributionTestComplete} isCompleted={isCompleted} />;
+
+      case 'data-verify':
+        return <DataVerify onComplete={handleDataVerifyComplete} isCompleted={isCompleted} />;
+
+      case 'onboarding-complete':
+        return <OnboardingComplete appName={currentApp?.appInfo.appName || 'App'} onViewDashboard={handleViewDashboard} />;
 
       default:
         return null;
