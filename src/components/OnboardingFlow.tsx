@@ -51,6 +51,27 @@ const steps: Step[] = [
   },
   {
     id: 5,
+    question: "What made you look for a new MMP?",
+    subtitle: "Select the main reason for switching",
+    type: 'choice',
+    conditionalOn: { stepId: 2, values: ['yes'] },
+    options: [
+      { label: 'Too expensive', value: 'expensive', description: 'Pricing was not cost-effective' },
+      { label: 'Inaccurate data/attribution', value: 'inaccurate', description: 'Data or attribution results were unreliable' },
+      { label: 'Poor UI/UX', value: 'poor-ux', description: 'User interface was difficult to use' },
+      { label: 'Lack of CS support', value: 'no-support', description: 'Customer support was insufficient' },
+      { label: 'Other', value: 'other' },
+    ]
+  },
+  {
+    id: 6,
+    question: "What made you look for a new MMP?",
+    subtitle: "Please tell us more",
+    type: 'text',
+    conditionalOn: { stepId: 5, values: ['other'] },
+  },
+  {
+    id: 7,
     question: "How do you plan to use Airbridge?",
     subtitle: "Select your primary goal",
     type: 'choice',
@@ -64,7 +85,7 @@ const steps: Step[] = [
     ]
   },
   {
-    id: 6,
+    id: 8,
     question: "Do you have any ad channels in use?",
     subtitle: "Select channels to integrate (you can add more later)",
     type: 'multi-select',
@@ -73,8 +94,15 @@ const steps: Step[] = [
       { label: 'Google Ads', value: 'google' },
       { label: 'Apple Search Ads', value: 'apple' },
       { label: 'TikTok For Business', value: 'tiktok' },
-      { label: 'Other / None yet', value: 'other' },
+      { label: 'Other', value: 'other' },
     ]
+  },
+  {
+    id: 9,
+    question: "Which ad channels do you use?",
+    subtitle: "Please specify the channel names",
+    type: 'text',
+    conditionalOn: { stepId: 8, values: ['other'] },
   },
 ];
 
@@ -98,6 +126,10 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       if (typeof answer === 'string') {
         return values.includes(answer);
       }
+      // Support multi-select arrays
+      if (Array.isArray(answer)) {
+        return values.some(v => answer.includes(v));
+      }
       return false;
     });
   };
@@ -112,20 +144,26 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     return () => clearTimeout(timer);
   }, [currentStepIndex]);
 
+  // Helper function to check if step should be visible based on answers
+  const shouldShowStep = (s: Step, answersObj: Record<number, string | string[]>) => {
+    if (!s.conditionalOn) return true;
+    const { stepId, values } = s.conditionalOn;
+    const answer = answersObj[stepId];
+    if (typeof answer === 'string') {
+      return values.includes(answer);
+    }
+    if (Array.isArray(answer)) {
+      return values.some(v => answer.includes(v));
+    }
+    return false;
+  };
+
   const handleChoice = (value: string) => {
     const newAnswers = { ...answers, [step.id]: value };
     setAnswers(newAnswers);
     setTimeout(() => {
       // Recalculate visible steps with new answers
-      const newVisibleSteps = steps.filter(s => {
-        if (!s.conditionalOn) return true;
-        const { stepId, values } = s.conditionalOn;
-        const answer = newAnswers[stepId];
-        if (typeof answer === 'string') {
-          return values.includes(answer);
-        }
-        return false;
-      });
+      const newVisibleSteps = steps.filter(s => shouldShowStep(s, newAnswers));
       if (currentStepIndex < newVisibleSteps.length - 1) {
         setCurrentStepIndex(currentStepIndex + 1);
       } else {
@@ -139,15 +177,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     const newAnswers = { ...answers, [step.id]: textInput.trim() };
     setAnswers(newAnswers);
     setTimeout(() => {
-      const newVisibleSteps = steps.filter(s => {
-        if (!s.conditionalOn) return true;
-        const { stepId, values } = s.conditionalOn;
-        const answer = newAnswers[stepId];
-        if (typeof answer === 'string') {
-          return values.includes(answer);
-        }
-        return false;
-      });
+      const newVisibleSteps = steps.filter(s => shouldShowStep(s, newAnswers));
       if (currentStepIndex < newVisibleSteps.length - 1) {
         setCurrentStepIndex(currentStepIndex + 1);
       } else {
@@ -167,7 +197,9 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     const newAnswers = { ...answers, [step.id]: selectedOptions };
     setAnswers(newAnswers);
     setTimeout(() => {
-      if (currentStepIndex < visibleSteps.length - 1) {
+      // Recalculate visible steps with new answers (for multi-select conditional)
+      const newVisibleSteps = steps.filter(s => shouldShowStep(s, newAnswers));
+      if (currentStepIndex < newVisibleSteps.length - 1) {
         setCurrentStepIndex(currentStepIndex + 1);
         setSelectedOptions([]);
       } else {

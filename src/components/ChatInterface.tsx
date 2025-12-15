@@ -53,6 +53,16 @@ type MessageContent =
   | { type: 'code-block'; title: string; code: string; language: string }
   | { type: 'sdk-init-code'; appName: string; appToken: string }
   | { type: 'deeplink-choice' }
+  // Deep Link Setup (multi-step flow)
+  | { type: 'deeplink-platform-info'; platforms: string[] }
+  | { type: 'deeplink-ios-input'; bundleId?: string }
+  | { type: 'deeplink-android-input'; packageName?: string }
+  | { type: 'deeplink-dashboard-guide'; platform: 'ios' | 'android'; data: DeeplinkDashboardData }
+  | { type: 'deeplink-sdk-setup'; platform: 'ios' | 'android'; framework: string; appName: string }
+  | { type: 'deeplink-test-guide'; platforms: string[]; appName: string }
+  | { type: 'deeplink-test-checklist' }
+  | { type: 'deeplink-test-scenarios'; appName: string }
+  | { type: 'deeplink-complete' }
   | { type: 'sdk-verify' }
   | { type: 'channel-select' }
   | { type: 'channel-integration-overview'; selectedChannels: string[] }
@@ -90,6 +100,13 @@ type MessageContent =
   | { type: 'github-pr-waiting'; prUrl?: string; step: string }
   | { type: 'github-pr-complete'; prUrl: string; prNumber: number; step: string }
   | { type: 'github-pr-review'; prUrl: string; prNumber: number; step: string }
+  // Web SDK Installation (multi-step flow)
+  | { type: 'web-sdk-method-select'; appName: string; webToken: string }
+  | { type: 'web-sdk-install-code'; method: 'script' | 'package'; appName: string; webToken: string }
+  | { type: 'web-sdk-init-options'; appName: string; webToken: string }
+  | { type: 'web-sdk-user-identity' }
+  // Legacy Web SDK Install (kept for backwards compatibility)
+  | { type: 'web-sdk-install'; appName: string; webToken: string }
   // SDK Test & Verification types
   | { type: 'sdk-test' }
   | { type: 'sdk-test-result'; passed: boolean; details: { install: boolean; init: boolean; events: boolean } }
@@ -203,6 +220,15 @@ type DeeplinkTestScenario = {
   status: 'pending' | 'testing' | 'passed' | 'failed';
 };
 
+// Deeplink Dashboard Data Types
+type DeeplinkDashboardData = {
+  uriScheme: string;
+  // iOS specific
+  appId?: string;
+  // Android specific
+  sha256Fingerprints?: string[];
+};
+
 // Data Verification Types
 type DataVerifyMetrics = {
   eventsReceived: number;
@@ -234,25 +260,59 @@ type RegisteredApp = {
   isExpanded: boolean;
 };
 
-const createAppSteps = (): OnboardingStep[] => [
-  // Phase 2: SDK Installation & Setup
-  { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install SDK packages', status: 'pending' },
-  { id: 'sdk-init', phase: 2, title: 'SDK Initialization', description: 'Add SDK code to your app', status: 'pending' },
-  { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links', status: 'pending' },
-  { id: 'sdk-test', phase: 2, title: 'SDK Test', description: 'Test SDK integration', status: 'pending' },
-  // Phase 3: Event Taxonomy
-  { id: 'event-taxonomy', phase: 3, title: 'Event Taxonomy', description: 'Define events to track', status: 'pending' },
-  // Phase 4: Ad Channel Integration
-  { id: 'channel-select', phase: 4, title: 'Channel Selection', description: 'Select ad platforms', status: 'pending' },
-  { id: 'channel-integration', phase: 4, title: 'Channel Integration', description: 'Connect to ad platforms', status: 'pending' },
-  { id: 'cost-integration', phase: 4, title: 'Cost Integration', description: 'Enable cost data import', status: 'pending' },
-  { id: 'skan-integration', phase: 4, title: 'SKAN Integration', description: 'iOS attribution setup', status: 'pending' },
-  { id: 'tracking-link', phase: 4, title: 'Tracking Link', description: 'Create tracking links', status: 'pending' },
-  // Phase 5: Verification
-  { id: 'deeplink-test', phase: 5, title: 'Deep Link Test', description: 'Test deep link functionality', status: 'pending' },
-  { id: 'attribution-test', phase: 5, title: 'Attribution Test', description: 'Verify attribution setup', status: 'pending' },
-  { id: 'data-verify', phase: 5, title: 'Data Verification', description: 'Confirm data collection', status: 'pending' },
-];
+// Production mode steps - full onboarding flow
+const createAppSteps = (platforms: string[] = []): OnboardingStep[] => {
+  const steps: OnboardingStep[] = [
+    // Phase 2: SDK Installation & Setup
+    { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install SDK packages', status: 'pending' },
+  ];
+
+  // Add Web SDK Install step if web platform is selected
+  if (platforms.includes('web')) {
+    steps.push({ id: 'web-sdk-install', phase: 2, title: 'Web SDK Installation', description: 'Install Web SDK', status: 'pending' });
+  }
+
+  steps.push(
+    { id: 'sdk-init', phase: 2, title: 'SDK Initialization', description: 'Add SDK code to your app', status: 'pending' },
+    { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links', status: 'pending' },
+    { id: 'sdk-test', phase: 2, title: 'SDK Test', description: 'Test SDK integration', status: 'pending' },
+    // Phase 3: Event Taxonomy
+    { id: 'event-taxonomy', phase: 3, title: 'Event Taxonomy', description: 'Define events to track', status: 'pending' },
+    // Phase 4: Ad Channel Integration
+    { id: 'channel-select', phase: 4, title: 'Channel Selection', description: 'Select ad platforms', status: 'pending' },
+    { id: 'channel-integration', phase: 4, title: 'Channel Integration', description: 'Connect to ad platforms', status: 'pending' },
+    { id: 'cost-integration', phase: 4, title: 'Cost Integration', description: 'Enable cost data import', status: 'pending' },
+    { id: 'skan-integration', phase: 4, title: 'SKAN Integration', description: 'iOS attribution setup', status: 'pending' },
+    { id: 'tracking-link', phase: 4, title: 'Tracking Link', description: 'Create tracking links', status: 'pending' },
+    // Phase 5: Verification
+    { id: 'deeplink-test', phase: 5, title: 'Deep Link Test', description: 'Test deep link functionality', status: 'pending' },
+    { id: 'attribution-test', phase: 5, title: 'Attribution Test', description: 'Verify attribution setup', status: 'pending' },
+    { id: 'data-verify', phase: 5, title: 'Data Verification', description: 'Confirm data collection', status: 'pending' },
+  );
+
+  return steps;
+};
+
+// Dev mode steps - simplified flow (SDK setup only)
+const createDevAppSteps = (platforms: string[] = []): OnboardingStep[] => {
+  const steps: OnboardingStep[] = [
+    // Phase 2: SDK Installation & Setup only
+    { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install SDK packages', status: 'pending' },
+  ];
+
+  // Add Web SDK Install step if web platform is selected
+  if (platforms.includes('web')) {
+    steps.push({ id: 'web-sdk-install', phase: 2, title: 'Web SDK Installation', description: 'Install Web SDK', status: 'pending' });
+  }
+
+  steps.push(
+    { id: 'sdk-init', phase: 2, title: 'SDK Initialization', description: 'Add SDK code to your app', status: 'pending' },
+    { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links', status: 'pending' },
+    { id: 'sdk-test', phase: 2, title: 'SDK Test', description: 'Test SDK integration', status: 'pending' },
+  );
+
+  return steps;
+};
 
 // GitHub Icon Component
 function GitHubIcon({ className, fill = "currentColor" }: { className?: string; fill?: string }) {
@@ -260,6 +320,512 @@ function GitHubIcon({ className, fill = "currentColor" }: { className?: string; 
     <svg className={className} viewBox="0 0 24 24" fill={fill}>
       <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
     </svg>
+  );
+}
+
+// Web SDK Method Select Component (Step 1)
+function WebSdkMethodSelect({ onSelect, isCompleted = false }: {
+  onSelect: (method: 'script' | 'package') => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Installation method selected</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4 shadow-sm">
+      <div className="text-sm font-medium text-gray-700 mb-3">How would you like to install the SDK?</div>
+      <div className="space-y-2">
+        <button
+          onClick={() => onSelect('script')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-orange-100">
+            <Code className="w-5 h-5 text-orange-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">Script Tag (Direct HTML)</div>
+            <div className="text-sm text-gray-500">Quick and easy - Recommended for standard websites</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+        <button
+          onClick={() => onSelect('package')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-green-100">
+            <Tv className="w-5 h-5 text-green-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">Package Manager (npm/yarn/pnpm)</div>
+            <div className="text-sm text-gray-500">Recommended for React, Vue, and other build-based projects</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Web SDK Install Code Component (Step 2-3)
+function WebSdkInstallCode({ method, appName, webToken, onComplete, isCompleted = false }: {
+  method: 'script' | 'package';
+  appName: string;
+  webToken: string;
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  const [packageManager, setPackageManager] = useState<'npm' | 'yarn' | 'pnpm'>('npm');
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const copyToClipboard = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const browserCode = `<script>
+(function(a_,i_,r_,_b,_r,_i,_d,_g,_e){if(!a_[_b]){var n=function(){var c=i_.createElement(r_);c.onerror=function(){h.queue.filter(function(a){return 0<=_d.indexOf(a[0])}).forEach(function(a){a=a[1];a=a[a.length-1];"function"===typeof a&&a("error occur when load airbridge")})};c.async=1;c.src=_r;"complete"===i_.readyState?i_.head.appendChild(c):a_.addEventListener("load",function k(){a_.removeEventListener("load",k);i_.head.appendChild(c)})},h={queue:[],get isSDKEnabled(){return!1}};_i.concat(_d).forEach(function(c){var a=c.split("."),k=a.pop();a.reduce(function(p,q){return p[q]=p[q]||{}},h)[k]=function(){h.queue.push([c,arguments])}});a_[_b]=h;"undefined"!==typeof i_.documentMode&&(_r=_r.replace(/^https:/,""));0<_g?(_b=new (a_.XDomainRequest||a_.XMLHttpRequest),_i=function(){},_b.open("GET",_r),_b.timeout=_g,_b.onload=function(){n()},_b.onerror=_i,_b.onprogress=_i,_b.ontimeout=_i,_b.send()):n()}})(window,document,"script","airbridge","https://static.airbridge.io/sdk/latest/airbridge.min.js","init startTracking stopTracking openBanner setBanner setDownload setDownloads openDeeplink setDeeplinks sendWeb setUserAgent setMobileAppData setUserID clearUserID setUserEmail clearUserEmail setUserPhone clearUserPhone setUserAttribute removeUserAttribute clearUserAttributes setUserAlias removeUserAlias clearUserAlias clearUser setUserId setUserAttributes addUserAlias setDeviceAlias removeDeviceAlias clearDeviceAlias setDeviceIFV setDeviceIFA setDeviceGAID events.send events.signIn events.signUp events.signOut events.purchased events.addedToCart events.productDetailsViewEvent events.homeViewEvent events.productListViewEvent events.searchResultViewEvent".split(" "),["events.wait","fetchResource","createTouchpoint","createTrackingLink"],0);
+
+airbridge.init({
+    app: '${appName}',
+    webToken: '${webToken}',
+})
+</script>`;
+
+  const packageInstallCommands = {
+    npm: 'npm install airbridge-web-sdk-loader',
+    yarn: 'yarn add airbridge-web-sdk-loader',
+    pnpm: 'pnpm i airbridge-web-sdk-loader',
+  };
+
+  const packageUsageCode = `import airbridge from 'airbridge-web-sdk-loader'
+
+airbridge.init({
+    app: '${appName}',
+    webToken: '${webToken}',
+})`;
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">SDK installation code applied</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4 shadow-sm">
+      {/* Auth Info */}
+      <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+        <div className="text-xs text-gray-500 mb-2">Authentication Info (Auto-configured)</div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="text-xs text-gray-400">App Name</div>
+            <div className="text-sm font-mono text-gray-900">{appName}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-400">Web Token</div>
+            <div className="text-sm font-mono text-gray-900 truncate">{webToken}</div>
+          </div>
+        </div>
+      </div>
+
+      {method === 'script' ? (
+        <div className="space-y-3">
+          <div className="text-sm text-gray-600">
+            Add this script to the HTML <code className="bg-gray-100 px-1 rounded">&lt;head&gt;</code> section:
+          </div>
+          <div className="relative">
+            <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg text-xs overflow-x-auto max-h-48">
+              <code>{browserCode}</code>
+            </pre>
+            <button
+              onClick={() => copyToClipboard(browserCode, 'browser')}
+              className="absolute top-2 right-2 p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            >
+              {copiedCode === 'browser' ? (
+                <Check className="w-4 h-4 text-green-400" />
+              ) : (
+                <Copy className="w-4 h-4 text-gray-300" />
+              )}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Package Manager Tabs */}
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+            {(['npm', 'yarn', 'pnpm'] as const).map((pm) => (
+              <button
+                key={pm}
+                onClick={() => setPackageManager(pm)}
+                className={`flex-1 py-1.5 px-3 rounded text-xs font-medium transition-colors ${
+                  packageManager === pm
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {pm}
+              </button>
+            ))}
+          </div>
+
+          {/* Install Command */}
+          <div>
+            <div className="text-sm text-gray-600 mb-2">1. Install package:</div>
+            <div className="relative">
+              <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-sm">
+                <code>{packageInstallCommands[packageManager]}</code>
+              </pre>
+              <button
+                onClick={() => copyToClipboard(packageInstallCommands[packageManager], 'install')}
+                className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+              >
+                {copiedCode === 'install' ? (
+                  <Check className="w-3 h-3 text-green-400" />
+                ) : (
+                  <Copy className="w-3 h-3 text-gray-300" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Usage Code */}
+          <div>
+            <div className="text-sm text-gray-600 mb-2">2. Initialize SDK:</div>
+            <div className="relative">
+              <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-sm overflow-x-auto">
+                <code>{packageUsageCode}</code>
+              </pre>
+              <button
+                onClick={() => copyToClipboard(packageUsageCode, 'usage')}
+                className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+              >
+                {copiedCode === 'usage' ? (
+                  <Check className="w-3 h-3 text-green-400" />
+                ) : (
+                  <Copy className="w-3 h-3 text-gray-300" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <button
+        onClick={onComplete}
+        className="w-full mt-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+      >
+        Installation Code Applied
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+// Web SDK Init Options Component (Step 4)
+function WebSdkInitOptions({ appName, webToken, onComplete, onSkip, isCompleted = false }: {
+  appName: string;
+  webToken: string;
+  onComplete: (options: Record<string, boolean | number | string>) => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  const [options, setOptions] = useState({
+    autoStartTrackingEnabled: true,
+    utmParsing: false,
+    userHash: true,
+  });
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const copyToClipboard = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const generateInitCode = () => {
+    const optionEntries = Object.entries(options)
+      .filter(([_, value]) => value !== false && value !== '')
+      .map(([key, value]) => `    ${key}: ${typeof value === 'string' ? `'${value}'` : value},`)
+      .join('\n');
+
+    return `airbridge.init({
+    app: '${appName}',
+    webToken: '${webToken}',
+${optionEntries}
+})`;
+  };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Initialization options configured</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4 shadow-sm">
+      <div className="text-sm font-medium text-gray-700 mb-1">Additional Initialization Options</div>
+      <div className="text-xs text-gray-500 mb-4">Configure options as needed. Default values are recommended.</div>
+
+      {/* Basic Options */}
+      <div className="space-y-3 mb-4">
+        <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+          <div>
+            <div className="text-sm font-medium text-gray-900">Auto Tracking</div>
+            <div className="text-xs text-gray-500">Automatically collect pageviews</div>
+          </div>
+          <input
+            type="checkbox"
+            checked={options.autoStartTrackingEnabled}
+            onChange={(e) => setOptions({ ...options, autoStartTrackingEnabled: e.target.checked })}
+            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+        </label>
+        <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+          <div>
+            <div className="text-sm font-medium text-gray-900">UTM Parsing</div>
+            <div className="text-xs text-gray-500">Auto-extract UTM parameters from URL</div>
+          </div>
+          <input
+            type="checkbox"
+            checked={options.utmParsing}
+            onChange={(e) => setOptions({ ...options, utmParsing: e.target.checked })}
+            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+        </label>
+        <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+          <div>
+            <div className="text-sm font-medium text-gray-900">User Data Hashing</div>
+            <div className="text-xs text-gray-500">SHA-256 hash email and phone number</div>
+          </div>
+          <input
+            type="checkbox"
+            checked={options.userHash}
+            onChange={(e) => setOptions({ ...options, userHash: e.target.checked })}
+            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+        </label>
+      </div>
+
+      {/* Advanced Options Toggle */}
+      <button
+        onClick={() => setShowAdvanced(!showAdvanced)}
+        className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4"
+      >
+        {showAdvanced ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        View Advanced Options
+      </button>
+
+      {showAdvanced && (
+        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-gray-500 text-left">
+                <th className="pb-2">Option</th>
+                <th className="pb-2">Type</th>
+                <th className="pb-2">Description</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-700">
+              <tr><td className="py-1 font-mono">cookieWindow</td><td>number</td><td>Cookie expiration (days)</td></tr>
+              <tr><td className="py-1 font-mono">cookieWindowInMinutes</td><td>number</td><td>Cookie expiration (minutes)</td></tr>
+              <tr><td className="py-1 font-mono">shareCookieSubdomain</td><td>boolean</td><td>Share cookie across subdomains</td></tr>
+              <tr><td className="py-1 font-mono">defaultChannel</td><td>string</td><td>Default channel name</td></tr>
+              <tr><td className="py-1 font-mono">collectMolocoCookieID</td><td>boolean</td><td>Collect Moloco cookie ID</td></tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Generated Code Preview */}
+      <div className="mb-4">
+        <div className="text-xs text-gray-500 mb-2">Generated initialization code:</div>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
+            <code>{generateInitCode()}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(generateInitCode())}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onSkip}
+          className="flex-1 py-3 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+        >
+          Use Default
+        </button>
+        <button
+          onClick={() => onComplete(options)}
+          className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+        >
+          Apply Options
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Web SDK User Identity Component (Step 5)
+function WebSdkUserIdentity({ onComplete, onSkip, isCompleted = false }: {
+  onComplete: () => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const copyToClipboard = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const loginCode = `// Set user identity on login
+airbridge.setUserID('user_12345');
+airbridge.setUserEmail('user@example.com');
+airbridge.setUserPhone('821012341234');
+airbridge.setUserAttribute('membership', 'gold');`;
+
+  const logoutCode = `// Clear user info on logout
+airbridge.clearUser();`;
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">User identity setup complete</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4 shadow-sm">
+      <div className="text-sm font-medium text-gray-700 mb-1">Would you like to track logged-in users?</div>
+      <div className="text-xs text-gray-500 mb-4">Set up user identity if your app has login functionality.</div>
+
+      {/* Available Methods */}
+      <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+        <div className="text-xs text-gray-500 mb-2">Available methods:</div>
+        <table className="w-full text-xs">
+          <tbody className="text-gray-700">
+            <tr><td className="py-1 font-mono text-blue-600">setUserID(id)</td><td>Set user ID</td></tr>
+            <tr><td className="py-1 font-mono text-blue-600">setUserEmail(email)</td><td>Set email</td></tr>
+            <tr><td className="py-1 font-mono text-blue-600">setUserPhone(phone)</td><td>Set phone number</td></tr>
+            <tr><td className="py-1 font-mono text-blue-600">setUserAttribute(key, value)</td><td>Set custom attribute</td></tr>
+            <tr><td className="py-1 font-mono text-blue-600">setUserAlias(key, value)</td><td>Set user alias</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Login Code */}
+      <div className="mb-3">
+        <div className="text-xs text-gray-500 mb-2">Login code example:</div>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
+            <code>{loginCode}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(loginCode, 'login')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'login' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Logout Code */}
+      <div className="mb-4">
+        <div className="text-xs text-gray-500 mb-2">Logout code example:</div>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
+            <code>{logoutCode}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(logoutCode, 'logout')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'logout' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onSkip}
+          className="flex-1 py-3 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+        >
+          No Login Feature
+        </button>
+        <button
+          onClick={onComplete}
+          className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+        >
+          Setup Complete
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Legacy Web SDK Install Component (keeping for backwards compatibility)
+function WebSdkInstall({ appName, webToken, onComplete, isCompleted = false }: {
+  appName: string;
+  webToken: string;
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Web SDK Installation Complete</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <WebSdkMethodSelect onSelect={() => onComplete()} isCompleted={false} />
   );
 }
 
@@ -1817,9 +2383,8 @@ function EnvironmentSelect({ onSelect, isCompleted = false }: { onSelect: (env: 
           </div>
           <div className="flex-1">
             <div className="font-medium text-gray-900">Development</div>
-            <div className="text-sm text-gray-500">Recommended for first-time setup. Test SDK integration quickly.</div>
+            <div className="text-sm text-gray-500">For first-time setup. Test SDK integration quickly.</div>
           </div>
-          <div className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">Recommended</div>
         </button>
         <button
           onClick={() => onSelect('production')}
@@ -2833,6 +3398,926 @@ function DeeplinkChoice({ onSelect, isCompleted = false }: { onSelect: (choice: 
           A feature that directs users to a specific screen in your app after clicking an ad.
           <br />Example: Product ad click → Product detail page
         </p>
+      </div>
+    </div>
+  );
+}
+
+// Deep Link iOS Input Component
+function DeeplinkIosInput({
+  bundleId,
+  onSubmit,
+  isCompleted = false
+}: {
+  bundleId?: string;
+  onSubmit: (data: { uriScheme: string; appId: string }) => void;
+  isCompleted?: boolean;
+}) {
+  const [uriScheme, setUriScheme] = useState('');
+  const [appIdPrefix, setAppIdPrefix] = useState('');
+  const [copySuccess, setCopySuccess] = useState<string | null>(null);
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopySuccess(id);
+    setTimeout(() => setCopySuccess(null), 2000);
+  };
+
+  const appId = appIdPrefix && bundleId ? `${appIdPrefix}.${bundleId}` : '';
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">iOS Deep Link Setup</div>
+        <div className="text-xs text-gray-400">Setup Complete</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="text-sm font-medium text-gray-900 mb-4">🍎 iOS Deep Link Configuration</div>
+
+      {/* URI Scheme Input */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          URL Scheme <span className="text-red-500">*</span>
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={uriScheme}
+            onChange={(e) => setUriScheme(e.target.value.toLowerCase().replace(/[^a-z0-9+]/g, ''))}
+            placeholder="myapp"
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+          />
+          <span className="flex items-center px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500">://</span>
+        </div>
+        <p className="mt-1.5 text-xs text-gray-500">
+          Only lowercase letters, numbers, and + are allowed. e.g., myapp, myapp+web
+        </p>
+      </div>
+
+      {/* App ID Prefix Input */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          App ID Prefix <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={appIdPrefix}
+          onChange={(e) => setAppIdPrefix(e.target.value.toUpperCase())}
+          placeholder="9JA89QQLNQ"
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+        />
+        <p className="mt-1.5 text-xs text-gray-500">
+          Find this in your Apple Developer Dashboard
+        </p>
+      </div>
+
+      {/* Generated App ID Display */}
+      {bundleId && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+          <div className="text-xs font-medium text-blue-700 mb-1">Generated App ID</div>
+          <div className="flex items-center justify-between">
+            <code className="text-sm text-blue-900">
+              {appId || `[App ID Prefix].${bundleId}`}
+            </code>
+            {appId && (
+              <button
+                onClick={() => handleCopy(appId, 'appId')}
+                className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+              >
+                {copySuccess === 'appId' ? (
+                  <Check className="w-4 h-4 text-green-600" />
+                ) : (
+                  <Copy className="w-4 h-4 text-blue-600" />
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Help Section */}
+      <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+        <div className="text-xs font-medium text-gray-700 mb-2">📍 How to find App ID Prefix</div>
+        <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+          <li>Go to Apple Developer Dashboard</li>
+          <li>Navigate to Certificates, Identifiers & Profiles</li>
+          <li>Identifiers → Select your app</li>
+          <li>Copy the App ID Prefix value</li>
+        </ol>
+        <a
+          href="https://developer.apple.com/account/resources/identifiers/list"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:text-blue-700"
+        >
+          <ExternalLink className="w-3 h-3" />
+          Open Apple Developer Dashboard
+        </a>
+      </div>
+
+      {/* Submit Button */}
+      <button
+        onClick={() => onSubmit({ uriScheme: uriScheme + '://', appId })}
+        disabled={!uriScheme || !appIdPrefix}
+        className={`w-full py-2.5 rounded-lg font-medium transition-colors ${
+          uriScheme && appIdPrefix
+            ? 'bg-blue-500 text-white hover:bg-blue-600'
+            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+        }`}
+      >
+        Continue
+      </button>
+    </div>
+  );
+}
+
+// Deep Link Android Input Component
+function DeeplinkAndroidInput({
+  packageName,
+  onSubmit,
+  isCompleted = false
+}: {
+  packageName?: string;
+  onSubmit: (data: { uriScheme: string; sha256Fingerprints: string[] }) => void;
+  isCompleted?: boolean;
+}) {
+  const [uriScheme, setUriScheme] = useState('');
+  const [fingerprints, setFingerprints] = useState('');
+  const [copySuccess, setCopySuccess] = useState<string | null>(null);
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopySuccess(id);
+    setTimeout(() => setCopySuccess(null), 2000);
+  };
+
+  const keytoolCommand = 'keytool -list -v -keystore YOUR_KEYSTORE.keystore';
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Android Deep Link Setup</div>
+        <div className="text-xs text-gray-400">Setup Complete</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="text-sm font-medium text-gray-900 mb-4">🤖 Android Deep Link Configuration</div>
+
+      {/* URI Scheme Input */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          URL Scheme <span className="text-red-500">*</span>
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={uriScheme}
+            onChange={(e) => setUriScheme(e.target.value.toLowerCase().replace(/[^a-z0-9+]/g, ''))}
+            placeholder="myapp"
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+          />
+          <span className="flex items-center px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500">://</span>
+        </div>
+        <p className="mt-1.5 text-xs text-gray-500">
+          Using the same scheme as iOS is recommended
+        </p>
+      </div>
+
+      {/* Package Name Display */}
+      {packageName && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-100 rounded-lg">
+          <div className="text-xs font-medium text-green-700 mb-1">Package Name (Auto-filled)</div>
+          <code className="text-sm text-green-900">{packageName}</code>
+        </div>
+      )}
+
+      {/* SHA256 Fingerprint Input */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          SHA256 Fingerprint <span className="text-red-500">*</span>
+        </label>
+        <textarea
+          value={fingerprints}
+          onChange={(e) => setFingerprints(e.target.value)}
+          placeholder="14:6D:E9:83:C5:73:06:50:D8:EE:..."
+          rows={3}
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 font-mono"
+        />
+        <p className="mt-1.5 text-xs text-gray-500">
+          Separate multiple fingerprints with commas
+        </p>
+      </div>
+
+      {/* Help Section */}
+      <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+        <div className="text-xs font-medium text-gray-700 mb-2">📍 How to find SHA256 Fingerprint</div>
+
+        <div className="mb-3">
+          <div className="text-xs text-gray-600 mb-1">Terminal command:</div>
+          <div className="flex items-center gap-2 p-2 bg-gray-800 rounded-lg">
+            <code className="flex-1 text-xs text-green-400 overflow-x-auto">{keytoolCommand}</code>
+            <button
+              onClick={() => handleCopy(keytoolCommand, 'keytool')}
+              className="p-1.5 hover:bg-gray-700 rounded transition-colors"
+            >
+              {copySuccess === 'keytool' ? (
+                <Check className="w-4 h-4 text-green-400" />
+              ) : (
+                <Copy className="w-4 h-4 text-gray-400" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div className="text-xs text-gray-600">
+          Or find it in Google Play Console:
+          <br />App Integrity → App Signing → SHA-256 certificate fingerprint
+        </div>
+
+        <a
+          href="https://play.google.com/console"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:text-blue-700"
+        >
+          <ExternalLink className="w-3 h-3" />
+          Open Google Play Console
+        </a>
+      </div>
+
+      {/* Submit Button */}
+      <button
+        onClick={() => onSubmit({
+          uriScheme: uriScheme + '://',
+          sha256Fingerprints: fingerprints.split(',').map(f => f.trim()).filter(Boolean)
+        })}
+        disabled={!uriScheme || !fingerprints}
+        className={`w-full py-2.5 rounded-lg font-medium transition-colors ${
+          uriScheme && fingerprints
+            ? 'bg-blue-500 text-white hover:bg-blue-600'
+            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+        }`}
+      >
+        Continue
+      </button>
+    </div>
+  );
+}
+
+// Deep Link Dashboard Guide Component
+function DeeplinkDashboardGuide({
+  platform,
+  data,
+  appName,
+  onComplete,
+  isCompleted = false
+}: {
+  platform: 'ios' | 'android';
+  data: DeeplinkDashboardData;
+  appName: string;
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  const [copySuccess, setCopySuccess] = useState<string | null>(null);
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopySuccess(id);
+    setTimeout(() => setCopySuccess(null), 2000);
+  };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Dashboard Setup Guide</div>
+        <div className="text-xs text-gray-400">Setup Complete</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="text-sm font-medium text-gray-900 mb-4">
+        {platform === 'ios' ? '🍎' : '🤖'} {platform === 'ios' ? 'iOS' : 'Android'} Dashboard Setup
+      </div>
+
+      {/* Dashboard Link */}
+      <a
+        href={`https://dashboard.airbridge.io/app/${appName}/tracking-link/deeplinks`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 w-full py-2.5 mb-4 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
+      >
+        <ExternalLink className="w-4 h-4" />
+        Open Airbridge Dashboard
+      </a>
+
+      <div className="text-xs text-gray-500 mb-4">
+        Navigate to [Tracking Link] → [Deep Links] and enter the following information:
+      </div>
+
+      {/* Values to Enter */}
+      <div className="space-y-3 mb-4">
+        {/* URI Scheme */}
+        <div className="p-3 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-gray-700">
+              {platform === 'ios' ? 'iOS' : 'Android'} URI Scheme
+            </span>
+            <button
+              onClick={() => handleCopy(data.uriScheme, 'uriScheme')}
+              className="p-1 hover:bg-gray-200 rounded transition-colors"
+            >
+              {copySuccess === 'uriScheme' ? (
+                <Check className="w-3.5 h-3.5 text-green-600" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-500" />
+              )}
+            </button>
+          </div>
+          <code className="text-sm text-gray-900">{data.uriScheme}</code>
+        </div>
+
+        {/* iOS App ID */}
+        {platform === 'ios' && data.appId && (
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-gray-700">iOS App ID</span>
+              <button
+                onClick={() => handleCopy(data.appId!, 'appId')}
+                className="p-1 hover:bg-gray-200 rounded transition-colors"
+              >
+                {copySuccess === 'appId' ? (
+                  <Check className="w-3.5 h-3.5 text-green-600" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5 text-gray-500" />
+                )}
+              </button>
+            </div>
+            <code className="text-sm text-gray-900">{data.appId}</code>
+          </div>
+        )}
+
+        {/* Android SHA256 Fingerprints */}
+        {platform === 'android' && data.sha256Fingerprints && data.sha256Fingerprints.length > 0 && (
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-gray-700">SHA256 Fingerprints</span>
+              <button
+                onClick={() => handleCopy(data.sha256Fingerprints!.join(',\n'), 'fingerprints')}
+                className="p-1 hover:bg-gray-200 rounded transition-colors"
+              >
+                {copySuccess === 'fingerprints' ? (
+                  <Check className="w-3.5 h-3.5 text-green-600" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5 text-gray-500" />
+                )}
+              </button>
+            </div>
+            <code className="text-xs text-gray-900 break-all">
+              {data.sha256Fingerprints.join(',\n')}
+            </code>
+          </div>
+        )}
+      </div>
+
+      {/* Completion Button */}
+      <button
+        onClick={onComplete}
+        className="w-full py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors"
+      >
+        Dashboard Setup Complete
+      </button>
+    </div>
+  );
+}
+
+// Deep Link SDK Setup Component
+function DeeplinkSdkSetup({
+  platform,
+  framework,
+  appName,
+  uriScheme,
+  onComplete,
+  isCompleted = false
+}: {
+  platform: 'ios' | 'android';
+  framework: string;
+  appName: string;
+  uriScheme: string;
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [expandedSection, setExpandedSection] = useState<string | null>('step1');
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopySuccess(id);
+    setTimeout(() => setCopySuccess(null), 2000);
+  };
+
+  const schemeWithoutProtocol = uriScheme.replace('://', '');
+
+  // iOS Setup Steps
+  const iosSteps = [
+    {
+      id: 'step1',
+      title: 'Step 1: Configure URL Types',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Navigate to the following path in Xcode:
+          </p>
+          <div className="p-2 bg-gray-100 rounded text-xs font-mono text-gray-700">
+            [Project] → [Info] → [URL Types]
+          </div>
+          <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+            <li>Click the + button</li>
+            <li>Enter in the URL Schemes field:</li>
+          </ol>
+          <div className="flex items-center gap-2 p-2 bg-gray-800 rounded-lg">
+            <code className="flex-1 text-xs text-green-400">{schemeWithoutProtocol}</code>
+            <button
+              onClick={() => handleCopy(schemeWithoutProtocol, 'scheme')}
+              className="p-1 hover:bg-gray-700 rounded"
+            >
+              {copySuccess === 'scheme' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+          <p className="text-xs text-amber-600">
+            ⚠️ Enter without the :// suffix
+          </p>
+        </div>
+      )
+    },
+    {
+      id: 'step2',
+      title: 'Step 2: Configure Associated Domains',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Navigate to the following path in Xcode:
+          </p>
+          <div className="p-2 bg-gray-100 rounded text-xs font-mono text-gray-700">
+            [Project] → [Signing & Capabilities]
+          </div>
+          <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+            <li>Click + Capability</li>
+            <li>Add Associated Domains</li>
+            <li>Add the following domains:</li>
+          </ol>
+          <div className="space-y-2">
+            {[
+              `applinks:${appName}.airbridge.io`,
+              `applinks:${appName}.abr.ge`
+            ].map((domain, i) => (
+              <div key={i} className="flex items-center gap-2 p-2 bg-gray-800 rounded-lg">
+                <code className="flex-1 text-xs text-green-400">{domain}</code>
+                <button
+                  onClick={() => handleCopy(domain, `domain${i}`)}
+                  className="p-1 hover:bg-gray-700 rounded"
+                >
+                  {copySuccess === `domain${i}` ? (
+                    <Check className="w-3.5 h-3.5 text-green-400" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-gray-400" />
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+  ];
+
+  // Android Setup Steps
+  const androidAppLinksCode = `<intent-filter android:autoVerify="true">
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+
+    <data android:scheme="http" android:host="${appName}.abr.ge" />
+    <data android:scheme="https" android:host="${appName}.abr.ge" />
+</intent-filter>`;
+
+  const androidUriSchemeCode = `<intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+
+    <data android:scheme="${schemeWithoutProtocol}" />
+</intent-filter>`;
+
+  const androidSteps = [
+    {
+      id: 'step1',
+      title: 'Step 1: Add App Links Intent Filter',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Add this to MainActivity in AndroidManifest.xml:
+          </p>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
+              {androidAppLinksCode}
+            </pre>
+            <button
+              onClick={() => handleCopy(androidAppLinksCode, 'applinks')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'applinks' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'step2',
+      title: 'Step 2: Add URI Scheme Intent Filter',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Add as a <span className="text-red-500 font-medium">separate</span> intent-filter tag:
+          </p>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
+              {androidUriSchemeCode}
+            </pre>
+            <button
+              onClick={() => handleCopy(androidUriSchemeCode, 'urischeme')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'urischeme' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+          <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs text-amber-700">
+              ⚠️ Important: Always use separate intent-filter tags!
+            </p>
+          </div>
+        </div>
+      )
+    }
+  ];
+
+  const steps = platform === 'ios' ? iosSteps : androidSteps;
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">SDK Setup Guide</div>
+        <div className="text-xs text-gray-400">Setup Complete</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="text-sm font-medium text-gray-900 mb-4">
+        {platform === 'ios' ? '🍎' : '🤖'} {platform === 'ios' ? 'iOS' : 'Android'} SDK Setup
+        <span className="ml-2 text-xs font-normal text-gray-500">({framework})</span>
+      </div>
+
+      {/* Steps Accordion */}
+      <div className="space-y-2 mb-4">
+        {steps.map((step) => (
+          <div key={step.id} className="border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setExpandedSection(expandedSection === step.id ? null : step.id)}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+            >
+              <span className="text-sm font-medium text-gray-700">{step.title}</span>
+              {expandedSection === step.id ? (
+                <ChevronDown className="w-4 h-4 text-gray-500" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-gray-500" />
+              )}
+            </button>
+            {expandedSection === step.id && (
+              <div className="p-3 border-t border-gray-200">
+                {step.content}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Checklist */}
+      <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg mb-4">
+        <div className="text-xs font-medium text-blue-700 mb-2">✅ Verification Checklist</div>
+        <div className="space-y-1 text-xs text-blue-600">
+          {platform === 'ios' ? (
+            <>
+              <div>☐ URL scheme entered in URL Types</div>
+              <div>☐ Domains added to Associated Domains</div>
+            </>
+          ) : (
+            <>
+              <div>☐ autoVerify="true" set in App Links intent-filter</div>
+              <div>☐ URI Scheme intent-filter added separately</div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Complete Button */}
+      <button
+        onClick={onComplete}
+        className="w-full py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors"
+      >
+        SDK Setup Complete
+      </button>
+    </div>
+  );
+}
+
+// Deep Link Test Checklist Component
+function DeeplinkTestChecklist({
+  onReady,
+  isCompleted = false
+}: {
+  onReady: () => void;
+  isCompleted?: boolean;
+}) {
+  const [checks, setChecks] = useState({
+    device: false,
+    appInstalled: false,
+    browser: false,
+    network: false
+  });
+
+  const allChecked = Object.values(checks).every(Boolean);
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Test Preparation</div>
+        <div className="text-xs text-gray-400">Ready</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="text-sm font-medium text-gray-900 mb-4">📋 Pre-Test Checklist</div>
+
+      <div className="space-y-3 mb-4">
+        {[
+          { id: 'device', label: 'Test device ready (physical device recommended)' },
+          { id: 'appInstalled', label: 'App installed and launched at least once' },
+          { id: 'browser', label: 'Default browser set to Chrome (Android) or Safari (iOS)' },
+          { id: 'network', label: 'Stable network connection' }
+        ].map((item) => (
+          <label
+            key={item.id}
+            className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+          >
+            <input
+              type="checkbox"
+              checked={checks[item.id as keyof typeof checks]}
+              onChange={(e) => setChecks(prev => ({ ...prev, [item.id]: e.target.checked }))}
+              className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">{item.label}</span>
+          </label>
+        ))}
+      </div>
+
+      <button
+        onClick={onReady}
+        disabled={!allChecked}
+        className={`w-full py-2.5 rounded-lg font-medium transition-colors ${
+          allChecked
+            ? 'bg-blue-500 text-white hover:bg-blue-600'
+            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+        }`}
+      >
+        Start Test
+      </button>
+    </div>
+  );
+}
+
+// Deep Link Test Scenarios Component
+function DeeplinkTestScenarios({
+  appName,
+  platforms,
+  onComplete,
+  isCompleted = false
+}: {
+  appName: string;
+  platforms: string[];
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  const [testResults, setTestResults] = useState<Record<string, 'pending' | 'passed' | 'failed'>>({
+    '1-1': 'pending',
+    '1-2': 'pending',
+    '2': 'pending'
+  });
+
+  const scenarios = [
+    {
+      id: '1-1',
+      name: 'Scenario 1-1',
+      appState: 'Installed',
+      description: 'URI Scheme Deep Link Test'
+    },
+    {
+      id: '1-2',
+      name: 'Scenario 1-2',
+      appState: 'Installed',
+      description: platforms.includes('ios') ? 'Universal Links Test' : 'App Links Test'
+    },
+    {
+      id: '2',
+      name: 'Scenario 2',
+      appState: 'Not Installed',
+      description: 'Deferred Deep Linking Test'
+    }
+  ];
+
+  const handleResult = (scenarioId: string, result: 'passed' | 'failed') => {
+    setTestResults(prev => ({ ...prev, [scenarioId]: result }));
+  };
+
+  const allTested = Object.values(testResults).every(r => r !== 'pending');
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Deep Link Test</div>
+        <div className="text-xs text-gray-400">Test Complete</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="text-sm font-medium text-gray-900 mb-4">🧪 Deep Link Test</div>
+
+      {/* Dashboard Test Link */}
+      <a
+        href={`https://dashboard.airbridge.io/app/${appName}/tracking-link/deeplinks`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 w-full py-2.5 mb-4 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
+      >
+        <ExternalLink className="w-4 h-4" />
+        Click Test Button in Dashboard
+      </a>
+
+      {/* Test Scenarios */}
+      <div className="space-y-3 mb-4">
+        {scenarios.map((scenario) => (
+          <div
+            key={scenario.id}
+            className={`p-3 border rounded-lg ${
+              testResults[scenario.id] === 'passed'
+                ? 'border-green-200 bg-green-50'
+                : testResults[scenario.id] === 'failed'
+                ? 'border-red-200 bg-red-50'
+                : 'border-gray-200'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <span className="text-sm font-medium text-gray-900">{scenario.name}</span>
+                <span className="ml-2 text-xs px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded">
+                  App {scenario.appState}
+                </span>
+              </div>
+              {testResults[scenario.id] !== 'pending' && (
+                <span className={`text-xs font-medium ${
+                  testResults[scenario.id] === 'passed' ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {testResults[scenario.id] === 'passed' ? '✓ Passed' : '✗ Failed'}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-600 mb-2">{scenario.description}</p>
+
+            {testResults[scenario.id] === 'pending' && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleResult(scenario.id, 'passed')}
+                  className="flex-1 py-1.5 text-xs font-medium text-green-600 bg-green-100 rounded hover:bg-green-200 transition-colors"
+                >
+                  Pass
+                </button>
+                <button
+                  onClick={() => handleResult(scenario.id, 'failed')}
+                  className="flex-1 py-1.5 text-xs font-medium text-red-600 bg-red-100 rounded hover:bg-red-200 transition-colors"
+                >
+                  Fail
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Help for Failed Tests */}
+      {Object.values(testResults).some(r => r === 'failed') && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
+          <div className="text-xs font-medium text-amber-700 mb-2">⚠️ If Test Failed, Check:</div>
+          <ul className="text-xs text-amber-600 space-y-1 list-disc list-inside">
+            <li>Dashboard information is accurate</li>
+            <li>SDK configuration is correct</li>
+            <li>App signing keystore is correct (Android)</li>
+          </ul>
+        </div>
+      )}
+
+      {/* Complete Button */}
+      <button
+        onClick={onComplete}
+        disabled={!allTested}
+        className={`w-full py-2.5 rounded-lg font-medium transition-colors ${
+          allTested
+            ? 'bg-green-500 text-white hover:bg-green-600'
+            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+        }`}
+      >
+        Complete Test
+      </button>
+    </div>
+  );
+}
+
+// Deep Link Complete Component
+function DeeplinkComplete({
+  onCreateTrackingLink,
+  onContinue,
+  isCompleted = false
+}: {
+  onCreateTrackingLink: () => void;
+  onContinue: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Deep Link Setup Complete</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="text-center mb-4">
+        <div className="text-4xl mb-2">🎉</div>
+        <div className="text-lg font-medium text-gray-900">Deep Link Setup Complete!</div>
+        <p className="text-sm text-gray-500 mt-1">
+          You can now apply deep links to your tracking links
+        </p>
+      </div>
+
+      {/* Stopover Airpage Info */}
+      <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg mb-4">
+        <div className="text-xs font-medium text-blue-700 mb-2">💡 Stopover Airpage Option Guide</div>
+        <div className="text-xs text-blue-600 space-y-1">
+          <div><strong>UA Campaigns:</strong> Recommended to disable (unnecessary popups may reduce conversion)</div>
+          <div><strong>Retargeting:</strong> Recommended to enable (ensures accurate deep link routing on iOS)</div>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="space-y-2">
+        <button
+          onClick={onCreateTrackingLink}
+          className="w-full py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
+        >
+          Create Tracking Link
+        </button>
+        <button
+          onClick={onContinue}
+          className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+        >
+          Continue to Channel Integration
+        </button>
       </div>
     </div>
   );
@@ -4737,6 +6222,16 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     channels: [] as string[],
   });
 
+  // Deeplink setup state
+  const [deeplinkState, setDeeplinkState] = useState<{
+    iosData?: { uriScheme: string; appId: string };
+    androidData?: { uriScheme: string; sha256Fingerprints: string[] };
+    currentPlatform?: 'ios' | 'android';
+    completedPlatforms: string[];
+  }>({
+    completedPlatforms: []
+  });
+
   // Get current app
   const currentApp = registeredApps.find(app => app.id === currentAppId);
 
@@ -4833,32 +6328,121 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     setMessages(prev => [...prev, newMessage]);
   };
 
-  // Initial welcome message
+  // Get user's goal from survey (question 7)
+  const getUserGoalInfo = () => {
+    const goal = userAnswers[7] as string;
+    const goalMap: Record<string, { label: string; emoji: string; description: string; steps: string[] }> = {
+      'deeplink': {
+        label: 'Deep Linking',
+        emoji: '🔗',
+        description: 'Route users directly to specific screens in your app after clicking ads',
+        steps: ['App Registration', 'SDK Installation', 'Deep Link Setup', 'Tracking Link Creation']
+      },
+      'attribution': {
+        label: 'Accurate & Unbiased Attribution',
+        emoji: '🎯',
+        description: 'Measure true ad performance without bias',
+        steps: ['App Registration', 'SDK Installation', 'Ad Channel Integration', 'Event Setup']
+      },
+      'granular-reports': {
+        label: 'Granular Data Reports',
+        emoji: '📊',
+        description: 'Get insights from campaign to creative level',
+        steps: ['App Registration', 'SDK Installation', 'Ad Channel Integration', 'Event Taxonomy Setup']
+      },
+      'adops': {
+        label: 'Automated Multichannel Reporting',
+        emoji: '⚡',
+        description: 'Unified AdOps management across all channels',
+        steps: ['App Registration', 'SDK Installation', 'Ad Channel Integration', 'Cost Data Integration']
+      },
+      'unified-analytics': {
+        label: 'Unified Web & App Analytics',
+        emoji: '📱',
+        description: 'Cross-platform data analysis',
+        steps: ['App Registration', 'SDK Installation (App + Web)', 'Event Setup']
+      },
+      'optimization': {
+        label: 'Ad Spend Optimization',
+        emoji: '💰',
+        description: 'Optimize spend by channel & campaign',
+        steps: ['App Registration', 'SDK Installation', 'Ad Channel Integration', 'Cost Data Integration']
+      }
+    };
+    return goalMap[goal] || null;
+  };
+
+  // Get user's selected channels from survey (question 8)
+  const getUserChannels = () => {
+    const channels = userAnswers[8] as string[];
+    if (!channels || channels.length === 0) return null;
+
+    const channelMap: Record<string, string> = {
+      'meta': 'Meta Ads',
+      'google': 'Google Ads',
+      'apple': 'Apple Search Ads',
+      'tiktok': 'TikTok For Business',
+      'other': 'Other Channels'
+    };
+
+    return channels.map(c => channelMap[c] || c);
+  };
+
+  // Initial welcome message with personalized content based on survey
   useEffect(() => {
+    const goalInfo = getUserGoalInfo();
+    const channels = getUserChannels();
+
     const timer = setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '👋 Hello! I\'m your Airbridge Onboarding Manager.' },
+        { type: 'text', text: '👋 Welcome! I\'m your Airbridge Onboarding Manager.' },
       ]);
     }, 300);
 
     const timer2 = setTimeout(() => {
-      addBotMessage([
-        { type: 'text', text: 'I\'ll guide you through:\n\n📱 App Registration\n🔧 SDK Installation\n📊 Ad Channel Integration' },
-      ]);
+      if (goalInfo) {
+        // Show personalized goal message
+        const channelText = channels && channels.length > 0
+          ? `\n\n📢 **Channels to integrate:** ${channels.join(', ')}`
+          : '';
+
+        addBotMessage([
+          { type: 'text', text: `${goalInfo.emoji} You've selected **${goalInfo.label}**!\n\n> ${goalInfo.description}${channelText}` },
+        ]);
+      } else {
+        addBotMessage([
+          { type: 'text', text: 'Let\'s get started with Airbridge for your app marketing!' },
+        ]);
+      }
     }, 1200);
 
     const timer3 = setTimeout(() => {
+      if (goalInfo) {
+        // Show required setup steps
+        const stepsText = goalInfo.steps.map((step, i) => `${i + 1}. ${step}`).join('\n');
+        addBotMessage([
+          { type: 'text', text: `🛠️ **Required Setup Steps:**\n\n${stepsText}\n\nI'll guide you through each step!` },
+        ]);
+      } else {
+        addBotMessage([
+          { type: 'text', text: 'Here\'s what we\'ll set up together:\n\n📱 App Registration\n🔧 SDK Installation\n📊 Ad Channel Integration' },
+        ]);
+      }
+    }, 2200);
+
+    const timer4 = setTimeout(() => {
       setCurrentPhase(1);
       addBotMessage([
-        { type: 'text', text: '🚀 Let\'s start by setting up your app.\n\nWhich environment would you like to set up?\n\n💡 If this is your first time, we recommend **Development** for quick testing.' },
+        { type: 'text', text: '🚀 Let\'s start with **App Registration**.\n\nWhich environment would you like to set up?' },
         { type: 'environment-select' },
       ]);
-    }, 2500);
+    }, 3500);
 
     return () => {
       clearTimeout(timer);
       clearTimeout(timer2);
       clearTimeout(timer3);
+      clearTimeout(timer4);
     };
   }, []);
 
@@ -5080,7 +6664,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       appInfo: setupState.appInfo,
       platforms: setupState.environment === 'dev' ? ['dev'] : setupState.platforms,
       environment: setupState.environment as 'dev' | 'production',
-      steps: createAppSteps(),
+      steps: setupState.environment === 'dev' ? createDevAppSteps(setupState.platforms) : createAppSteps(setupState.platforms),
       currentPhase: 1, // Stay in Phase 1 until token display is confirmed
       framework: '',
       channels: [],
@@ -5243,7 +6827,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       appInfo: setupState.appInfo,
       platforms: setupState.platforms,
       environment: setupState.environment as 'dev' | 'production',
-      steps: createAppSteps(),
+      steps: setupState.environment === 'dev' ? createDevAppSteps(setupState.platforms) : createAppSteps(setupState.platforms),
       currentPhase: 2,
       framework: '',
       channels: [],
@@ -5583,6 +7167,104 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     }, 300);
   };
 
+  // Web SDK Install Complete handler (legacy - used by old WebSdkInstall component)
+  const handleWebSdkInstallComplete = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('Web SDK installation complete');
+    updateStepStatus(app.id, 'web-sdk-install', 'completed');
+
+    // Move to SDK initialization
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '✅ **Web SDK installed!**\n\nNow let\'s continue with the SDK initialization for your other platforms.' },
+      ]);
+      updateStepStatus(app.id, 'sdk-init', 'in_progress');
+    }, 300);
+  };
+
+  // Web SDK Method Select handler (Step 1)
+  const handleWebSdkMethodSelect = (method: 'script' | 'package', appName: string, webToken: string) => {
+    const methodLabel = method === 'script' ? 'Script Tag' : 'Package Manager';
+    addUserMessage(`Selected ${methodLabel} method`);
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: `📦 Proceeding with **${methodLabel}** installation.\n\nPlease check the authentication info and installation code below.` },
+        { type: 'web-sdk-install-code', method, appName, webToken },
+      ]);
+    }, 300);
+  };
+
+  // Web SDK Install Code Complete handler (Step 2-3)
+  const handleWebSdkInstallCodeComplete = (appName: string, webToken: string) => {
+    addUserMessage('Installation code applied');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '⚙️ **Initialization Options** (Optional)\n\nSelect options to auto-generate the code.' },
+        { type: 'web-sdk-init-options', appName, webToken },
+      ]);
+    }, 300);
+  };
+
+  // Web SDK Init Options Complete handler (Step 4)
+  const handleWebSdkInitOptionsComplete = (options: Record<string, boolean | number | string>) => {
+    addUserMessage('Initialization options configured');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '👤 **User Identity Setup** (Optional)\n\nLinking user info on login enables more accurate analytics.' },
+        { type: 'web-sdk-user-identity' },
+      ]);
+    }, 300);
+  };
+
+  // Web SDK Init Options Skip handler
+  const handleWebSdkInitOptionsSkip = () => {
+    addUserMessage('Proceeding with default settings');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '👤 **User Identity Setup** (Optional)\n\nLinking user info on login enables more accurate analytics.' },
+        { type: 'web-sdk-user-identity' },
+      ]);
+    }, 300);
+  };
+
+  // Web SDK User Identity Complete handler (Step 5)
+  const handleWebSdkUserIdentityComplete = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('User identity setup complete');
+    updateStepStatus(app.id, 'web-sdk-install', 'completed');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '✅ **Web SDK Installation Complete!**\n\nNow let\'s proceed with SDK setup for other platforms.' },
+      ]);
+      updateStepStatus(app.id, 'sdk-init', 'in_progress');
+    }, 300);
+  };
+
+  // Web SDK User Identity Skip handler
+  const handleWebSdkUserIdentitySkip = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('Skipped user identity setup');
+    updateStepStatus(app.id, 'web-sdk-install', 'completed');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '✅ **Web SDK Installation Complete!**\n\nNow let\'s proceed with SDK setup for other platforms.' },
+      ]);
+      updateStepStatus(app.id, 'sdk-init', 'in_progress');
+    }, 300);
+  };
+
   // Framework select handler
   const handleFrameworkSelect = (framework: string) => {
     setSetupState(prev => ({ ...prev, framework }));
@@ -5603,6 +7285,26 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
     if (currentAppId) {
       updateAppStepStatus(currentAppId, 'sdk-install', 'completed');
+
+      // Check if web platform is selected - if so, go to web-sdk-install first
+      const app = registeredApps.find(a => a.id === currentAppId);
+      if (app?.platforms.includes('web')) {
+        updateAppStepStatus(currentAppId, 'web-sdk-install', 'in_progress');
+        const generateWebToken = () => {
+          const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+          return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+        };
+        const webAppName = app.appInfo.appName.toLowerCase().replace(/\s/g, '');
+        const webToken = generateWebToken();
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `🌐 **Web SDK Installation** - **${app.appInfo.appName}**\n\nLet's install the Web SDK. First, please select an installation method.` },
+            { type: 'web-sdk-method-select', appName: webAppName, webToken },
+          ]);
+        }, 300);
+        return;
+      }
+
       updateAppStepStatus(currentAppId, 'sdk-init', 'in_progress');
     }
 
@@ -5662,7 +7364,190 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
   // Deep link choice handler
   const handleDeeplinkChoice = (choice: string) => {
-    addUserMessage(choice === 'now' ? 'Set up now' : 'Later');
+    addUserMessage(choice === 'now' ? 'Set up now' : 'Set up later');
+
+    if (choice === 'later') {
+      // Skip deeplink setup
+      if (currentAppId) {
+        updateAppStepStatus(currentAppId, 'deeplink', 'completed');
+        updateAppStepStatus(currentAppId, 'sdk-test', 'in_progress');
+      }
+
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: '✅ Deep link setup will be done later.\n\n🧪 Now let\'s **test** if the SDK integration is working properly.' },
+          { type: 'sdk-test' },
+        ]);
+      }, 300);
+      return;
+    }
+
+    // Start deeplink setup flow - determine which platforms need setup
+    const platforms = currentApp?.platforms || setupState.platforms || [];
+    const hasIos = platforms.includes('ios');
+    const hasAndroid = platforms.includes('android');
+
+    // Reset deeplink state
+    setDeeplinkState({ completedPlatforms: [] });
+
+    setTimeout(() => {
+      if (hasIos) {
+        // Start with iOS
+        addBotMessage([
+          { type: 'text', text: '🔗 **Let\'s start deep link setup!**\n\nFirst, please enter the required information for iOS deep links.' },
+          { type: 'deeplink-ios-input', bundleId: currentApp?.appInfo.bundleId || setupState.appInfo.bundleId },
+        ]);
+      } else if (hasAndroid) {
+        // Start with Android
+        addBotMessage([
+          { type: 'text', text: '🔗 **Let\'s start deep link setup!**\n\nFirst, please enter the required information for Android deep links.' },
+          { type: 'deeplink-android-input', packageName: currentApp?.appInfo.packageName || setupState.appInfo.packageName },
+        ]);
+      } else {
+        // No mobile platforms, skip deeplink
+        if (currentAppId) {
+          updateAppStepStatus(currentAppId, 'deeplink', 'completed');
+          updateAppStepStatus(currentAppId, 'sdk-test', 'in_progress');
+        }
+        addBotMessage([
+          { type: 'text', text: '📱 Deep links are only used on mobile platforms (iOS/Android).\n\n🧪 Proceeding to SDK testing.' },
+          { type: 'sdk-test' },
+        ]);
+      }
+    }, 300);
+  };
+
+  // Deeplink iOS submit handler
+  const handleDeeplinkIosSubmit = (data: { uriScheme: string; appId: string }) => {
+    setDeeplinkState(prev => ({ ...prev, iosData: data, currentPlatform: 'ios' }));
+    addUserMessage(`iOS setup: ${data.uriScheme}`);
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '📋 iOS information has been saved!\n\nNow please complete the setup in the Airbridge dashboard.' },
+        { type: 'deeplink-dashboard-guide', platform: 'ios', data: { uriScheme: data.uriScheme, appId: data.appId } },
+      ]);
+    }, 300);
+  };
+
+  // Deeplink Android submit handler
+  const handleDeeplinkAndroidSubmit = (data: { uriScheme: string; sha256Fingerprints: string[] }) => {
+    setDeeplinkState(prev => ({ ...prev, androidData: data, currentPlatform: 'android' }));
+    addUserMessage(`Android setup: ${data.uriScheme}`);
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '📋 Android information has been saved!\n\nNow please complete the setup in the Airbridge dashboard.' },
+        { type: 'deeplink-dashboard-guide', platform: 'android', data: { uriScheme: data.uriScheme, sha256Fingerprints: data.sha256Fingerprints } },
+      ]);
+    }, 300);
+  };
+
+  // Deeplink Dashboard complete handler
+  const handleDeeplinkDashboardComplete = (platform: 'ios' | 'android') => {
+    addUserMessage(`${platform === 'ios' ? 'iOS' : 'Android'} dashboard setup complete`);
+
+    const appName = currentApp?.appInfo.appName.toLowerCase().replace(/\s/g, '') || 'myapp';
+    const framework = currentApp?.framework || setupState.framework || 'Native';
+    const uriScheme = platform === 'ios'
+      ? deeplinkState.iosData?.uriScheme || 'myapp://'
+      : deeplinkState.androidData?.uriScheme || 'myapp://';
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: `⚙️ Now please add deep link configuration to the ${platform === 'ios' ? 'iOS' : 'Android'} SDK.` },
+        { type: 'deeplink-sdk-setup', platform, framework, appName },
+      ]);
+    }, 300);
+  };
+
+  // Deeplink SDK setup complete handler
+  const handleDeeplinkSdkSetupComplete = (platform: 'ios' | 'android') => {
+    const updatedCompletedPlatforms = [...deeplinkState.completedPlatforms, platform];
+    setDeeplinkState(prev => ({ ...prev, completedPlatforms: updatedCompletedPlatforms }));
+    addUserMessage(`${platform === 'ios' ? 'iOS' : 'Android'} SDK setup complete`);
+
+    const platforms = currentApp?.platforms || setupState.platforms || [];
+    const hasIos = platforms.includes('ios');
+    const hasAndroid = platforms.includes('android');
+
+    // Check if we need to set up the other platform
+    if (platform === 'ios' && hasAndroid && !updatedCompletedPlatforms.includes('android')) {
+      // iOS done, now do Android
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: '✅ iOS deep link setup complete!\n\nNow let\'s set up Android deep links.' },
+          { type: 'deeplink-android-input', packageName: currentApp?.appInfo.packageName || setupState.appInfo.packageName },
+        ]);
+      }, 300);
+    } else if (platform === 'android' && hasIos && !updatedCompletedPlatforms.includes('ios')) {
+      // Android done, now do iOS
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: '✅ Android deep link setup complete!\n\nNow let\'s set up iOS deep links.' },
+          { type: 'deeplink-ios-input', bundleId: currentApp?.appInfo.bundleId || setupState.appInfo.bundleId },
+        ]);
+      }, 300);
+    } else {
+      // All platforms done, proceed to test
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: '🧪 Deep link setup is complete for all platforms!\n\nNow let\'s test if the deep links are working properly.' },
+          { type: 'deeplink-test-checklist' },
+        ]);
+      }, 300);
+    }
+  };
+
+  // Deeplink test ready handler
+  const handleDeeplinkTestReady = () => {
+    addUserMessage('Test preparation complete');
+
+    const appName = currentApp?.appInfo.appName.toLowerCase().replace(/\s/g, '') || 'myapp';
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '🧪 Starting deep link test.\n\nClick the Test button in the dashboard and test each scenario.' },
+        { type: 'deeplink-test-scenarios', appName },
+      ]);
+    }, 300);
+  };
+
+  // Deeplink test complete handler
+  const handleDeeplinkTestComplete = () => {
+    addUserMessage('Deep link test complete');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '🎉 Deep link setup is complete!' },
+        { type: 'deeplink-complete' },
+      ]);
+    }, 300);
+  };
+
+  // Deeplink create tracking link handler
+  const handleDeeplinkCreateTrackingLink = () => {
+    addUserMessage('Create tracking link');
+
+    if (currentAppId) {
+      updateAppStepStatus(currentAppId, 'deeplink', 'completed');
+      updateAppStepStatus(currentAppId, 'tracking-link', 'in_progress');
+    }
+
+    const appName = currentApp?.appInfo.appName.toLowerCase().replace(/\s/g, '') || 'myapp';
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '🔗 Navigating to tracking link creation page.' },
+        { type: 'tracking-link-create', channel: 'organic' },
+      ]);
+    }, 300);
+  };
+
+  // Deeplink continue to channel handler
+  const handleDeeplinkContinue = () => {
+    addUserMessage('채널 연동으로 계속하기');
+
     if (currentAppId) {
       updateAppStepStatus(currentAppId, 'deeplink', 'completed');
       updateAppStepStatus(currentAppId, 'sdk-test', 'in_progress');
@@ -5670,7 +7555,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '✅ Deep link setup is complete!\n\n🧪 Now let\'s **test** your SDK integration to make sure everything is working properly.' },
+        { type: 'text', text: '🧪 이제 SDK 통합이 제대로 작동하는지 **테스트**해 보겠습니다.' },
         { type: 'sdk-test' },
       ]);
     }, 300);
@@ -6118,13 +8003,27 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     addUserMessage('SDK test completed successfully');
     updateStepStatus(app.id, 'sdk-test', 'completed');
 
-    setTimeout(() => {
-      addBotMessage([
-        { type: 'text', text: '**SDK test passed!** Your SDK integration is working correctly.\n\nNow let\'s set up event tracking to measure user actions in your app.' },
-        { type: 'standard-event-select' },
-      ]);
-      updateStepStatus(app.id, 'event-taxonomy', 'in_progress');
-    }, 300);
+    // Check if Dev mode
+    const isDevMode = app.environment === 'dev';
+
+    if (isDevMode) {
+      // Dev mode: SDK test complete = onboarding complete
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: '**SDK test passed!** Your development environment is ready.\n\n🎉 **Development setup complete!**' },
+          { type: 'dev-completion-summary', appName: app.appInfo.appName },
+        ]);
+      }, 300);
+    } else {
+      // Production mode: Continue to Event Taxonomy
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: '**SDK test passed!** Your SDK integration is working correctly.\n\nNow let\'s set up event tracking to measure user actions in your app.' },
+          { type: 'standard-event-select' },
+        ]);
+        updateStepStatus(app.id, 'event-taxonomy', 'in_progress');
+      }, 300);
+    }
   };
 
   // Tracking Link handlers
@@ -6159,23 +8058,6 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
         { type: 'deeplink-test' },
       ]);
       updateStepStatus(app.id, 'deeplink-test', 'in_progress');
-    }, 300);
-  };
-
-  // Deep Link Test handler
-  const handleDeeplinkTestComplete = (scenarios: DeeplinkTestScenario[]) => {
-    const app = currentApp;
-    if (!app) return;
-
-    addUserMessage('Deep link test completed');
-    updateStepStatus(app.id, 'deeplink-test', 'completed');
-
-    setTimeout(() => {
-      addBotMessage([
-        { type: 'text', text: '**Deep link test passed!** All scenarios verified.\n\nNow let\'s verify your attribution setup.' },
-        { type: 'attribution-test' },
-      ]);
-      updateStepStatus(app.id, 'attribution-test', 'in_progress');
     }, 300);
   };
 
@@ -6326,6 +8208,22 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
           addBotMessage([
             { type: 'text', text: `📦 **SDK Installation** for **${app.appInfo.appName}**\n\nThe SDK needs to be installed by a developer. Who will handle this?` },
             { type: 'sdk-install-choice' },
+          ]);
+        }, 300);
+        break;
+
+      case 'web-sdk-install':
+        // Generate mock web token
+        const generateWebToken = () => {
+          const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+          return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+        };
+        const webAppName = app.appInfo.appName.toLowerCase().replace(/\s/g, '');
+        const webToken = generateWebToken();
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `🌐 **Web SDK Installation** - **${app.appInfo.appName}**\n\nLet's install the Web SDK. First, please select an installation method.` },
+            { type: 'web-sdk-method-select', appName: webAppName, webToken },
           ]);
         }, 300);
         break;
@@ -6588,6 +8486,55 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
           />
         );
 
+      case 'web-sdk-install':
+        return (
+          <WebSdkInstall
+            appName={content.appName}
+            webToken={content.webToken}
+            onComplete={handleWebSdkInstallComplete}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'web-sdk-method-select':
+        return (
+          <WebSdkMethodSelect
+            onSelect={(method) => handleWebSdkMethodSelect(method, content.appName, content.webToken)}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'web-sdk-install-code':
+        return (
+          <WebSdkInstallCode
+            method={content.method}
+            appName={content.appName}
+            webToken={content.webToken}
+            onComplete={() => handleWebSdkInstallCodeComplete(content.appName, content.webToken)}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'web-sdk-init-options':
+        return (
+          <WebSdkInitOptions
+            appName={content.appName}
+            webToken={content.webToken}
+            onComplete={handleWebSdkInitOptionsComplete}
+            onSkip={handleWebSdkInitOptionsSkip}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'web-sdk-user-identity':
+        return (
+          <WebSdkUserIdentity
+            onComplete={handleWebSdkUserIdentityComplete}
+            onSkip={handleWebSdkUserIdentitySkip}
+            isCompleted={isCompleted}
+          />
+        );
+
       case 'sdk-guide-share':
         return (
           <SdkGuideShare
@@ -6611,6 +8558,74 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
       case 'deeplink-choice':
         return <DeeplinkChoice onSelect={handleDeeplinkChoice} isCompleted={isCompleted} />;
+
+      case 'deeplink-ios-input':
+        return (
+          <DeeplinkIosInput
+            bundleId={content.bundleId}
+            onSubmit={handleDeeplinkIosSubmit}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'deeplink-android-input':
+        return (
+          <DeeplinkAndroidInput
+            packageName={content.packageName}
+            onSubmit={handleDeeplinkAndroidSubmit}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'deeplink-dashboard-guide':
+        return (
+          <DeeplinkDashboardGuide
+            platform={content.platform}
+            data={content.data}
+            appName={currentApp?.appInfo.appName.toLowerCase().replace(/\s/g, '') || 'myapp'}
+            onComplete={() => handleDeeplinkDashboardComplete(content.platform)}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'deeplink-sdk-setup':
+        return (
+          <DeeplinkSdkSetup
+            platform={content.platform}
+            framework={content.framework}
+            appName={content.appName}
+            uriScheme={deeplinkState.iosData?.uriScheme || deeplinkState.androidData?.uriScheme || 'myapp://'}
+            onComplete={() => handleDeeplinkSdkSetupComplete(content.platform)}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'deeplink-test-checklist':
+        return (
+          <DeeplinkTestChecklist
+            onReady={handleDeeplinkTestReady}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'deeplink-test-scenarios':
+        return (
+          <DeeplinkTestScenarios
+            appName={content.appName}
+            platforms={currentApp?.platforms || []}
+            onComplete={handleDeeplinkTestComplete}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'deeplink-complete':
+        return (
+          <DeeplinkComplete
+            onCreateTrackingLink={handleDeeplinkCreateTrackingLink}
+            onContinue={handleDeeplinkContinue}
+            isCompleted={isCompleted}
+          />
+        );
 
       case 'sdk-verify':
         return <SDKVerify onConfirm={handleSDKVerifyConfirm} isCompleted={isCompleted} />;
