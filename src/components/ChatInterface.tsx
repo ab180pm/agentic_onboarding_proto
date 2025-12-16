@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, CheckCircle2, Circle, Sparkles, Copy, Check, ExternalLink,
   Smartphone, Code, Tv, AlertCircle, ChevronRight, ChevronDown, ChevronLeft, Loader2, Plus, Lightbulb,
-  Maximize2, Minimize2, MessageCircle, X, Share2, MessageSquare
+  Maximize2, MessageCircle, X, Share2, MessageSquare
 } from 'lucide-react';
 import { AirbridgeBackground } from './AirbridgeBackground';
 
@@ -569,7 +569,7 @@ function WebSdkInitOptions({ appName, webToken, onComplete, onSkip, isCompleted 
 
   const generateInitCode = () => {
     const optionEntries = Object.entries(options)
-      .filter(([_, value]) => value !== false && value !== '')
+      .filter(([_, value]) => value !== false)
       .map(([key, value]) => `    ${key}: ${typeof value === 'string' ? `'${value}'` : value},`)
       .join('\n');
 
@@ -6262,6 +6262,9 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
   // Sidebar collapse state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  // Sidebar tab state
+  const [sidebarTab, setSidebarTab] = useState<'apps' | 'chats'>('apps');
+
   // Chat rooms state (for Q&A chats)
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
@@ -7398,14 +7401,14 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     if (!app) return;
 
     addUserMessage('Web SDK installation complete');
-    updateStepStatus(app.id, 'web-sdk-install', 'completed');
+    updateAppStepStatus(app.id, 'web-sdk-install', 'completed');
 
     // Move to SDK initialization
     setTimeout(() => {
       addBotMessage([
         { type: 'text', text: '✅ **Web SDK installed!**\n\nNow let\'s continue with the SDK initialization for your other platforms.' },
       ]);
-      updateStepStatus(app.id, 'sdk-init', 'in_progress');
+      updateAppStepStatus(app.id, 'sdk-init', 'in_progress');
     }, 300);
   };
 
@@ -7464,13 +7467,13 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     if (!app) return;
 
     addUserMessage('User identity setup complete');
-    updateStepStatus(app.id, 'web-sdk-install', 'completed');
+    updateAppStepStatus(app.id, 'web-sdk-install', 'completed');
 
     setTimeout(() => {
       addBotMessage([
         { type: 'text', text: '✅ **Web SDK Installation Complete!**\n\nNow let\'s proceed with SDK setup for other platforms.' },
       ]);
-      updateStepStatus(app.id, 'sdk-init', 'in_progress');
+      updateAppStepStatus(app.id, 'sdk-init', 'in_progress');
     }, 300);
   };
 
@@ -7480,13 +7483,13 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     if (!app) return;
 
     addUserMessage('Skipped user identity setup');
-    updateStepStatus(app.id, 'web-sdk-install', 'completed');
+    updateAppStepStatus(app.id, 'web-sdk-install', 'completed');
 
     setTimeout(() => {
       addBotMessage([
         { type: 'text', text: '✅ **Web SDK Installation Complete!**\n\nNow let\'s proceed with SDK setup for other platforms.' },
       ]);
-      updateStepStatus(app.id, 'sdk-init', 'in_progress');
+      updateAppStepStatus(app.id, 'sdk-init', 'in_progress');
     }, 300);
   };
 
@@ -8226,7 +8229,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     if (!app) return;
 
     addUserMessage('SDK test completed successfully');
-    updateStepStatus(app.id, 'sdk-test', 'completed');
+    updateAppStepStatus(app.id, 'sdk-test', 'completed');
 
     // Check if Dev mode
     const isDevMode = app.environment === 'dev';
@@ -8246,7 +8249,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
           { type: 'text', text: '**SDK test passed!** Your SDK integration is working correctly.\n\nNow let\'s set up event tracking to measure user actions in your app.' },
           { type: 'standard-event-select' },
         ]);
-        updateStepStatus(app.id, 'event-taxonomy', 'in_progress');
+        updateAppStepStatus(app.id, 'event-taxonomy', 'in_progress');
       }, 300);
     }
   };
@@ -8275,14 +8278,14 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     if (!app) return;
 
     addUserMessage('Continue to Verification');
-    updateStepStatus(app.id, 'tracking-link', 'completed');
+    updateAppStepStatus(app.id, 'tracking-link', 'completed');
 
     setTimeout(() => {
       addBotMessage([
         { type: 'text', text: '**Phase 5: Verification**\n\nLet\'s verify that everything is working correctly.\n\nFirst, we\'ll test your deep link configuration.' },
         { type: 'deeplink-test' },
       ]);
-      updateStepStatus(app.id, 'deeplink-test', 'in_progress');
+      updateAppStepStatus(app.id, 'deeplink-test', 'in_progress');
     }, 300);
   };
 
@@ -8292,14 +8295,14 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     if (!app) return;
 
     addUserMessage('Attribution test completed');
-    updateStepStatus(app.id, 'attribution-test', 'completed');
+    updateAppStepStatus(app.id, 'attribution-test', 'completed');
 
     setTimeout(() => {
       addBotMessage([
         { type: 'text', text: '**Attribution test passed!** Your attribution tracking is working correctly.\n\nFinally, let\'s verify that data is being collected properly.' },
         { type: 'data-verify' },
       ]);
-      updateStepStatus(app.id, 'data-verify', 'in_progress');
+      updateAppStepStatus(app.id, 'data-verify', 'in_progress');
     }, 300);
   };
 
@@ -8309,7 +8312,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     if (!app) return;
 
     addUserMessage('Data verification completed');
-    updateStepStatus(app.id, 'data-verify', 'completed');
+    updateAppStepStatus(app.id, 'data-verify', 'completed');
 
     setTimeout(() => {
       addBotMessage([
@@ -9155,45 +9158,105 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
   // Main chat content - defined as JSX element to prevent remounting on state changes
   const chatContent = (
-    <div className={`flex bg-gray-50 ${
+    <div className={`flex bg-white overflow-visible ${
       viewMode === 'fullscreen'
         ? 'h-screen w-screen'
         : 'h-[600px] rounded-xl shadow-2xl border border-gray-200 relative'
     }`} style={viewMode !== 'fullscreen' ? { height: '720px', maxHeight: '85vh' } : undefined}>
       {/* View Mode Controls - top right corner (fullscreen only, positioned in main area) */}
-      {/* Sidebar */}
-      <motion.div
-        className={`bg-white border-r border-gray-200 flex flex-col overflow-hidden flex-shrink-0 relative ${
-          isSidebarCollapsed ? 'p-3' : 'p-6'
-        }`}
-        animate={{
-          width: isSidebarCollapsed ? 64 : (viewMode === 'fullscreen' ? 320 : 288),
-        }}
-        transition={{ duration: 0.2, ease: 'easeInOut' }}
-      >
-        {/* Toggle Button */}
-        <button
-          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className="absolute top-4 right-2 p-1.5 rounded-lg hover:bg-gray-100 transition-colors z-10"
-          title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      {/* Sidebar Container */}
+      <div className="flex-shrink-0 relative">
+        {/* Sidebar */}
+        <motion.div
+          className={`bg-white border-r border-gray-200 flex flex-col overflow-hidden h-full ${
+            isSidebarCollapsed ? 'p-3' : 'p-6'
+          }`}
+          animate={{
+            width: isSidebarCollapsed ? 64 : (viewMode === 'fullscreen' ? 320 : 288),
+          }}
+          transition={{ duration: 0.2, ease: 'easeInOut' }}
         >
-          {isSidebarCollapsed ? (
-            <ChevronRight className="w-4 h-4 text-gray-500" />
-          ) : (
-            <ChevronLeft className="w-4 h-4 text-gray-500" />
+
+        {/* Sidebar Header with Title and Collapse Button */}
+        <div className={`flex items-center mb-4 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+          {!isSidebarCollapsed && (
+            <h2 className="font-semibold text-gray-900">Airbridge AI</h2>
           )}
-        </button>
+          <button
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="relative w-7 h-7 rounded-full border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 active:bg-blue-100 flex items-center justify-center text-gray-500 transition-all shadow-sm before:absolute before:inset-[-5px] before:content-['']"
+            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <motion.div
+              animate={{ rotate: isSidebarCollapsed ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </motion.div>
+          </button>
+        </div>
+
+        {/* Tab Buttons - Expanded */}
+        {!isSidebarCollapsed && (
+          <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-lg">
+            <button
+              onClick={() => setSidebarTab('apps')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                sidebarTab === 'apps'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Smartphone className="w-4 h-4" />
+              Apps
+            </button>
+            <button
+              onClick={() => setSidebarTab('chats')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                sidebarTab === 'chats'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <MessageCircle className="w-4 h-4" />
+              Chats
+            </button>
+          </div>
+        )}
+
+        {/* Tab Icons - Collapsed */}
+        {isSidebarCollapsed && (
+          <div className="flex flex-col gap-2 mb-4">
+            <button
+              onClick={() => setSidebarTab('apps')}
+              className={`p-2 rounded-lg transition-all flex items-center justify-center ${
+                sidebarTab === 'apps'
+                  ? 'bg-blue-100 text-blue-600'
+                  : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+              }`}
+              title="Apps"
+            >
+              <Smartphone className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setSidebarTab('chats')}
+              className={`p-2 rounded-lg transition-all flex items-center justify-center ${
+                sidebarTab === 'chats'
+                  ? 'bg-blue-100 text-blue-600'
+                  : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+              }`}
+              title="Chats"
+            >
+              <MessageCircle className="w-5 h-5" />
+            </button>
+          </div>
+        )}
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-4">
           {/* MY APPS Section */}
+          {sidebarTab === 'apps' && (
           <div>
-            {/* Section Header */}
-            {!isSidebarCollapsed && (
-              <div className={`text-xs font-medium uppercase tracking-wide mb-2 mt-2 ${!currentChatId ? 'text-blue-600' : 'text-gray-400'}`}>
-                My Apps
-              </div>
-            )}
 
             {/* Add New App Button */}
             {isSidebarCollapsed ? (
@@ -9202,7 +9265,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
                 className="w-full mb-2 p-2 rounded-lg border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-500 hover:text-blue-600 transition-all flex items-center justify-center"
                 title="Add New App"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-5 h-5" />
               </button>
             ) : (
               <button
@@ -9218,11 +9281,12 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
             {isAddingApp && (
               <button
                 onClick={() => { setCurrentChatId(null); setCurrentAppId(null); }}
-                className={`w-full rounded-xl mb-2 transition-colors ${
+                className={`w-full rounded-xl mb-2 transition-colors ${isSidebarCollapsed ? 'p-2 flex items-center justify-center' : 'p-3'} ${
                   !currentChatId && !currentAppId
                     ? 'bg-blue-50 border border-blue-500'
                     : 'bg-white border border-gray-200 hover:bg-gray-50'
-                } ${isSidebarCollapsed ? 'p-2 flex justify-center' : 'p-3'}`}
+                }`}
+                title={isSidebarCollapsed ? (setupState.appInfo.appName || 'New App') : undefined}
               >
                 {isSidebarCollapsed ? (
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
@@ -9255,9 +9319,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
                   {/* App Header */}
                   <button
                     onClick={() => { handleBackToOnboarding(); toggleAppExpansion(app.id); setCurrentAppId(app.id); }}
-                    className={`w-full flex items-center transition-colors ${
-                      isSidebarCollapsed ? 'p-2 justify-center' : 'p-3 gap-2'
-                    } ${!currentChatId && currentAppId === app.id ? '' : 'hover:bg-gray-50'}`}
+                    className={`w-full flex items-center transition-colors ${isSidebarCollapsed ? 'p-2 justify-center' : 'p-3 gap-2'} ${!currentChatId && currentAppId === app.id ? '' : 'hover:bg-gray-50'}`}
                     title={isSidebarCollapsed ? app.appInfo.appName : undefined}
                   >
                     <div className={`rounded-lg flex items-center justify-center w-8 h-8 ${
@@ -9377,16 +9439,11 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
               ))}
             </div>
           </div>
+          )}
 
           {/* CHATS Section */}
+          {sidebarTab === 'chats' && (
           <div>
-            {/* Section Header */}
-            {!isSidebarCollapsed && (
-              <div className={`text-xs font-medium uppercase tracking-wide mb-2 mt-4 ${currentChatId ? 'text-blue-600' : 'text-gray-400'}`}>
-                Chats
-              </div>
-            )}
-
             {/* New Chat Button */}
             {isSidebarCollapsed ? (
               <button
@@ -9394,7 +9451,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
                 className="w-full mb-2 p-2 rounded-lg border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-500 hover:text-blue-600 transition-all flex items-center justify-center"
                 title="New Chat"
               >
-                <MessageCircle className="w-4 h-4" />
+                <MessageCircle className="w-5 h-5" />
               </button>
             ) : (
               <button
@@ -9412,13 +9469,13 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
                 <button
                   key={chat.id}
                   onClick={() => handleSelectChat(chat.id)}
-                  className={`w-full rounded-xl overflow-hidden border transition-colors ${
+                  className={`w-full rounded-xl overflow-hidden border transition-colors ${isSidebarCollapsed ? 'p-2 flex justify-center' : 'p-3'} ${
                     currentChatId === chat.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
-                  } ${isSidebarCollapsed ? 'p-2 flex justify-center' : 'p-3'}`}
+                  }`}
                   title={isSidebarCollapsed ? chat.title : undefined}
                 >
                   {isSidebarCollapsed ? (
-                    <MessageCircle className={`w-4 h-4 ${currentChatId === chat.id ? 'text-blue-600' : 'text-gray-500'}`} />
+                    <MessageCircle className={`w-5 h-5 ${currentChatId === chat.id ? 'text-blue-600' : 'text-gray-400'}`} />
                   ) : (
                     <div className="flex items-center gap-2">
                       <MessageCircle className={`w-4 h-4 flex-shrink-0 ${currentChatId === chat.id ? 'text-blue-600' : 'text-gray-400'}`} />
@@ -9429,26 +9486,24 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
               ))}
             </div>
           </div>
+          )}
         </div>
       </motion.div>
+
+      </div>
 
       {/* Chat Area */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 p-6 flex-shrink-0">
+        <div className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex-1">
               <h1 className="font-semibold text-lg">
                 {currentChatRoom ? currentChatRoom.title : 'Onboarding Manager'}
               </h1>
-              <p className="text-gray-600 text-sm mt-1">
-                {currentChatRoom ? 'Ask anything about Airbridge' : 'Airbridge Onboarding Manager is here to help'}
-              </p>
             </div>
             {/* View Mode Controls */}
-            <div className="self-start">
-              <ViewModeControls compact />
-            </div>
+            <ViewModeControls compact />
           </div>
         </div>
 
