@@ -6206,6 +6206,9 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
   // View mode state
   const [viewMode, setViewMode] = useState<ViewMode>('fullscreen');
 
+  // Sidebar collapse state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   // Registered apps state
   const [registeredApps, setRegisteredApps] = useState<RegisteredApp[]>([]);
   const [currentAppId, setCurrentAppId] = useState<string | null>(null);
@@ -8911,92 +8914,124 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     }`} style={viewMode !== 'fullscreen' ? { height: '720px', maxHeight: '85vh' } : undefined}>
       {/* View Mode Controls - top right corner (fullscreen only, positioned in main area) */}
       {/* Sidebar */}
-      <div
-        className="bg-white border-r border-gray-200 p-6 flex flex-col overflow-hidden flex-shrink-0"
-        style={{ width: viewMode === 'fullscreen' ? '320px' : '288px', minWidth: viewMode === 'fullscreen' ? '320px' : '288px', maxWidth: viewMode === 'fullscreen' ? '320px' : '288px' }}
+      <motion.div
+        className={`bg-white border-r border-gray-200 flex flex-col overflow-hidden flex-shrink-0 relative ${
+          isSidebarCollapsed ? 'p-3' : 'p-6'
+        }`}
+        animate={{
+          width: isSidebarCollapsed ? 64 : (viewMode === 'fullscreen' ? 320 : 288),
+        }}
+        transition={{ duration: 0.2, ease: 'easeInOut' }}
       >
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-2">
+        {/* Toggle Button */}
+        <button
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="absolute top-4 right-2 p-1.5 rounded-lg hover:bg-gray-100 transition-colors z-10"
+          title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {isSidebarCollapsed ? (
+            <ChevronRight className="w-4 h-4 text-gray-500" />
+          ) : (
+            <ChevronLeft className="w-4 h-4 text-gray-500" />
+          )}
+        </button>
+
+        {/* Header */}
+        <div className={`mb-4 ${isSidebarCollapsed ? 'flex justify-center pt-6' : ''}`}>
+          {isSidebarCollapsed ? (
             <Sparkles className="w-5 h-5 text-blue-600" />
-            <h2 className="font-semibold">Setup Guide</h2>
-          </div>
-          <p className="text-sm text-gray-600">
-            Complete your Airbridge setup
-          </p>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-5 h-5 text-blue-600" />
+                <h2 className="font-semibold">Setup Guide</h2>
+              </div>
+              <p className="text-sm text-gray-600">
+                Complete your Airbridge setup
+              </p>
+            </>
+          )}
         </div>
 
-        {/* Phase 1: App Registration */}
-        <div className="space-y-4 flex-1 overflow-y-auto overflow-x-hidden">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className={`text-xs font-medium ${currentPhase >= 1 ? 'text-blue-600' : 'text-gray-400'}`}>
-                Phase 1: App Registration
-              </div>
-              {registeredApps.length > 0 && (
-                <span className="text-sm px-3 py-1 rounded-full bg-green-100 text-green-800">
-                  {registeredApps.length} app{registeredApps.length > 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
+        {/* Add New App Button */}
+        {isSidebarCollapsed ? (
+          <button
+            onClick={handleAddAnotherApp}
+            className="w-full mb-4 p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all flex items-center justify-center"
+            title="Add New App"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        ) : (
+          <button
+            onClick={handleAddAnotherApp}
+            className="w-full mb-4 p-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all flex items-center justify-center gap-2 text-sm font-medium shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Add New App
+          </button>
+        )}
 
-            {/* Current app registration in progress */}
-            {isAddingApp && (
-              <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 mb-2">
+        {/* App List - Scrollable */}
+        <div className="space-y-2 flex-1 overflow-y-auto overflow-x-hidden">
+          {/* Current app registration in progress */}
+          {isAddingApp && (
+            <div className={`rounded-xl bg-blue-50 border border-blue-200 ${isSidebarCollapsed ? 'p-2 flex justify-center' : 'p-3'}`}>
+              {isSidebarCollapsed ? (
+                <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+              ) : (
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-white border border-blue-200 flex items-center justify-center flex-shrink-0">
-                    <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                  <div className="w-8 h-8 rounded-full bg-white border border-blue-200 flex items-center justify-center flex-shrink-0">
+                    <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-blue-700">
                       {setupState.appInfo.appName || 'New App'}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">
-                      Registering...
-                    </div>
+                    <div className="text-xs text-gray-500 truncate">Registering...</div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          )}
 
-            {/* Add Another App button - show when not currently adding and has registered apps */}
-            {!isAddingApp && registeredApps.length > 0 && (
-              <button
-                onClick={handleAddAnotherApp}
-                className="w-full p-3 rounded-xl border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 text-sm text-gray-600 hover:text-blue-600"
-              >
-                <Plus className="w-4 h-4" />
-                Add Another App
-              </button>
-            )}
-          </div>
-
-          {/* Registered Apps with their Phase 2,3 */}
+          {/* Registered Apps */}
           {registeredApps.map((app) => (
-            <div key={app.id} className="border border-gray-200 rounded-xl overflow-hidden max-w-full">
-              {/* App Header - clickable to toggle */}
+            <div key={app.id} className="border border-gray-200 rounded-xl overflow-hidden">
+              {/* App Header */}
               <button
                 onClick={() => toggleAppExpansion(app.id)}
-                className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors"
+                className={`w-full flex items-center hover:bg-gray-50 transition-colors ${
+                  isSidebarCollapsed ? 'p-2 justify-center' : 'p-3 gap-2'
+                }`}
+                title={isSidebarCollapsed ? app.appInfo.appName : undefined}
               >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-50">
+                <div className={`rounded-lg flex items-center justify-center bg-blue-50 ${
+                  isSidebarCollapsed ? 'w-8 h-8' : 'w-8 h-8'
+                }`}>
                   <Smartphone className="w-4 h-4 text-blue-500" />
                 </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <div className="text-sm font-medium text-gray-900 truncate">{app.appInfo.appName}</div>
-                  <div className="text-xs text-gray-500">
-                    {app.platforms.map(p => p === 'ios' ? 'iOS' : p === 'android' ? 'Android' : 'Web').join(', ')} • {app.environment === 'dev' ? 'Dev' : 'Prod'}
-                  </div>
-                </div>
-                {app.isExpanded ? (
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
+
+                {!isSidebarCollapsed && (
+                  <>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="text-sm font-medium text-gray-900 truncate">{app.appInfo.appName}</div>
+                      <div className="text-xs text-gray-500">
+                        {app.platforms.map(p => p === 'ios' ? 'iOS' : p === 'android' ? 'Android' : 'Web').join(', ')} • {app.environment === 'dev' ? 'Dev' : 'Prod'}
+                      </div>
+                    </div>
+                    {app.isExpanded ? (
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    )}
+                  </>
                 )}
               </button>
 
-              {/* Collapsible Phase 2,3 content */}
+              {/* Collapsible Steps - only when sidebar expanded AND app expanded */}
               <AnimatePresence>
-                {app.isExpanded && (
+                {!isSidebarCollapsed && app.isExpanded && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
@@ -9004,160 +9039,44 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
                     transition={{ duration: 0.2 }}
                     className="overflow-hidden"
                   >
-                    <div className="px-4 py-4 space-y-4 border-t border-gray-100 min-w-0">
-                      {/* Phase 2: SDK Installation */}
-                      <div className="min-w-0">
-                        <div className={`text-sm font-medium mb-3 truncate ${app.currentPhase >= 2 ? 'text-blue-600' : 'text-gray-400'}`}>
-                          Phase 2: SDK Installation
-                        </div>
-                        <div className="space-y-2">
-                          {app.steps.filter(s => s.phase === 2).map((step) => {
-                            const isDisabled = !canStartStep(app, step.id) && step.status === 'pending';
-                            return (
-                              <button
-                                key={step.id}
-                                onClick={() => !isDisabled && handleStepClick(app.id, step)}
-                                disabled={isDisabled}
-                                className={`w-full p-3 rounded-xl transition-all text-sm text-left ${
-                                  isDisabled
-                                    ? 'bg-gray-50 border border-gray-100 opacity-50 cursor-not-allowed'
-                                    : step.status === 'completed'
-                                    ? 'bg-green-50 border border-green-200 hover:bg-green-100 cursor-pointer hover:shadow-md'
-                                    : step.status === 'in_progress'
-                                    ? 'bg-blue-50 border border-blue-200 hover:bg-blue-100 cursor-pointer hover:shadow-md'
-                                    : 'bg-gray-50 border border-gray-100 hover:bg-gray-100 cursor-pointer hover:shadow-md'
-                                }`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  {step.status === 'completed' ? (
-                                    <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
-                                  ) : step.status === 'in_progress' ? (
-                                    <Loader2 className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
-                                  ) : (
-                                    <Circle className={`w-5 h-5 flex-shrink-0 ${isDisabled ? 'text-gray-200' : 'text-gray-300'}`} />
-                                  )}
-                                  <span className={`flex-1 truncate ${
-                                    isDisabled ? 'text-gray-400' :
-                                    step.status === 'completed' ? 'text-green-700' :
-                                    step.status === 'in_progress' ? 'text-blue-700' : 'text-gray-500'
-                                  }`}>
-                                    {step.title}
-                                  </span>
-                                  <ChevronRight className={`w-4 h-4 flex-shrink-0 ${
-                                    isDisabled ? 'text-gray-200' :
-                                    step.status === 'completed' ? 'text-green-400' :
-                                    step.status === 'in_progress' ? 'text-blue-400' : 'text-gray-300'
-                                  }`} />
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Phase 3: Event Taxonomy - Hidden for Dev mode */}
-                      {app.environment !== 'dev' && app.steps.filter(s => s.phase === 3).length > 0 && (
-                        <div>
-                          <div className={`text-sm font-medium mb-3 truncate ${app.currentPhase >= 3 ? 'text-blue-600' : 'text-gray-400'}`}>
-                            Phase 3: Event Taxonomy
-                          </div>
-                          <div className="space-y-2">
-                            {app.steps.filter(s => s.phase === 3).map((step) => {
-                              const isDisabled = !canStartStep(app, step.id) && step.status === 'pending';
-                              return (
-                                <button
-                                  key={step.id}
-                                  onClick={() => !isDisabled && handleStepClick(app.id, step)}
-                                  disabled={isDisabled}
-                                  className={`w-full p-3 rounded-xl transition-all text-sm text-left ${
-                                    isDisabled
-                                      ? 'bg-gray-50 border border-gray-100 opacity-50 cursor-not-allowed'
-                                      : step.status === 'completed'
-                                      ? 'bg-green-50 border border-green-200 hover:bg-green-100 cursor-pointer hover:shadow-md'
-                                      : step.status === 'in_progress'
-                                      ? 'bg-blue-50 border border-blue-200 hover:bg-blue-100 cursor-pointer hover:shadow-md'
-                                      : 'bg-gray-50 border border-gray-100 hover:bg-gray-100 cursor-pointer hover:shadow-md'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    {step.status === 'completed' ? (
-                                      <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
-                                    ) : step.status === 'in_progress' ? (
-                                      <Loader2 className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
-                                    ) : (
-                                      <Circle className={`w-5 h-5 flex-shrink-0 ${isDisabled ? 'text-gray-200' : 'text-gray-300'}`} />
-                                    )}
-                                    <span className={`flex-1 truncate ${
-                                      isDisabled ? 'text-gray-400' :
-                                      step.status === 'completed' ? 'text-green-700' :
-                                      step.status === 'in_progress' ? 'text-blue-700' : 'text-gray-500'
-                                    }`}>
-                                      {step.title}
-                                    </span>
-                                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${
-                                      isDisabled ? 'text-gray-200' :
-                                      step.status === 'completed' ? 'text-green-400' :
-                                      step.status === 'in_progress' ? 'text-blue-400' : 'text-gray-300'
-                                    }`} />
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Phase 4: Ad Channel Integration - Hidden for Dev mode */}
-                      {app.environment !== 'dev' && app.steps.filter(s => s.phase === 4).length > 0 && (
-                        <div>
-                          <div className={`text-sm font-medium mb-3 truncate ${app.currentPhase >= 4 ? 'text-blue-600' : 'text-gray-400'}`}>
-                            Phase 4: Ad Channel Integration
-                          </div>
-                          <div className="space-y-2">
-                            {app.steps.filter(s => s.phase === 4).map((step) => {
-                              const isDisabled = !canStartStep(app, step.id) && step.status === 'pending';
-                              return (
-                                <button
-                                  key={step.id}
-                                  onClick={() => !isDisabled && handleStepClick(app.id, step)}
-                                  disabled={isDisabled}
-                                  className={`w-full p-3 rounded-xl transition-all text-sm text-left ${
-                                    isDisabled
-                                      ? 'bg-gray-50 border border-gray-100 opacity-50 cursor-not-allowed'
-                                      : step.status === 'completed'
-                                      ? 'bg-green-50 border border-green-200 hover:bg-green-100 cursor-pointer hover:shadow-md'
-                                      : step.status === 'in_progress'
-                                      ? 'bg-blue-50 border border-blue-200 hover:bg-blue-100 cursor-pointer hover:shadow-md'
-                                      : 'bg-gray-50 border border-gray-100 hover:bg-gray-100 cursor-pointer hover:shadow-md'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    {step.status === 'completed' ? (
-                                      <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
-                                    ) : step.status === 'in_progress' ? (
-                                      <Loader2 className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
-                                    ) : (
-                                      <Circle className={`w-5 h-5 flex-shrink-0 ${isDisabled ? 'text-gray-200' : 'text-gray-300'}`} />
-                                    )}
-                                    <span className={`flex-1 truncate ${
-                                      isDisabled ? 'text-gray-400' :
-                                      step.status === 'completed' ? 'text-green-700' :
-                                      step.status === 'in_progress' ? 'text-blue-700' : 'text-gray-500'
-                                    }`}>
-                                      {step.title}
-                                    </span>
-                                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${
-                                      isDisabled ? 'text-gray-200' :
-                                      step.status === 'completed' ? 'text-green-400' :
-                                      step.status === 'in_progress' ? 'text-blue-400' : 'text-gray-300'
-                                    }`} />
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
+                    <div className="px-3 pb-3 space-y-1 border-t border-gray-100">
+                      {/* All steps - no phase separation */}
+                      {app.steps.map((step) => {
+                        const isDisabled = !canStartStep(app, step.id) && step.status === 'pending';
+                        return (
+                          <button
+                            key={step.id}
+                            onClick={() => !isDisabled && handleStepClick(app.id, step)}
+                            disabled={isDisabled}
+                            className={`w-full p-2 rounded-lg transition-all text-sm text-left ${
+                              isDisabled
+                                ? 'opacity-50 cursor-not-allowed'
+                                : step.status === 'completed'
+                                ? 'bg-green-50 hover:bg-green-100'
+                                : step.status === 'in_progress'
+                                ? 'bg-blue-50 hover:bg-blue-100'
+                                : 'hover:bg-gray-100'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              {step.status === 'completed' ? (
+                                <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                              ) : step.status === 'in_progress' ? (
+                                <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
+                              ) : (
+                                <Circle className={`w-4 h-4 flex-shrink-0 ${isDisabled ? 'text-gray-200' : 'text-gray-300'}`} />
+                              )}
+                              <span className={`flex-1 truncate text-xs ${
+                                isDisabled ? 'text-gray-400' :
+                                step.status === 'completed' ? 'text-green-700' :
+                                step.status === 'in_progress' ? 'text-blue-700' : 'text-gray-600'
+                              }`}>
+                                {step.title}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </motion.div>
                 )}
@@ -9165,25 +9084,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
             </div>
           ))}
         </div>
-
-        {/* Progress */}
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <div className="text-sm text-gray-600 mb-2">Overall Progress</div>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.5 }}
-              />
-            </div>
-            <span className="text-sm font-medium">
-              {completedSteps}/{totalSteps || '-'}
-            </span>
-          </div>
-        </div>
-      </div>
+      </motion.div>
 
       {/* Chat Area */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
