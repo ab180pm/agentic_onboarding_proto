@@ -121,7 +121,8 @@ type MessageContent =
   | { type: 'attribution-test-result'; passed: boolean }
   | { type: 'data-verify' }
   | { type: 'data-verify-result'; metrics: DataVerifyMetrics }
-  | { type: 'onboarding-complete' };
+  | { type: 'onboarding-complete' }
+  | { type: 'category-navigation' };
 
 type Message = {
   id: string;
@@ -130,12 +131,20 @@ type Message = {
   timestamp: Date;
 };
 
+type ChatRoom = {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: Date;
+};
+
 type OnboardingStep = {
   id: string;
   phase: number;
   title: string;
   description: string;
   status: 'pending' | 'in_progress' | 'completed';
+  category: 'sdk' | 'deeplink' | 'integration' | 'event-taxonomy';
 };
 
 type CompletionData = {
@@ -258,36 +267,37 @@ type RegisteredApp = {
   framework: string;
   channels: string[];
   isExpanded: boolean;
+  messages: Message[]; // App-specific chat history
 };
 
 // Production mode steps - full onboarding flow
 const createAppSteps = (platforms: string[] = []): OnboardingStep[] => {
   const steps: OnboardingStep[] = [
-    // Phase 2: SDK Installation & Setup
-    { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install SDK packages', status: 'pending' },
+    // SDK category
+    { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install SDK packages', status: 'pending', category: 'sdk' },
   ];
 
   // Add Web SDK Install step if web platform is selected
   if (platforms.includes('web')) {
-    steps.push({ id: 'web-sdk-install', phase: 2, title: 'Web SDK Installation', description: 'Install Web SDK', status: 'pending' });
+    steps.push({ id: 'web-sdk-install', phase: 2, title: 'Web SDK Installation', description: 'Install Web SDK', status: 'pending', category: 'sdk' });
   }
 
   steps.push(
-    { id: 'sdk-init', phase: 2, title: 'SDK Initialization', description: 'Add SDK code to your app', status: 'pending' },
-    { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links', status: 'pending' },
-    { id: 'sdk-test', phase: 2, title: 'SDK Test', description: 'Test SDK integration', status: 'pending' },
-    // Phase 3: Event Taxonomy
-    { id: 'event-taxonomy', phase: 3, title: 'Event Taxonomy', description: 'Define events to track', status: 'pending' },
-    // Phase 4: Ad Channel Integration
-    { id: 'channel-select', phase: 4, title: 'Channel Selection', description: 'Select ad platforms', status: 'pending' },
-    { id: 'channel-integration', phase: 4, title: 'Channel Integration', description: 'Connect to ad platforms', status: 'pending' },
-    { id: 'cost-integration', phase: 4, title: 'Cost Integration', description: 'Enable cost data import', status: 'pending' },
-    { id: 'skan-integration', phase: 4, title: 'SKAN Integration', description: 'iOS attribution setup', status: 'pending' },
-    { id: 'tracking-link', phase: 4, title: 'Tracking Link', description: 'Create tracking links', status: 'pending' },
-    // Phase 5: Verification
-    { id: 'deeplink-test', phase: 5, title: 'Deep Link Test', description: 'Test deep link functionality', status: 'pending' },
-    { id: 'attribution-test', phase: 5, title: 'Attribution Test', description: 'Verify attribution setup', status: 'pending' },
-    { id: 'data-verify', phase: 5, title: 'Data Verification', description: 'Confirm data collection', status: 'pending' },
+    { id: 'sdk-init', phase: 2, title: 'SDK Initialization', description: 'Add SDK code to your app', status: 'pending', category: 'sdk' },
+    { id: 'sdk-test', phase: 2, title: 'SDK Test', description: 'Test SDK integration', status: 'pending', category: 'sdk' },
+    // Deep Link category
+    { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links', status: 'pending', category: 'deeplink' },
+    { id: 'tracking-link', phase: 4, title: 'Tracking Link', description: 'Create tracking links', status: 'pending', category: 'deeplink' },
+    { id: 'deeplink-test', phase: 5, title: 'Deep Link Test', description: 'Test deep link functionality', status: 'pending', category: 'deeplink' },
+    // Event Taxonomy category
+    { id: 'event-taxonomy', phase: 3, title: 'Event Taxonomy', description: 'Define events to track', status: 'pending', category: 'event-taxonomy' },
+    // Integration category
+    { id: 'channel-select', phase: 4, title: 'Channel Selection', description: 'Select ad platforms', status: 'pending', category: 'integration' },
+    { id: 'channel-integration', phase: 4, title: 'Channel Integration', description: 'Connect to ad platforms', status: 'pending', category: 'integration' },
+    { id: 'cost-integration', phase: 4, title: 'Cost Integration', description: 'Enable cost data import', status: 'pending', category: 'integration' },
+    { id: 'skan-integration', phase: 4, title: 'SKAN Integration', description: 'iOS attribution setup', status: 'pending', category: 'integration' },
+    { id: 'attribution-test', phase: 5, title: 'Attribution Test', description: 'Verify attribution setup', status: 'pending', category: 'integration' },
+    { id: 'data-verify', phase: 5, title: 'Data Verification', description: 'Confirm data collection', status: 'pending', category: 'integration' },
   );
 
   return steps;
@@ -296,19 +306,20 @@ const createAppSteps = (platforms: string[] = []): OnboardingStep[] => {
 // Dev mode steps - simplified flow (SDK setup only)
 const createDevAppSteps = (platforms: string[] = []): OnboardingStep[] => {
   const steps: OnboardingStep[] = [
-    // Phase 2: SDK Installation & Setup only
-    { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install SDK packages', status: 'pending' },
+    // SDK category
+    { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install SDK packages', status: 'pending', category: 'sdk' },
   ];
 
   // Add Web SDK Install step if web platform is selected
   if (platforms.includes('web')) {
-    steps.push({ id: 'web-sdk-install', phase: 2, title: 'Web SDK Installation', description: 'Install Web SDK', status: 'pending' });
+    steps.push({ id: 'web-sdk-install', phase: 2, title: 'Web SDK Installation', description: 'Install Web SDK', status: 'pending', category: 'sdk' });
   }
 
   steps.push(
-    { id: 'sdk-init', phase: 2, title: 'SDK Initialization', description: 'Add SDK code to your app', status: 'pending' },
-    { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links', status: 'pending' },
-    { id: 'sdk-test', phase: 2, title: 'SDK Test', description: 'Test SDK integration', status: 'pending' },
+    { id: 'sdk-init', phase: 2, title: 'SDK Initialization', description: 'Add SDK code to your app', status: 'pending', category: 'sdk' },
+    { id: 'sdk-test', phase: 2, title: 'SDK Test', description: 'Test SDK integration', status: 'pending', category: 'sdk' },
+    // Deep Link category
+    { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links', status: 'pending', category: 'deeplink' },
   );
 
   return steps;
@@ -1596,6 +1607,48 @@ Please complete the SDK installation and let me know when it's done!
         <p className="text-xs text-gray-400 mt-2 text-center">
           See how Airbridge works with sample data
         </p>
+      </div>
+    </div>
+  );
+}
+
+// Category Navigation Component
+function CategoryNavigation({ onSelect, isCompleted = false }: {
+  onSelect: (category: string) => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500">Category selected</div>
+      </div>
+    );
+  }
+
+  const categories = [
+    { id: 'deeplink', label: 'Deep Link', icon: '🔗', description: 'Set up deep links and tracking links' },
+    { id: 'event-taxonomy', label: 'Event Taxonomy', icon: '📊', description: 'Define events to track in your app' },
+    { id: 'integration', label: 'Integration', icon: '📡', description: 'Connect ad platforms and channels' },
+  ];
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="text-sm font-medium text-gray-700 mb-3">What would you like to set up next?</div>
+      <div className="space-y-2">
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => onSelect(cat.id)}
+            className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+          >
+            <div className="text-xl">{cat.icon}</div>
+            <div className="flex-1">
+              <div className="font-medium text-gray-900 text-sm">{cat.label}</div>
+              <div className="text-xs text-gray-500">{cat.description}</div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400" />
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -6209,6 +6262,10 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
   // Sidebar collapse state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  // Chat rooms state (for Q&A chats)
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+
   // Registered apps state
   const [registeredApps, setRegisteredApps] = useState<RegisteredApp[]>([]);
   const [currentAppId, setCurrentAppId] = useState<string | null>(null);
@@ -6254,6 +6311,74 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     ));
   };
 
+  // Get current chat room
+  const currentChatRoom = currentChatId ? chatRooms.find(c => c.id === currentChatId) : null;
+
+  // Get messages to display (priority: chat room > registered app > new app registration)
+  const currentMessages = currentChatRoom
+    ? currentChatRoom.messages
+    : currentApp
+      ? currentApp.messages
+      : messages;
+
+  // Create new chat room
+  const handleNewChat = () => {
+    const newChatId = `chat-${Date.now()}`;
+    const welcomeMessage: Message = {
+      id: `msg-${Date.now()}`,
+      role: 'bot',
+      content: [{ type: 'text', text: '👋 안녕하세요! Airbridge Q&A 봇입니다.\nSDK 설치, 딥링크, 어트리뷰션 등 궁금한 것을 물어보세요.' }],
+      timestamp: new Date(),
+    };
+    const newChatRoom: ChatRoom = {
+      id: newChatId,
+      title: 'New Chat',
+      messages: [welcomeMessage],
+      createdAt: new Date(),
+    };
+    setChatRooms(prev => [newChatRoom, ...prev]);
+    setCurrentChatId(newChatId);
+  };
+
+  // Select chat room
+  const handleSelectChat = (chatId: string) => {
+    setCurrentChatId(chatId);
+  };
+
+  // Go back to onboarding (deselect chat)
+  const handleBackToOnboarding = () => {
+    setCurrentChatId(null);
+  };
+
+  // Add message to current chat room
+  const addChatMessage = (content: MessageContent[], role: 'bot' | 'user') => {
+    if (!currentChatId) return;
+
+    const newMessage: Message = {
+      id: `msg-${Date.now()}`,
+      role,
+      content,
+      timestamp: new Date(),
+    };
+
+    setChatRooms(prev => prev.map(room => {
+      if (room.id !== currentChatId) return room;
+
+      const updatedMessages = [...room.messages, newMessage];
+
+      // Auto-generate title from first user message
+      let title = room.title;
+      if (role === 'user' && room.title === 'New Chat') {
+        const textContent = content.find(c => c.type === 'text');
+        if (textContent && textContent.type === 'text') {
+          title = textContent.text.slice(0, 20) + (textContent.text.length > 20 ? '...' : '');
+        }
+      }
+
+      return { ...room, messages: updatedMessages, title };
+    }));
+  };
+
   // Start adding another app
   const handleAddAnotherApp = () => {
     setIsAddingApp(true);
@@ -6269,12 +6394,17 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     });
     setCurrentPhase(1);
 
-    setTimeout(() => {
-      addBotMessage([
+    // Set initial message directly to avoid closure issues
+    const initialMessage: Message = {
+      id: Date.now().toString(),
+      role: 'bot',
+      content: [
         { type: 'text', text: '➕ Let\'s add another app!\n\nWhich environment would you like to set up?' },
         { type: 'environment-select' },
-      ]);
-    }, 300);
+      ],
+      timestamp: new Date(),
+    };
+    setMessages([initialMessage]);
   };
 
   const scrollToBottom = () => {
@@ -6283,7 +6413,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [currentMessages]);
 
   // Scroll to bottom when view mode changes
   useEffect(() => {
@@ -6302,23 +6432,45 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
         content,
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, newMessage]);
+
+      // If viewing a registered app, update that app's messages
+      if (currentAppId) {
+        setRegisteredApps(prev => prev.map(app =>
+          app.id === currentAppId
+            ? { ...app, messages: [...app.messages, newMessage] }
+            : app
+        ));
+      } else {
+        // New app registration - update messages state
+        setMessages(prev => [...prev, newMessage]);
+      }
       setIsTyping(false);
     }, 600);
   };
 
   // Update the last bot message (replace content)
   const updateLastBotMessage = (content: MessageContent[]) => {
-    setMessages(prev => {
-      const lastBotIndex = prev.map(m => m.role).lastIndexOf('bot');
-      if (lastBotIndex === -1) return prev;
-      const updated = [...prev];
-      updated[lastBotIndex] = {
-        ...updated[lastBotIndex],
-        content,
-      };
-      return updated;
-    });
+    if (currentAppId) {
+      setRegisteredApps(prev => prev.map(app => {
+        if (app.id !== currentAppId) return app;
+        const lastBotIndex = app.messages.map(m => m.role).lastIndexOf('bot');
+        if (lastBotIndex === -1) return app;
+        const updated = [...app.messages];
+        updated[lastBotIndex] = { ...updated[lastBotIndex], content };
+        return { ...app, messages: updated };
+      }));
+    } else {
+      setMessages(prev => {
+        const lastBotIndex = prev.map(m => m.role).lastIndexOf('bot');
+        if (lastBotIndex === -1) return prev;
+        const updated = [...prev];
+        updated[lastBotIndex] = {
+          ...updated[lastBotIndex],
+          content,
+        };
+        return updated;
+      });
+    }
   };
 
   const addUserMessage = (text: string) => {
@@ -6328,7 +6480,18 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       content: [{ type: 'text', text }],
       timestamp: new Date(),
     };
-    setMessages(prev => [...prev, newMessage]);
+
+    // If viewing a registered app, update that app's messages
+    if (currentAppId) {
+      setRegisteredApps(prev => prev.map(app =>
+        app.id === currentAppId
+          ? { ...app, messages: [...app.messages, newMessage] }
+          : app
+      ));
+    } else {
+      // New app registration - update messages state
+      setMessages(prev => [...prev, newMessage]);
+    }
   };
 
   // Get user's goal from survey (question 7)
@@ -6661,6 +6824,12 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
   // Complete app registration and move to SDK setup
   const completeAppRegistration = () => {
+    // Guard: prevent duplicate app creation
+    if (!isAddingApp) {
+      console.log('[completeAppRegistration] Skipped - app already created');
+      return;
+    }
+
     const newAppId = Date.now().toString();
     const newApp: RegisteredApp = {
       id: newAppId,
@@ -6672,6 +6841,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       framework: '',
       channels: [],
       isExpanded: true,
+      messages: [...messages], // Save current messages to the app
     };
 
     setRegisteredApps(prev => [
@@ -6823,6 +6993,12 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
   // Dashboard confirm handler - auto-detected
   const handleDashboardConfirm = (status: string) => {
+    // Guard: prevent duplicate app creation
+    if (!isAddingApp) {
+      console.log('[handleDashboardConfirm] Skipped - app already created');
+      return;
+    }
+
     // Create new registered app
     const newAppId = Date.now().toString();
     const newApp: RegisteredApp = {
@@ -6835,6 +7011,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       framework: '',
       channels: [],
       isExpanded: true,
+      messages: [...messages], // Save current messages to the app
     };
 
     // Collapse other apps and add new one
@@ -7158,16 +7335,61 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '✅ Perfect! I\'ll wait for your developer to complete the SDK setup.\n\n💡 **What happens next:**\n• Your developer will install the SDK\n• Once done, they\'ll verify the integration\n• You can track progress in the sidebar\n\nIn the meantime, would you like to set up **Ad Channel Integration**? This can be done in parallel!' },
-        {
-          type: 'confirm-select',
-          options: [
-            { label: 'Set up Ad Channels now', value: 'setup-channels' },
-            { label: 'Wait for SDK completion', value: 'wait' },
-          ]
-        },
+        { type: 'text', text: '✅ Perfect! I\'ll wait for your developer to complete the SDK setup.\n\n💡 **What happens next:**\n• Your developer will install the SDK\n• Once done, they\'ll verify the integration\n• You can track progress in the sidebar\n\nIn the meantime, you can work on other setup steps. Each category can be set up independently!' },
+        { type: 'category-navigation' },
       ]);
     }, 300);
+  };
+
+  // Category Navigation handler
+  const handleCategoryNavigation = (category: string) => {
+    const app = currentApp;
+    if (!app || !currentAppId) return;
+
+    const categoryLabels: Record<string, string> = {
+      'deeplink': 'Deep Link',
+      'event-taxonomy': 'Event Taxonomy',
+      'integration': 'Integration',
+    };
+
+    addUserMessage(`Set up ${categoryLabels[category] || category}`);
+
+    // Find the first step in the selected category
+    const categorySteps = app.steps.filter(s => s.category === category);
+    const firstStep = categorySteps[0];
+
+    if (firstStep) {
+      // Mark first step as in_progress
+      updateAppStepStatus(currentAppId, firstStep.id, 'in_progress');
+
+      setTimeout(() => {
+        // Navigate to the appropriate step
+        switch (firstStep.id) {
+          case 'deeplink':
+            addBotMessage([
+              { type: 'text', text: `🔗 **Deep Link Setup** for **${app.appInfo.appName}**\n\nDeep links direct users to specific screens in your app after clicking ads.\n\nWould you like to set it up now?` },
+              { type: 'deeplink-choice' },
+            ]);
+            break;
+          case 'event-taxonomy':
+            addBotMessage([
+              { type: 'text', text: `📊 **Event Taxonomy** for **${app.appInfo.appName}**\n\nLet's set up the events you want to track in your app.` },
+              { type: 'standard-event-select' },
+            ]);
+            break;
+          case 'channel-select':
+            addBotMessage([
+              { type: 'text', text: `📡 **Ad Channel Integration** for **${app.appInfo.appName}**\n\nConnect your ad platforms to track attribution.\n\nWhich channels would you like to integrate?` },
+              { type: 'channel-select' },
+            ]);
+            break;
+          default:
+            addBotMessage([
+              { type: 'text', text: `Let's continue with **${firstStep.title}** for **${app.appInfo.appName}**.` },
+            ]);
+        }
+      }, 300);
+    }
   };
 
   // Web SDK Install Complete handler (legacy - used by old WebSdkInstall component)
@@ -8128,14 +8350,30 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
   const handleSend = () => {
     if (!inputValue.trim()) return;
-    addUserMessage(inputValue);
-    setInputValue('');
 
-    setTimeout(() => {
-      addBotMessage([
-        { type: 'text', text: 'I\'ve noted your message. Would you like to continue with the current step?' },
-      ]);
-    }, 500);
+    // Check if in chat room mode
+    if (currentChatId) {
+      // Add user message to chat room
+      addChatMessage([{ type: 'text', text: inputValue }], 'user');
+      setInputValue('');
+
+      // Bot response for chat
+      setTimeout(() => {
+        addChatMessage([
+          { type: 'text', text: '네, 질문을 확인했습니다. 더 자세한 정보가 필요하시면 말씀해 주세요!' },
+        ], 'bot');
+      }, 500);
+    } else {
+      // Onboarding mode - add to onboarding messages
+      addUserMessage(inputValue);
+      setInputValue('');
+
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: 'I\'ve noted your message. Would you like to continue with the current step?' },
+        ]);
+      }, 500);
+    }
   };
 
   // Handle back navigation - removes the last bot message and user response pair
@@ -8161,27 +8399,33 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     // This is a simplified approach - in production, we'd track state more carefully
   };
 
-  // Check if we can go back
-  const canGoBack = messages.length >= 2 && messages.some(m => m.role === 'user');
+  // Check if we can go back (only for onboarding, not chat rooms)
+  const canGoBack = !currentChatId && messages.length >= 2 && messages.some(m => m.role === 'user');
 
-  // Step order for prerequisite checking
-  const stepOrder = [
-    'sdk-install', 'sdk-init', 'deeplink', 'sdk-test',  // Phase 2: SDK
-    'event-taxonomy',  // Phase 3: Event Taxonomy
-    'channel-select', 'channel-integration', 'cost-integration', 'skan-integration', 'tracking-link',  // Phase 4: Channels
-    'deeplink-test', 'attribution-test', 'data-verify'  // Phase 5: Verification
-  ];
+  // Step order within each category for prerequisite checking
+  const categoryStepOrder: Record<string, string[]> = {
+    'sdk': ['sdk-install', 'web-sdk-install', 'sdk-init', 'sdk-test'],
+    'deeplink': ['deeplink', 'tracking-link', 'deeplink-test'],
+    'event-taxonomy': ['event-taxonomy'],
+    'integration': ['channel-select', 'channel-integration', 'cost-integration', 'skan-integration', 'attribution-test', 'data-verify'],
+  };
 
-  // Check if a step can be started (prerequisite steps completed)
+  // Check if a step can be started (only check within same category)
   const canStartStep = (app: RegisteredApp, stepId: string): boolean => {
-    const stepIndex = stepOrder.indexOf(stepId);
+    const step = app.steps.find(s => s.id === stepId);
+    if (!step) return false;
 
-    // First step can always be started
-    if (stepIndex === 0) return true;
+    const categoryOrder = categoryStepOrder[step.category];
+    if (!categoryOrder) return true;
 
-    // Check if all previous steps are completed
+    const stepIndex = categoryOrder.indexOf(stepId);
+
+    // First step in category can always be started
+    if (stepIndex <= 0) return true;
+
+    // Check if previous step in same category is completed
     for (let i = 0; i < stepIndex; i++) {
-      const prevStepId = stepOrder[i];
+      const prevStepId = categoryOrder[i];
       const prevStep = app.steps.find(s => s.id === prevStepId);
       // If the previous step exists and is not completed, cannot start this step
       if (prevStep && prevStep.status !== 'completed') {
@@ -8196,7 +8440,8 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     const app = registeredApps.find(a => a.id === appId);
     if (!app) return;
 
-    // Set current app as active
+    // Switch from chat to app view and set current app as active
+    setCurrentChatId(null);
     setCurrentAppId(appId);
 
     // Update step to in_progress if pending
@@ -8843,6 +9088,9 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       case 'data-verify':
         return <DataVerify onComplete={handleDataVerifyComplete} isCompleted={isCompleted} />;
 
+      case 'category-navigation':
+        return <CategoryNavigation onSelect={handleCategoryNavigation} isCompleted={isCompleted} />;
+
       case 'onboarding-complete':
         return <OnboardingComplete appName={currentApp?.appInfo.appName || 'App'} onViewDashboard={handleViewDashboard} />;
 
@@ -8936,153 +9184,251 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
           )}
         </button>
 
-        {/* Header */}
-        <div className={`mb-4 ${isSidebarCollapsed ? 'flex justify-center pt-6' : ''}`}>
-          {isSidebarCollapsed ? (
-            <Sparkles className="w-5 h-5 text-blue-600" />
-          ) : (
-            <>
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-5 h-5 text-blue-600" />
-                <h2 className="font-semibold">Setup Guide</h2>
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-4">
+          {/* MY APPS Section */}
+          <div>
+            {/* Section Header */}
+            {!isSidebarCollapsed && (
+              <div className={`text-xs font-medium uppercase tracking-wide mb-2 mt-2 ${!currentChatId ? 'text-blue-600' : 'text-gray-400'}`}>
+                My Apps
               </div>
-              <p className="text-sm text-gray-600">
-                Complete your Airbridge setup
-              </p>
-            </>
-          )}
-        </div>
+            )}
 
-        {/* Add New App Button */}
-        {isSidebarCollapsed ? (
-          <button
-            onClick={handleAddAnotherApp}
-            className="w-full mb-4 p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all flex items-center justify-center"
-            title="Add New App"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        ) : (
-          <button
-            onClick={handleAddAnotherApp}
-            className="w-full mb-4 p-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all flex items-center justify-center gap-2 text-sm font-medium shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Add New App
-          </button>
-        )}
-
-        {/* App List - Scrollable */}
-        <div className="space-y-2 flex-1 overflow-y-auto overflow-x-hidden">
-          {/* Current app registration in progress */}
-          {isAddingApp && (
-            <div className={`rounded-xl bg-blue-50 border border-blue-200 ${isSidebarCollapsed ? 'p-2 flex justify-center' : 'p-3'}`}>
-              {isSidebarCollapsed ? (
-                <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
-              ) : (
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-white border border-blue-200 flex items-center justify-center flex-shrink-0">
-                    <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-blue-700">
-                      {setupState.appInfo.appName || 'New App'}
-                    </div>
-                    <div className="text-xs text-gray-500 truncate">Registering...</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Registered Apps */}
-          {registeredApps.map((app) => (
-            <div key={app.id} className="border border-gray-200 rounded-xl overflow-hidden">
-              {/* App Header */}
+            {/* Add New App Button */}
+            {isSidebarCollapsed ? (
               <button
-                onClick={() => toggleAppExpansion(app.id)}
-                className={`w-full flex items-center hover:bg-gray-50 transition-colors ${
-                  isSidebarCollapsed ? 'p-2 justify-center' : 'p-3 gap-2'
-                }`}
-                title={isSidebarCollapsed ? app.appInfo.appName : undefined}
+                onClick={() => { handleBackToOnboarding(); handleAddAnotherApp(); }}
+                className="w-full mb-2 p-2 rounded-lg border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-500 hover:text-blue-600 transition-all flex items-center justify-center"
+                title="Add New App"
               >
-                <div className={`rounded-lg flex items-center justify-center bg-blue-50 ${
-                  isSidebarCollapsed ? 'w-8 h-8' : 'w-8 h-8'
-                }`}>
-                  <Smartphone className="w-4 h-4 text-blue-500" />
-                </div>
+                <Plus className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={() => { handleBackToOnboarding(); handleAddAnotherApp(); }}
+                className="w-full mb-2 p-3 rounded-xl border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-600 hover:text-blue-600 transition-all flex items-center justify-center gap-2 text-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Add New App
+              </button>
+            )}
 
-                {!isSidebarCollapsed && (
-                  <>
-                    <div className="flex-1 min-w-0 text-left">
-                      <div className="text-sm font-medium text-gray-900 truncate">{app.appInfo.appName}</div>
-                      <div className="text-xs text-gray-500">
-                        {app.platforms.map(p => p === 'ios' ? 'iOS' : p === 'android' ? 'Android' : 'Web').join(', ')} • {app.environment === 'dev' ? 'Dev' : 'Prod'}
-                      </div>
+            {/* Current app registration in progress */}
+            {isAddingApp && (
+              <button
+                onClick={() => { setCurrentChatId(null); setCurrentAppId(null); }}
+                className={`w-full rounded-xl mb-2 transition-colors ${
+                  !currentChatId && !currentAppId
+                    ? 'bg-blue-50 border border-blue-500'
+                    : 'bg-white border border-gray-200 hover:bg-gray-50'
+                } ${isSidebarCollapsed ? 'p-2 flex justify-center' : 'p-3'}`}
+              >
+                {isSidebarCollapsed ? (
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    !currentChatId && !currentAppId ? 'bg-blue-500' : 'bg-blue-50'
+                  }`}>
+                    <Loader2 className={`w-4 h-4 animate-spin ${!currentChatId && !currentAppId ? 'text-white' : 'text-blue-500'}`} />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                      !currentChatId && !currentAppId ? 'bg-blue-500' : 'bg-blue-50'
+                    }`}>
+                      <Loader2 className={`w-4 h-4 animate-spin ${!currentChatId && !currentAppId ? 'text-white' : 'text-blue-500'}`} />
                     </div>
-                    {app.isExpanded ? (
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
-                    )}
-                  </>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className={`text-sm font-medium ${!currentChatId && !currentAppId ? 'text-blue-700' : 'text-gray-900'}`}>
+                        {setupState.appInfo.appName || 'New App'}
+                      </div>
+                      <div className={`text-xs truncate ${!currentChatId && !currentAppId ? 'text-blue-500' : 'text-gray-500'}`}>Registering...</div>
+                    </div>
+                  </div>
                 )}
               </button>
+            )}
 
-              {/* Collapsible Steps - only when sidebar expanded AND app expanded */}
-              <AnimatePresence>
-                {!isSidebarCollapsed && app.isExpanded && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="overflow-hidden"
+            {/* Registered Apps */}
+            <div className="space-y-2">
+              {registeredApps.map((app) => (
+                <div key={app.id} className={`border rounded-xl overflow-hidden ${!currentChatId && currentAppId === app.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                  {/* App Header */}
+                  <button
+                    onClick={() => { handleBackToOnboarding(); toggleAppExpansion(app.id); setCurrentAppId(app.id); }}
+                    className={`w-full flex items-center transition-colors ${
+                      isSidebarCollapsed ? 'p-2 justify-center' : 'p-3 gap-2'
+                    } ${!currentChatId && currentAppId === app.id ? '' : 'hover:bg-gray-50'}`}
+                    title={isSidebarCollapsed ? app.appInfo.appName : undefined}
                   >
-                    <div className="px-3 pb-3 space-y-1 border-t border-gray-100">
-                      {/* All steps - no phase separation */}
-                      {app.steps.map((step) => {
-                        const isDisabled = !canStartStep(app, step.id) && step.status === 'pending';
-                        return (
-                          <button
-                            key={step.id}
-                            onClick={() => !isDisabled && handleStepClick(app.id, step)}
-                            disabled={isDisabled}
-                            className={`w-full p-2 rounded-lg transition-all text-sm text-left ${
-                              isDisabled
-                                ? 'opacity-50 cursor-not-allowed'
-                                : step.status === 'completed'
-                                ? 'bg-green-50 hover:bg-green-100'
-                                : step.status === 'in_progress'
-                                ? 'bg-blue-50 hover:bg-blue-100'
-                                : 'hover:bg-gray-100'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              {step.status === 'completed' ? (
-                                <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
-                              ) : step.status === 'in_progress' ? (
-                                <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
-                              ) : (
-                                <Circle className={`w-4 h-4 flex-shrink-0 ${isDisabled ? 'text-gray-200' : 'text-gray-300'}`} />
-                              )}
-                              <span className={`flex-1 truncate text-xs ${
-                                isDisabled ? 'text-gray-400' :
-                                step.status === 'completed' ? 'text-green-700' :
-                                step.status === 'in_progress' ? 'text-blue-700' : 'text-gray-600'
-                              }`}>
-                                {step.title}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
+                    <div className={`rounded-lg flex items-center justify-center w-8 h-8 ${
+                      !currentChatId && currentAppId === app.id ? 'bg-blue-500' : 'bg-blue-50'
+                    }`}>
+                      <Smartphone className={`w-4 h-4 ${
+                        !currentChatId && currentAppId === app.id ? 'text-white' : 'text-blue-500'
+                      }`} />
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+
+                    {!isSidebarCollapsed && (
+                      <>
+                        <div className="flex-1 min-w-0 text-left">
+                          <div className={`text-sm font-medium truncate ${
+                            !currentChatId && currentAppId === app.id ? 'text-blue-700' : 'text-gray-900'
+                          }`}>{app.appInfo.appName}</div>
+                          <div className={`text-xs ${
+                            !currentChatId && currentAppId === app.id ? 'text-blue-500' : 'text-gray-500'
+                          }`}>
+                            {app.platforms.map(p => p === 'ios' ? 'iOS' : p === 'android' ? 'Android' : 'Web').join(', ')} • {app.environment === 'dev' ? 'Dev' : 'Prod'}
+                          </div>
+                        </div>
+                        {app.isExpanded ? (
+                          <ChevronDown className={`w-4 h-4 ${!currentChatId && currentAppId === app.id ? 'text-blue-500' : 'text-gray-400'}`} />
+                        ) : (
+                          <ChevronRight className={`w-4 h-4 ${!currentChatId && currentAppId === app.id ? 'text-blue-500' : 'text-gray-400'}`} />
+                        )}
+                      </>
+                    )}
+                  </button>
+
+                  {/* Collapsible Steps */}
+                  <AnimatePresence>
+                    {!isSidebarCollapsed && app.isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-3 pb-3 border-t border-gray-100 pt-2">
+                          {/* Group steps by category */}
+                          {(['sdk', 'deeplink', 'event-taxonomy', 'integration'] as const).map((category) => {
+                            const categorySteps = app.steps.filter(s => s.category === category);
+                            if (categorySteps.length === 0) return null;
+
+                            const categoryLabels = {
+                              'sdk': 'SDK',
+                              'deeplink': 'Deep Link',
+                              'event-taxonomy': 'Event Taxonomy',
+                              'integration': 'Integration',
+                            };
+
+                            const categoryCompleted = categorySteps.every(s => s.status === 'completed');
+                            const categoryInProgress = categorySteps.some(s => s.status === 'in_progress');
+
+                            return (
+                              <div key={category} className="mb-3">
+                                <div className={`text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5 ${
+                                  categoryCompleted ? 'text-green-600' : categoryInProgress ? 'text-blue-600' : 'text-gray-400'
+                                }`}>
+                                  {categoryCompleted && <CheckCircle2 className="w-3 h-3" />}
+                                  {categoryLabels[category]}
+                                </div>
+                                <div className="space-y-1">
+                                  {categorySteps.map((step) => {
+                                    const isDisabled = !canStartStep(app, step.id) && step.status === 'pending';
+                                    return (
+                                      <button
+                                        key={step.id}
+                                        onClick={() => !isDisabled && handleStepClick(app.id, step)}
+                                        disabled={isDisabled}
+                                        className={`w-full p-2 rounded-lg transition-all duration-150 text-sm text-left relative ${
+                                          isDisabled
+                                            ? 'opacity-50 cursor-not-allowed bg-gray-50'
+                                            : step.status === 'completed'
+                                            ? 'bg-green-50 hover:bg-green-100 hover:shadow-sm'
+                                            : step.status === 'in_progress'
+                                            ? 'bg-blue-100 hover:bg-blue-150 shadow-sm border-l-2 border-blue-500'
+                                            : 'bg-white hover:bg-gray-100 hover:shadow-sm border border-transparent hover:border-gray-200'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          {step.status === 'completed' ? (
+                                            <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                          ) : step.status === 'in_progress' ? (
+                                            <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                                              <Loader2 className="w-3 h-3 text-white animate-spin" />
+                                            </div>
+                                          ) : (
+                                            <Circle className={`w-4 h-4 flex-shrink-0 ${isDisabled ? 'text-gray-200' : 'text-gray-300'}`} />
+                                          )}
+                                          <span className={`flex-1 truncate text-xs font-medium ${
+                                            isDisabled ? 'text-gray-400' :
+                                            step.status === 'completed' ? 'text-green-700' :
+                                            step.status === 'in_progress' ? 'text-blue-700' : 'text-gray-600'
+                                          }`}>
+                                            {step.title}
+                                          </span>
+                                          {step.status === 'in_progress' && (
+                                            <ChevronRight className="w-3 h-3 text-blue-500" />
+                                          )}
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          {/* CHATS Section */}
+          <div>
+            {/* Section Header */}
+            {!isSidebarCollapsed && (
+              <div className={`text-xs font-medium uppercase tracking-wide mb-2 mt-4 ${currentChatId ? 'text-blue-600' : 'text-gray-400'}`}>
+                Chats
+              </div>
+            )}
+
+            {/* New Chat Button */}
+            {isSidebarCollapsed ? (
+              <button
+                onClick={handleNewChat}
+                className="w-full mb-2 p-2 rounded-lg border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-500 hover:text-blue-600 transition-all flex items-center justify-center"
+                title="New Chat"
+              >
+                <MessageCircle className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={handleNewChat}
+                className="w-full mb-2 p-3 rounded-xl border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-600 hover:text-blue-600 transition-all flex items-center justify-center gap-2 text-sm"
+              >
+                <MessageCircle className="w-4 h-4" />
+                New Chat
+              </button>
+            )}
+
+            {/* Chat Rooms */}
+            <div className="space-y-2">
+              {chatRooms.map((chat) => (
+                <button
+                  key={chat.id}
+                  onClick={() => handleSelectChat(chat.id)}
+                  className={`w-full rounded-xl overflow-hidden border transition-colors ${
+                    currentChatId === chat.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                  } ${isSidebarCollapsed ? 'p-2 flex justify-center' : 'p-3'}`}
+                  title={isSidebarCollapsed ? chat.title : undefined}
+                >
+                  {isSidebarCollapsed ? (
+                    <MessageCircle className={`w-4 h-4 ${currentChatId === chat.id ? 'text-blue-600' : 'text-gray-500'}`} />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className={`w-4 h-4 flex-shrink-0 ${currentChatId === chat.id ? 'text-blue-600' : 'text-gray-400'}`} />
+                      <span className={`text-sm truncate text-left flex-1 ${currentChatId === chat.id ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>{chat.title}</span>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </motion.div>
 
@@ -9091,20 +9437,12 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
         {/* Header */}
         <div className="bg-white border-b border-gray-200 p-6 flex-shrink-0">
           <div className="flex items-center gap-3">
-            {canGoBack && (
-              <button
-                onClick={handleBack}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-1 text-gray-500 hover:text-gray-700"
-                title="Go back to previous step"
-              >
-                <ChevronLeft className="w-5 h-5" />
-                <span className="text-sm">Back</span>
-              </button>
-            )}
             <div className="flex-1">
-              <h1 className="font-semibold text-lg">Airbridge Setup</h1>
+              <h1 className="font-semibold text-lg">
+                {currentChatRoom ? currentChatRoom.title : 'Onboarding Manager'}
+              </h1>
               <p className="text-gray-600 text-sm mt-1">
-                Airbridge Onboarding Manager is here to help
+                {currentChatRoom ? 'Ask anything about Airbridge' : 'Airbridge Onboarding Manager is here to help'}
               </p>
             </div>
             {/* View Mode Controls */}
@@ -9118,9 +9456,9 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-3xl mx-auto space-y-4">
             <AnimatePresence>
-              {messages.map((message, messageIndex) => {
+              {currentMessages.map((message, messageIndex) => {
                 // Find the last bot message index
-                const lastBotMessageIndex = messages.map((m, i) => m.role === 'bot' ? i : -1).filter(i => i !== -1).pop() ?? -1;
+                const lastBotMessageIndex = currentMessages.map((m, i) => m.role === 'bot' ? i : -1).filter(i => i !== -1).pop() ?? -1;
                 const isLastBotMessage = message.role === 'bot' && messageIndex === lastBotMessageIndex;
 
                 return (
@@ -9147,6 +9485,16 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
                           {renderMessageContent(content, isLastBotMessage)}
                         </div>
                       ))}
+                      {/* Back button - only on last bot message */}
+                      {isLastBotMessage && canGoBack && (
+                        <button
+                          onClick={handleBack}
+                          className="mt-3 flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                          <span>Back</span>
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 );
