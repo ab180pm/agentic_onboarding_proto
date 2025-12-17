@@ -3,9 +3,41 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, CheckCircle2, Circle, Sparkles, Copy, Check, ExternalLink,
   Smartphone, Code, Tv, AlertCircle, ChevronRight, ChevronDown, ChevronLeft, Loader2, Plus, Lightbulb,
-  Maximize2, MessageCircle, X, Share2, MessageSquare
+  Maximize2, MessageCircle, X, Share2, MessageSquare, BookOpen
 } from 'lucide-react';
 import { AirbridgeBackground } from '../AirbridgeBackground';
+
+// Common UI Styles
+const INPUT_STYLES = {
+  base: "w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all",
+  error: "w-full px-4 py-3 border border-red-500 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all",
+  readonly: "w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-600 bg-gray-50 cursor-not-allowed",
+  textarea: "w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none font-mono",
+  select: "w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer",
+};
+
+const BUTTON_STYLES = {
+  primary: "w-full py-3 rounded-lg font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700",
+  primaryDisabled: "w-full py-3 rounded-lg font-medium transition-colors bg-gray-100 text-gray-400 cursor-not-allowed",
+  primaryWithIcon: "w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700",
+  primaryWithIconMb: "w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3",
+  secondary: "w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-500 text-white hover:bg-blue-600",
+  purple: "w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-purple-600 text-white hover:bg-purple-700 mb-3",
+};
+
+// Common Card Styles
+const CARD_STYLES = {
+  base: "bg-white border border-gray-200 rounded-xl p-5 mt-4",
+  completed: "bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60",
+};
+
+// Common Label Styles
+const LABEL_STYLES = {
+  title: "text-sm font-medium text-gray-700 mb-4",           // 카드 제목
+  subtitle: "text-xs text-gray-500 mb-3",                    // 부제목/설명
+  field: "block text-sm font-medium text-gray-700 mb-2",     // 입력 필드 레이블
+  fieldDesc: "text-xs text-gray-500 mb-2",                   // 필드 설명
+};
 
 // View mode types
 type ViewMode = 'fullscreen' | 'module' | 'minimized';
@@ -235,6 +267,7 @@ type DeeplinkDashboardData = {
   // iOS specific
   appId?: string;
   // Android specific
+  packageName?: string;
   sha256Fingerprints?: string[];
 };
 
@@ -341,7 +374,7 @@ function WebSdkMethodSelect({ onSelect, isCompleted = false }: {
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-500" />
           <span className="text-sm font-medium text-gray-700">Installation method selected</span>
@@ -351,8 +384,8 @@ function WebSdkMethodSelect({ onSelect, isCompleted = false }: {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4 shadow-sm">
-      <div className="text-sm font-medium text-gray-700 mb-3">How would you like to install the SDK?</div>
+    <div className={`${CARD_STYLES.base} shadow-sm`}>
+      <div className={LABEL_STYLES.title}>How would you like to install the SDK?</div>
       <div className="space-y-2">
         <button
           onClick={() => onSelect('script')}
@@ -426,7 +459,7 @@ airbridge.init({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-500" />
           <span className="text-sm font-medium text-gray-700">SDK installation code applied</span>
@@ -436,10 +469,10 @@ airbridge.init({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4 shadow-sm">
+    <div className={`${CARD_STYLES.base} shadow-sm`}>
       {/* Auth Info */}
       <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-        <div className="text-xs text-gray-500 mb-2">Authentication Info (Auto-configured)</div>
+        <div className={LABEL_STYLES.fieldDesc}>Authentication Info (Auto-configured)</div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <div className="text-xs text-gray-400">App Name</div>
@@ -582,7 +615,7 @@ ${optionEntries}
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-500" />
           <span className="text-sm font-medium text-gray-700">Initialization options configured</span>
@@ -592,7 +625,7 @@ ${optionEntries}
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4 shadow-sm">
+    <div className={`${CARD_STYLES.base} shadow-sm`}>
       <div className="text-sm font-medium text-gray-700 mb-1">Additional Initialization Options</div>
       <div className="text-xs text-gray-500 mb-4">Configure options as needed. Default values are recommended.</div>
 
@@ -668,7 +701,7 @@ ${optionEntries}
 
       {/* Generated Code Preview */}
       <div className="mb-4">
-        <div className="text-xs text-gray-500 mb-2">Generated initialization code:</div>
+        <div className={LABEL_STYLES.fieldDesc}>Generated initialization code:</div>
         <div className="relative">
           <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
             <code>{generateInitCode()}</code>
@@ -730,7 +763,7 @@ airbridge.clearUser();`;
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-500" />
           <span className="text-sm font-medium text-gray-700">User identity setup complete</span>
@@ -740,13 +773,13 @@ airbridge.clearUser();`;
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4 shadow-sm">
+    <div className={`${CARD_STYLES.base} shadow-sm`}>
       <div className="text-sm font-medium text-gray-700 mb-1">Would you like to track logged-in users?</div>
       <div className="text-xs text-gray-500 mb-4">Set up user identity if your app has login functionality.</div>
 
       {/* Available Methods */}
       <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-        <div className="text-xs text-gray-500 mb-2">Available methods:</div>
+        <div className={LABEL_STYLES.fieldDesc}>Available methods:</div>
         <table className="w-full text-xs">
           <tbody className="text-gray-700">
             <tr><td className="py-1 font-mono text-blue-600">setUserID(id)</td><td>Set user ID</td></tr>
@@ -760,7 +793,7 @@ airbridge.clearUser();`;
 
       {/* Login Code */}
       <div className="mb-3">
-        <div className="text-xs text-gray-500 mb-2">Login code example:</div>
+        <div className={LABEL_STYLES.fieldDesc}>Login code example:</div>
         <div className="relative">
           <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
             <code>{loginCode}</code>
@@ -780,7 +813,7 @@ airbridge.clearUser();`;
 
       {/* Logout Code */}
       <div className="mb-4">
-        <div className="text-xs text-gray-500 mb-2">Logout code example:</div>
+        <div className={LABEL_STYLES.fieldDesc}>Logout code example:</div>
         <div className="relative">
           <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
             <code>{logoutCode}</code>
@@ -826,7 +859,7 @@ function WebSdkInstall({ appName, webToken, onComplete, isCompleted = false }: {
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-500" />
           <span className="text-sm font-medium text-gray-700">Web SDK Installation Complete</span>
@@ -847,7 +880,7 @@ function SdkInstallMethodSelect({ onSelect, isCompleted = false }: {
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Installation Method</div>
         <div className="text-xs text-gray-400">Selection completed</div>
       </div>
@@ -855,8 +888,8 @@ function SdkInstallMethodSelect({ onSelect, isCompleted = false }: {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">How would you like to install the SDK?</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>How would you like to install the SDK?</div>
       <div className="space-y-3">
         {/* Automation Option */}
         <button
@@ -940,7 +973,7 @@ function GitHubConnect({ onConnect, onSkip, isCompleted = false }: {
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center"
@@ -961,7 +994,7 @@ function GitHubConnect({ onConnect, onSkip, isCompleted = false }: {
   // Connecting state - showing OAuth flow
   if (connectState !== 'idle') {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className={CARD_STYLES.base}>
         <div className="flex items-center gap-3 mb-6">
           <div
             className="w-12 h-12 rounded-xl flex items-center justify-center"
@@ -1035,7 +1068,7 @@ function GitHubConnect({ onConnect, onSkip, isCompleted = false }: {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-3 mb-4">
         <div
           className="w-12 h-12 rounded-xl flex items-center justify-center"
@@ -1050,7 +1083,7 @@ function GitHubConnect({ onConnect, onSkip, isCompleted = false }: {
       </div>
 
       <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">What we'll be able to do:</div>
+        <div className={LABEL_STYLES.field}>What we'll be able to do:</div>
         <ul className="space-y-2 text-sm text-gray-600">
           <li className="flex items-start gap-2">
             <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
@@ -1097,7 +1130,7 @@ function GitHubRepoSelect({ repos, onSelect, isCompleted = false }: {
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Repository Selection</div>
         <div className="text-xs text-gray-400">Repository selected</div>
       </div>
@@ -1110,8 +1143,8 @@ function GitHubRepoSelect({ repos, onSelect, isCompleted = false }: {
   );
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">Select your repository</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>Select your repository</div>
 
       {/* Search */}
       <div className="mb-3">
@@ -1120,7 +1153,7 @@ function GitHubRepoSelect({ repos, onSelect, isCompleted = false }: {
           placeholder="Search repositories..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 transition-colors text-sm"
+          className={INPUT_STYLES.base}
         />
       </div>
 
@@ -1156,7 +1189,7 @@ function GitHubPermissions({ onGranted, isCompleted = false }: {
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Permissions</div>
         <div className="text-xs text-gray-400">Permissions granted</div>
       </div>
@@ -1173,7 +1206,7 @@ function GitHubPermissions({ onGranted, isCompleted = false }: {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <AlertCircle className="w-5 h-5 text-amber-500" />
         <div className="font-medium text-gray-900">Additional Permissions Required</div>
@@ -1261,7 +1294,7 @@ function GitHubPRConfirm({ step, onConfirm, onSkip, isCompleted = false }: {
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">{info.title} PR</div>
         <div className="text-xs text-gray-400">PR created</div>
       </div>
@@ -1269,7 +1302,7 @@ function GitHubPRConfirm({ step, onConfirm, onSkip, isCompleted = false }: {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-100">
           <GitHubIcon className="w-5 h-5 text-blue-600" />
@@ -1281,7 +1314,7 @@ function GitHubPRConfirm({ step, onConfirm, onSkip, isCompleted = false }: {
       </div>
 
       <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">Changes to be made:</div>
+        <div className={LABEL_STYLES.field}>Changes to be made:</div>
         <ul className="space-y-2">
           {info.changes.map((change, index) => (
             <li key={index} className="flex items-start gap-2 text-sm text-gray-600">
@@ -1319,7 +1352,7 @@ function GitHubPRWaiting({ prUrl, step, isCompleted = false }: {
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Creating PR</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -1327,7 +1360,7 @@ function GitHubPRWaiting({ prUrl, step, isCompleted = false }: {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-4">
         <div className="relative">
           <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
@@ -1365,7 +1398,7 @@ function GitHubPRComplete({ prUrl, prNumber, step, onReview, isCompleted = false
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">PR #{prNumber}</div>
         <div className="text-xs text-gray-400">Created successfully</div>
       </div>
@@ -1373,7 +1406,7 @@ function GitHubPRComplete({ prUrl, prNumber, step, onReview, isCompleted = false
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
           <CheckCircle2 className="w-6 h-6 text-green-600" />
@@ -1420,7 +1453,7 @@ function GitHubPRReview({ prUrl, prNumber, step, onMerged, onContinue, isComplet
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">PR Review</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -1428,8 +1461,8 @@ function GitHubPRReview({ prUrl, prNumber, step, onMerged, onContinue, isComplet
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">What would you like to do?</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>What would you like to do?</div>
 
       <div className="space-y-3">
         <a
@@ -1475,7 +1508,7 @@ function GitHubPRReview({ prUrl, prNumber, step, onMerged, onContinue, isComplet
 function SdkInstallChoice({ onSelect, isCompleted = false }: { onSelect: (choice: 'self' | 'share') => void; isCompleted?: boolean }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">SDK Installation</div>
         <div className="text-xs text-gray-400">Selection completed</div>
       </div>
@@ -1483,8 +1516,8 @@ function SdkInstallChoice({ onSelect, isCompleted = false }: { onSelect: (choice
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">Who will install the SDK?</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>Who will install the SDK?</div>
       <div className="space-y-2">
         <button
           onClick={() => onSelect('self')}
@@ -1528,7 +1561,7 @@ function SdkGuideShare({ appName, platforms, framework, onCopy, onComplete, isCo
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">SDK Guide Share</div>
         <div className="text-xs text-gray-400">Guide shared</div>
       </div>
@@ -1563,8 +1596,8 @@ Please complete the SDK installation and let me know when it's done!
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">Share SDK Setup Guide</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>Share SDK Setup Guide</div>
 
       <div className="bg-gray-50 rounded-lg p-4 mb-4 text-sm text-gray-700 whitespace-pre-line font-mono">
         {guideText}
@@ -1619,7 +1652,7 @@ function CategoryNavigation({ onSelect, isCompleted = false }: {
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500">Category selected</div>
       </div>
     );
@@ -1632,8 +1665,8 @@ function CategoryNavigation({ onSelect, isCompleted = false }: {
   ];
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">What would you like to set up next?</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>What would you like to set up next?</div>
       <div className="space-y-2">
         {categories.map((cat) => (
           <button
@@ -1684,7 +1717,7 @@ function SdkTest({ onRunTest, isCompleted = false }: {
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-600" />
           <span className="text-sm font-medium text-gray-700">SDK Test Passed</span>
@@ -1694,7 +1727,7 @@ function SdkTest({ onRunTest, isCompleted = false }: {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
           <Code className="w-5 h-5 text-blue-600" />
@@ -1708,7 +1741,7 @@ function SdkTest({ onRunTest, isCompleted = false }: {
       {testState === 'idle' && (
         <>
           <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <div className="text-sm font-medium text-gray-700 mb-2">This test will verify:</div>
+            <div className={LABEL_STYLES.field}>This test will verify:</div>
             <ul className="space-y-2 text-sm text-gray-600">
               <li className="flex items-center gap-2">
                 <Circle className="w-4 h-4 text-gray-400" />
@@ -1806,7 +1839,7 @@ function TrackingLinkForm({ channel, onCreate, isCompleted = false }: {
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-600" />
           <span className="text-sm font-medium text-gray-700">Tracking Link Created</span>
@@ -1833,7 +1866,7 @@ function TrackingLinkForm({ channel, onCreate, isCompleted = false }: {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
           <Share2 className="w-5 h-5 text-purple-600" />
@@ -1846,18 +1879,18 @@ function TrackingLinkForm({ channel, onCreate, isCompleted = false }: {
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Link Name</label>
+          <label className={LABEL_STYLES.field}>Link Name</label>
           <input
             type="text"
             value={linkName}
             onChange={(e) => setLinkName(e.target.value)}
             placeholder="e.g., Summer Campaign 2024"
-            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
+            className={INPUT_STYLES.base}
           />
         </div>
 
         <div className="bg-gray-50 rounded-lg p-4">
-          <div className="text-sm font-medium text-gray-700 mb-2">Link Settings</div>
+          <div className={LABEL_STYLES.field}>Link Settings</div>
           <div className="space-y-2 text-sm text-gray-600">
             <div className="flex justify-between">
               <span>Channel</span>
@@ -1903,7 +1936,7 @@ function TrackingLinkComplete({ links, onContinue, isCompleted = false }: {
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500">Tracking Links: {links.length} created</div>
       </div>
     );
@@ -1916,7 +1949,7 @@ function TrackingLinkComplete({ links, onContinue, isCompleted = false }: {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
           <CheckCircle2 className="w-5 h-5 text-green-600" />
@@ -1980,7 +2013,7 @@ function DeeplinkTest({ onComplete, isCompleted = false }: {
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-600" />
           <span className="text-sm font-medium text-gray-700">Deep Link Test Completed</span>
@@ -2014,7 +2047,7 @@ function DeeplinkTest({ onComplete, isCompleted = false }: {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
           <Share2 className="w-5 h-5 text-indigo-600" />
@@ -2084,7 +2117,7 @@ function AttributionTest({ onComplete, isCompleted = false }: {
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-600" />
           <span className="text-sm font-medium text-gray-700">Attribution Test Passed</span>
@@ -2118,7 +2151,7 @@ function AttributionTest({ onComplete, isCompleted = false }: {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
           <Sparkles className="w-5 h-5 text-orange-600" />
@@ -2194,7 +2227,7 @@ function DataVerify({ onComplete, isCompleted = false }: {
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-600" />
           <span className="text-sm font-medium text-gray-700">Data Verification Complete</span>
@@ -2226,7 +2259,7 @@ function DataVerify({ onComplete, isCompleted = false }: {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
           <CheckCircle2 className="w-5 h-5 text-emerald-600" />
@@ -2331,7 +2364,7 @@ function OnboardingComplete({ appName, onViewDashboard }: {
       </div>
 
       <div className="bg-white rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-3">What's been set up:</div>
+        <div className={LABEL_STYLES.title}>What's been set up:</div>
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <CheckCircle2 className="w-4 h-4 text-green-600" />
@@ -2412,7 +2445,7 @@ function CodeBlock({ title, code }: { title: string; code: string; language: str
 function EnvironmentSelect({ onSelect, isCompleted = false }: { onSelect: (env: 'dev' | 'production') => void; isCompleted?: boolean }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Select Environment</div>
         <div className="text-xs text-gray-400">Selection completed</div>
       </div>
@@ -2420,8 +2453,8 @@ function EnvironmentSelect({ onSelect, isCompleted = false }: { onSelect: (env: 
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-2">Select Environment</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.field}>Select Environment</div>
       <div className="flex items-center gap-2 mb-3 px-4 py-3 rounded-lg bg-amber-100">
         <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-600" />
         <span className="text-sm text-amber-800">Environment cannot be changed after registration</span>
@@ -2468,7 +2501,7 @@ function AppNameInput({ onSubmit, isCompleted = false }: { onSubmit: (name: stri
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">App Name</div>
         <div className="text-xs text-gray-400">Input completed</div>
       </div>
@@ -2476,15 +2509,15 @@ function AppNameInput({ onSubmit, isCompleted = false }: { onSubmit: (name: stri
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">App Name</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>App Name</div>
       <input
         type="text"
         value={name}
         onChange={e => setName(e.target.value)}
         onKeyDown={e => e.key === 'Enter' && handleSubmit()}
         placeholder="Enter your app name"
-        className="w-full rounded-lg focus:outline-none border border-gray-200 text-gray-900 px-3 py-2"
+        className={INPUT_STYLES.base}
         autoFocus
       />
       <button
@@ -2501,7 +2534,7 @@ function AppNameInput({ onSubmit, isCompleted = false }: { onSubmit: (name: stri
 // App Search Loading Component
 function AppSearchLoading({ query }: { query: string }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-3">
         <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
         <div>
@@ -2533,7 +2566,7 @@ function AppSearchResults({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Search Results</div>
         <div className="text-xs text-gray-400">Selection completed</div>
       </div>
@@ -2541,8 +2574,8 @@ function AppSearchResults({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>
         Search results for "{query}"
       </div>
 
@@ -2602,7 +2635,7 @@ function PlatformMultiSelect({ onSelect, isCompleted = false }: { onSelect: (pla
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Select Platforms</div>
         <div className="text-xs text-gray-400">Selection completed</div>
       </div>
@@ -2610,8 +2643,8 @@ function PlatformMultiSelect({ onSelect, isCompleted = false }: { onSelect: (pla
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-2">Select Platforms</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.field}>Select Platforms</div>
       <div className="text-xs text-gray-500 mb-4">
         Select all platforms for your app. They will be registered as a single app.
       </div>
@@ -2673,7 +2706,7 @@ function DevAppNameInput({ onSubmit, isCompleted = false }: { onSubmit: (name: s
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">App Name</div>
         <div className="text-xs text-gray-400">Input completed</div>
       </div>
@@ -2681,9 +2714,9 @@ function DevAppNameInput({ onSubmit, isCompleted = false }: { onSubmit: (name: s
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-2">App Name</div>
-      <div className="text-xs text-gray-500 mb-3">
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.field}>App Name</div>
+      <div className={LABEL_STYLES.subtitle}>
         Enter a name for your development app (lowercase letters and numbers only)
       </div>
       <div className="flex items-center gap-2 mb-3 px-4 py-3 rounded-lg bg-amber-100">
@@ -2696,7 +2729,7 @@ function DevAppNameInput({ onSubmit, isCompleted = false }: { onSubmit: (name: s
         onChange={handleChange}
         onKeyDown={e => e.key === 'Enter' && isValid && onSubmit(name.trim())}
         placeholder="myappdev"
-        className={`w-full rounded-lg focus:outline-none border text-gray-900 px-4 py-3 ${error ? 'border-red-500' : 'border-gray-200'}`}
+        className={error ? INPUT_STYLES.error : INPUT_STYLES.base}
         autoFocus
       />
       {error && (
@@ -2735,7 +2768,7 @@ function PlatformRegistration({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Platform Registration</div>
         <div className="text-xs text-gray-400">Registration completed</div>
       </div>
@@ -2752,7 +2785,7 @@ function PlatformRegistration({
 
   if (platform === 'web') {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className={CARD_STYLES.base}>
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="text-sm font-medium text-gray-700">
@@ -2766,7 +2799,7 @@ function PlatformRegistration({
             <Tv className="w-5 h-5 text-gray-700" />
           </div>
         </div>
-        <div className="text-xs text-gray-500 mb-3">
+        <div className={LABEL_STYLES.subtitle}>
           Enter your website URL
         </div>
         <input
@@ -2791,7 +2824,7 @@ function PlatformRegistration({
 
   if (mode === 'choice') {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className={CARD_STYLES.base}>
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="text-sm font-medium text-gray-700">
@@ -2842,7 +2875,7 @@ function PlatformRegistration({
 
   if (mode === 'search') {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className={CARD_STYLES.base}>
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="text-sm font-medium text-gray-700">
@@ -2881,7 +2914,7 @@ function PlatformRegistration({
 
   // URL mode
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center justify-between mb-4">
         <div>
           <div className="text-sm font-medium text-gray-700">
@@ -2934,7 +2967,7 @@ function TimezoneCurrencyConfirm({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Timezone & Currency</div>
         <div className="text-xs text-gray-400">Confirmation completed</div>
       </div>
@@ -2942,11 +2975,11 @@ function TimezoneCurrencyConfirm({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-2">
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.field}>
         Timezone & Currency
       </div>
-      <div className="text-xs text-gray-500 mb-3">
+      <div className={LABEL_STYLES.subtitle}>
         Based on your location, we've detected the following settings:
       </div>
       <div className="flex items-center gap-2 mb-3 px-4 py-3 rounded-lg bg-amber-100">
@@ -2994,7 +3027,7 @@ function TimezoneCurrencyInput({ onSubmit, isCompleted = false }: { onSubmit: (t
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Timezone & Currency</div>
         <div className="text-xs text-gray-400">Input completed</div>
       </div>
@@ -3022,8 +3055,8 @@ function TimezoneCurrencyInput({ onSubmit, isCompleted = false }: { onSubmit: (t
   const isValid = timezone && currency;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-2">
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.field}>
         Select Timezone & Currency
       </div>
       <div className="flex items-center gap-2 mb-3 px-4 py-3 rounded-lg bg-amber-100">
@@ -3085,7 +3118,7 @@ function AppInfoForm({ onSubmit, platforms, isCompleted = false }: { onSubmit: (
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">App Information</div>
         <div className="text-xs text-gray-400">Form completed</div>
       </div>
@@ -3093,8 +3126,8 @@ function AppInfoForm({ onSubmit, platforms, isCompleted = false }: { onSubmit: (
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-4">App Information</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>App Information</div>
 
       <div className="space-y-4">
         <div>
@@ -3104,7 +3137,7 @@ function AppInfoForm({ onSubmit, platforms, isCompleted = false }: { onSubmit: (
             value={info.appName}
             onChange={e => setInfo({ ...info, appName: e.target.value })}
             placeholder="MyApp"
-            className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
+            className={INPUT_STYLES.base}
           />
         </div>
 
@@ -3115,13 +3148,13 @@ function AppInfoForm({ onSubmit, platforms, isCompleted = false }: { onSubmit: (
             value={info.storeUrl}
             onChange={e => setInfo({ ...info, storeUrl: e.target.value })}
             placeholder="https://apps.apple.com/..."
-            className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
+            className={INPUT_STYLES.base}
           />
           <p className="text-xs text-gray-500 mt-1">We&apos;ll automatically fetch app info when provided</p>
         </div>
 
         <div className="border-t border-gray-100 pt-4">
-          <p className="text-xs text-gray-500 mb-3">Or enter manually</p>
+          <p className={LABEL_STYLES.subtitle}>Or enter manually</p>
 
           {platforms.includes('ios') && (
             <div className="mb-3">
@@ -3131,7 +3164,7 @@ function AppInfoForm({ onSubmit, platforms, isCompleted = false }: { onSubmit: (
                 value={info.bundleId}
                 onChange={e => setInfo({ ...info, bundleId: e.target.value })}
                 placeholder="com.company.appname"
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
+                className={INPUT_STYLES.base}
               />
             </div>
           )}
@@ -3144,7 +3177,7 @@ function AppInfoForm({ onSubmit, platforms, isCompleted = false }: { onSubmit: (
                 value={info.packageName}
                 onChange={e => setInfo({ ...info, packageName: e.target.value })}
                 placeholder="com.company.appname"
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
+                className={INPUT_STYLES.base}
               />
             </div>
           )}
@@ -3198,7 +3231,7 @@ function DashboardAction({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Dashboard Action</div>
         <div className="text-xs text-gray-400">Action completed</div>
       </div>
@@ -3225,7 +3258,7 @@ function DashboardAction({
   );
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <a
         href="https://dashboard.airbridge.io"
         target="_blank"
@@ -3237,7 +3270,7 @@ function DashboardAction({
       </a>
 
       <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-        <div className="text-sm font-medium text-gray-700 mb-2">Information to Copy</div>
+        <div className={LABEL_STYLES.field}>Information to Copy</div>
 
         <div className="flex items-center justify-between py-2 px-3 bg-white rounded-lg">
           <div>
@@ -3303,7 +3336,7 @@ function FrameworkSelect({ onSelect, isCompleted = false }: { onSelect: (framewo
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Development Framework</div>
         <div className="text-xs text-gray-400">Selection completed</div>
       </div>
@@ -3311,12 +3344,12 @@ function FrameworkSelect({ onSelect, isCompleted = false }: { onSelect: (framewo
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">Select Development Framework</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>Select Development Framework</div>
 
       {frameworks.map(group => (
         <div key={group.category} className="mb-4 last:mb-0">
-          <div className="text-xs text-gray-500 mb-2">{group.category}</div>
+          <div className={LABEL_STYLES.fieldDesc}>{group.category}</div>
           <div className="space-y-2">
             {group.items.map(item => (
               <button
@@ -3342,7 +3375,7 @@ function SDKInitCode({ appName, appToken, onConfirm, isCompleted = false }: { ap
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">SDK Initialization</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -3363,8 +3396,8 @@ Airbridge.init({
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">SDK Initialization Code</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>SDK Initialization Code</div>
 
       <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#111827' }}>
         <div className="flex items-center justify-between px-4 py-2" style={{ backgroundColor: '#1f2937' }}>
@@ -3411,7 +3444,7 @@ Airbridge.init({
 function DeeplinkChoice({ onSelect, isCompleted = false }: { onSelect: (choice: string) => void; isCompleted?: boolean }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Deep Link Setup</div>
         <div className="text-xs text-gray-400">Selection completed</div>
       </div>
@@ -3419,8 +3452,8 @@ function DeeplinkChoice({ onSelect, isCompleted = false }: { onSelect: (choice: 
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">Deep Link Setup</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>Deep Link Setup</div>
 
       <div className="space-y-2">
         {[
@@ -3459,15 +3492,17 @@ function DeeplinkChoice({ onSelect, isCompleted = false }: { onSelect: (choice: 
 // Deep Link iOS Input Component
 function DeeplinkIosInput({
   bundleId,
+  appName,
   onSubmit,
   isCompleted = false
 }: {
   bundleId?: string;
+  appName?: string;
   onSubmit: (data: { uriScheme: string; appId: string }) => void;
   isCompleted?: boolean;
 }) {
   const [uriScheme, setUriScheme] = useState('');
-  const [appIdPrefix, setAppIdPrefix] = useState('');
+  const [appId, setAppId] = useState('');
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
 
   const handleCopy = (text: string, id: string) => {
@@ -3476,113 +3511,119 @@ function DeeplinkIosInput({
     setTimeout(() => setCopySuccess(null), 2000);
   };
 
-  const appId = appIdPrefix && bundleId ? `${appIdPrefix}.${bundleId}` : '';
+  const sdkConfigValue = appName ? `applinks:${appName.toLowerCase().replace(/\s/g, '')}.airbridge.io` : 'applinks:yourapp.airbridge.io';
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">iOS Deep Link Setup</div>
-        <div className="text-xs text-gray-400">Setup Complete</div>
+      <div className={CARD_STYLES.completed}>
+        <div className="text-sm font-medium text-gray-500 mb-1">iOS 딥링크 설정</div>
+        <div className="text-xs text-gray-400">설정 완료</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
-      <div className="text-sm font-medium text-gray-900 mb-4">🍎 iOS Deep Link Configuration</div>
+    <div className={CARD_STYLES.base}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-gray-900 flex items-center justify-center">
+            <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+            </svg>
+          </div>
+          <div>
+            <div className="font-medium text-gray-900">iOS 딥링크 설정</div>
+            <div className="text-sm text-gray-500">iOS 앱의 딥링크 정보를 입력하세요</div>
+          </div>
+        </div>
+        <a
+          href="https://help.airbridge.io/ko/guides/retargeting-with-deep-links"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          가이드
+        </a>
+      </div>
 
-      {/* URI Scheme Input */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          URL Scheme <span className="text-red-500">*</span>
-        </label>
-        <div className="flex gap-2">
+      <div className="space-y-4">
+        {/* iOS URL Scheme */}
+        <div>
+          <label className={LABEL_STYLES.field}>
+            iOS URL 스킴 <span className="text-red-500">*</span>
+          </label>
+          <p className={LABEL_STYLES.fieldDesc}>
+            iOS 설정 파일인 info.plist에서 지정하는 값만 입력할 수 있습니다.
+          </p>
           <input
             type="text"
             value={uriScheme}
-            onChange={(e) => setUriScheme(e.target.value.toLowerCase().replace(/[^a-z0-9+]/g, ''))}
-            placeholder="myapp"
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+            onChange={(e) => setUriScheme(e.target.value.toLowerCase().replace(/[^a-z0-9+.-]/g, ''))}
+            placeholder="예: myapp"
+            className={INPUT_STYLES.base}
           />
-          <span className="flex items-center px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500">://</span>
         </div>
-        <p className="mt-1.5 text-xs text-gray-500">
-          Only lowercase letters, numbers, and + are allowed. e.g., myapp, myapp+web
-        </p>
-      </div>
 
-      {/* App ID Prefix Input */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          App ID Prefix <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          value={appIdPrefix}
-          onChange={(e) => setAppIdPrefix(e.target.value.toUpperCase())}
-          placeholder="9JA89QQLNQ"
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-        />
-        <p className="mt-1.5 text-xs text-gray-500">
-          Find this in your Apple Developer Dashboard
-        </p>
-      </div>
-
-      {/* Generated App ID Display */}
-      {bundleId && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-          <div className="text-xs font-medium text-blue-700 mb-1">Generated App ID</div>
-          <div className="flex items-center justify-between">
-            <code className="text-sm text-blue-900">
-              {appId || `[App ID Prefix].${bundleId}`}
-            </code>
-            {appId && (
-              <button
-                onClick={() => handleCopy(appId, 'appId')}
-                className="p-1.5 hover:bg-blue-100 rounded transition-colors"
-              >
-                {copySuccess === 'appId' ? (
-                  <Check className="w-4 h-4 text-green-600" />
-                ) : (
-                  <Copy className="w-4 h-4 text-blue-600" />
-                )}
-              </button>
-            )}
+        {/* iOS App ID */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <label className="text-sm font-medium text-gray-700">
+              iOS 앱 ID <span className="text-red-500">*</span>
+            </label>
+            <a
+              href="https://help.airbridge.io/ko/developers/ios-sdk-v4#%EC%97%90%EC%96%B4%EB%B8%8C%EB%A6%BF%EC%A7%80%EC%97%90-%EB%94%A5%EB%A7%81%ED%81%AC-%EC%A0%95%EB%B3%B4-%EB%93%B1%EB%A1%9D%ED%95%98%EA%B8%B0"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+            >
+              <Code className="w-3 h-3" />
+              개발자 가이드
+            </a>
           </div>
+          <p className={LABEL_STYLES.fieldDesc}>
+            App ID Prefix와 Bundle ID를 마침표(.)로 조합하여 입력하세요.
+            <span className="block text-gray-400 mt-0.5">예: 1AB23CDEFG.com.your.bundleid</span>
+          </p>
+          <input
+            type="text"
+            value={appId}
+            onChange={(e) => setAppId(e.target.value)}
+            placeholder="예: 1AB23CDEFG.com.example.app"
+            className={INPUT_STYLES.base}
+          />
         </div>
-      )}
 
-      {/* Help Section */}
-      <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-        <div className="text-xs font-medium text-gray-700 mb-2">📍 How to find App ID Prefix</div>
-        <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
-          <li>Go to Apple Developer Dashboard</li>
-          <li>Navigate to Certificates, Identifiers & Profiles</li>
-          <li>Identifiers → Select your app</li>
-          <li>Copy the App ID Prefix value</li>
-        </ol>
-        <a
-          href="https://developer.apple.com/account/resources/identifiers/list"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:text-blue-700"
-        >
-          <ExternalLink className="w-3 h-3" />
-          Open Apple Developer Dashboard
-        </a>
+        {/* iOS SDK 설정 필요 정보 */}
+        <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
+          <label className="block text-sm font-medium text-blue-900 mb-2">
+            iOS SDK 설정 필요 정보
+          </label>
+          <p className="text-xs text-blue-700 mb-3">
+            Xcode에서 Associated Domains 설정 시 아래 값을 사용하세요.
+          </p>
+          <button
+            onClick={() => handleCopy(sdkConfigValue, 'sdkConfig')}
+            className="w-full flex items-center justify-between px-4 py-3 bg-white border border-blue-200 rounded-lg text-sm text-gray-900 hover:bg-blue-50 transition-colors"
+          >
+            <code className="font-mono text-sm">{sdkConfigValue}</code>
+            {copySuccess === 'sdkConfig' ? (
+              <Check className="w-4 h-4 text-green-600" />
+            ) : (
+              <Copy className="w-4 h-4 text-blue-500" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Submit Button */}
       <button
-        onClick={() => onSubmit({ uriScheme: uriScheme + '://', appId })}
-        disabled={!uriScheme || !appIdPrefix}
-        className={`w-full py-2.5 rounded-lg font-medium transition-colors ${
-          uriScheme && appIdPrefix
-            ? 'bg-blue-500 text-white hover:bg-blue-600'
-            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-        }`}
+        onClick={() => onSubmit({ uriScheme: uriScheme, appId })}
+        disabled={!uriScheme || !appId}
+        className={`w-full mt-6 ${uriScheme && appId ? BUTTON_STYLES.primary : BUTTON_STYLES.primaryDisabled}`}
       >
-        Continue
+        저장하고 계속하기
       </button>
     </div>
   );
@@ -3590,15 +3631,18 @@ function DeeplinkIosInput({
 
 // Deep Link Android Input Component
 function DeeplinkAndroidInput({
-  packageName,
+  packageName: initialPackageName,
+  appName,
   onSubmit,
   isCompleted = false
 }: {
   packageName?: string;
-  onSubmit: (data: { uriScheme: string; sha256Fingerprints: string[] }) => void;
+  appName?: string;
+  onSubmit: (data: { uriScheme: string; packageName: string; sha256Fingerprints: string[] }) => void;
   isCompleted?: boolean;
 }) {
   const [uriScheme, setUriScheme] = useState('');
+  const [packageName, setPackageName] = useState(initialPackageName || '');
   const [fingerprints, setFingerprints] = useState('');
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
 
@@ -3608,117 +3652,140 @@ function DeeplinkAndroidInput({
     setTimeout(() => setCopySuccess(null), 2000);
   };
 
-  const keytoolCommand = 'keytool -list -v -keystore YOUR_KEYSTORE.keystore';
+  const sdkConfigValue = appName ? `${appName.toLowerCase().replace(/\s/g, '')}.airbridge.io` : 'yourapp.airbridge.io';
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">Android Deep Link Setup</div>
-        <div className="text-xs text-gray-400">Setup Complete</div>
+      <div className={CARD_STYLES.completed}>
+        <div className="text-sm font-medium text-gray-500 mb-1">Android 딥링크 설정</div>
+        <div className="text-xs text-gray-400">설정 완료</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
-      <div className="text-sm font-medium text-gray-900 mb-4">🤖 Android Deep Link Configuration</div>
+    <div className={CARD_STYLES.base}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-green-600 flex items-center justify-center">
+            <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.523 15.341l1.624-2.817c.091-.158.039-.358-.117-.449a.325.325 0 0 0-.445.118l-1.646 2.856c-1.247-.569-2.644-.889-4.139-.889-1.495 0-2.893.32-4.139.889l-1.646-2.856a.325.325 0 0 0-.445-.118c-.156.091-.208.291-.117.449l1.624 2.817c-2.607 1.271-4.297 3.716-4.297 6.559h18.04c0-2.843-1.69-5.288-4.297-6.559zM7.699 18.859c-.396 0-.717-.322-.717-.719s.321-.719.717-.719c.396 0 .718.322.718.719s-.322.719-.718.719zm8.602 0c-.396 0-.717-.322-.717-.719s.321-.719.717-.719c.396 0 .718.322.718.719s-.322.719-.718.719zM5.246 9.054l-1.573-2.734a.325.325 0 0 1 .118-.445c.156-.091.357-.039.448.118l1.594 2.763c1.326-.604 2.817-.943 4.367-.943s3.041.339 4.367.943l1.594-2.763a.325.325 0 0 1 .448-.118c.156.091.208.291.118.445l-1.573 2.734c2.754 1.422 4.63 4.262 4.63 7.546H.616c0-3.284 1.876-6.124 4.63-7.546z"/>
+            </svg>
+          </div>
+          <div>
+            <div className="font-medium text-gray-900">Android 딥링크 설정</div>
+            <div className="text-sm text-gray-500">Android 앱의 딥링크 정보를 입력하세요</div>
+          </div>
+        </div>
+        <a
+          href="https://help.airbridge.io/ko/guides/retargeting-with-deep-links"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          가이드
+        </a>
+      </div>
 
-      {/* URI Scheme Input */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          URL Scheme <span className="text-red-500">*</span>
-        </label>
-        <div className="flex gap-2">
+      <div className="space-y-4">
+        {/* Android URL Scheme */}
+        <div>
+          <label className={LABEL_STYLES.field}>
+            Android URL 스킴 <span className="text-red-500">*</span>
+          </label>
+          <p className={LABEL_STYLES.fieldDesc}>
+            AndroidManifest.xml에서 지정한 URL 스킴을 입력하세요.
+          </p>
           <input
             type="text"
             value={uriScheme}
-            onChange={(e) => setUriScheme(e.target.value.toLowerCase().replace(/[^a-z0-9+]/g, ''))}
-            placeholder="myapp"
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+            onChange={(e) => setUriScheme(e.target.value.toLowerCase().replace(/[^a-z0-9+.-]/g, ''))}
+            placeholder="예: myapp"
+            className={INPUT_STYLES.base}
           />
-          <span className="flex items-center px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500">://</span>
         </div>
-        <p className="mt-1.5 text-xs text-gray-500">
-          Using the same scheme as iOS is recommended
-        </p>
-      </div>
 
-      {/* Package Name Display */}
-      {packageName && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-100 rounded-lg">
-          <div className="text-xs font-medium text-green-700 mb-1">Package Name (Auto-filled)</div>
-          <code className="text-sm text-green-900">{packageName}</code>
+        {/* Android Package Name */}
+        <div>
+          <label className={LABEL_STYLES.field}>
+            패키지 이름 <span className="text-red-500">*</span>
+          </label>
+          <p className={LABEL_STYLES.fieldDesc}>
+            Google Play 스토어 URL의 'id=' 이후 값입니다.
+            <span className="block text-gray-400 mt-0.5">예: com.your.packagename</span>
+          </p>
+          <input
+            type="text"
+            value={packageName}
+            onChange={(e) => setPackageName(e.target.value)}
+            placeholder="예: com.example.app"
+            className={INPUT_STYLES.base}
+          />
         </div>
-      )}
 
-      {/* SHA256 Fingerprint Input */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          SHA256 Fingerprint <span className="text-red-500">*</span>
-        </label>
-        <textarea
-          value={fingerprints}
-          onChange={(e) => setFingerprints(e.target.value)}
-          placeholder="14:6D:E9:83:C5:73:06:50:D8:EE:..."
-          rows={3}
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 font-mono"
-        />
-        <p className="mt-1.5 text-xs text-gray-500">
-          Separate multiple fingerprints with commas
-        </p>
-      </div>
-
-      {/* Help Section */}
-      <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-        <div className="text-xs font-medium text-gray-700 mb-2">📍 How to find SHA256 Fingerprint</div>
-
-        <div className="mb-3">
-          <div className="text-xs text-gray-600 mb-1">Terminal command:</div>
-          <div className="flex items-center gap-2 p-2 bg-gray-800 rounded-lg">
-            <code className="flex-1 text-xs text-green-400 overflow-x-auto">{keytoolCommand}</code>
-            <button
-              onClick={() => handleCopy(keytoolCommand, 'keytool')}
-              className="p-1.5 hover:bg-gray-700 rounded transition-colors"
+        {/* SHA256 Fingerprints */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <label className="text-sm font-medium text-gray-700">
+              SHA256 인증서 지문 <span className="text-red-500">*</span>
+            </label>
+            <a
+              href="https://help.airbridge.io/ko/developers/android-sdk-v4#%EC%97%90%EC%96%B4%EB%B8%8C%EB%A6%BF%EC%A7%80%EC%97%90-%EB%94%A5%EB%A7%81%ED%81%AC-%EC%A0%95%EB%B3%B4-%EB%93%B1%EB%A1%9D%ED%95%98%EA%B8%B0"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
             >
-              {copySuccess === 'keytool' ? (
-                <Check className="w-4 h-4 text-green-400" />
-              ) : (
-                <Copy className="w-4 h-4 text-gray-400" />
-              )}
-            </button>
+              <Code className="w-3 h-3" />
+              가이드
+            </a>
           </div>
+          <p className={LABEL_STYLES.fieldDesc}>
+            딥링크 검증에 사용됩니다. 여러 값은 쉼표(,)로 구분하세요.
+          </p>
+          <textarea
+            value={fingerprints}
+            onChange={(e) => setFingerprints(e.target.value)}
+            placeholder="예: 12:3A:B4:56:C7:89:..."
+            rows={2}
+            className={INPUT_STYLES.textarea}
+          />
         </div>
 
-        <div className="text-xs text-gray-600">
-          Or find it in Google Play Console:
-          <br />App Integrity → App Signing → SHA-256 certificate fingerprint
+        {/* Android SDK 설정 필요 정보 */}
+        <div className="p-4 bg-green-50 border border-green-100 rounded-lg">
+          <label className="block text-sm font-medium text-green-900 mb-2">
+            Android SDK 설정 필요 정보
+          </label>
+          <p className="text-xs text-green-700 mb-3">
+            AndroidManifest.xml의 인텐트 필터에서 host로 사용하세요.
+          </p>
+          <button
+            onClick={() => handleCopy(sdkConfigValue, 'sdkConfig')}
+            className="w-full flex items-center justify-between px-4 py-3 bg-white border border-green-200 rounded-lg text-sm text-gray-900 hover:bg-green-50 transition-colors"
+          >
+            <code className="font-mono text-sm">{sdkConfigValue}</code>
+            {copySuccess === 'sdkConfig' ? (
+              <Check className="w-4 h-4 text-green-600" />
+            ) : (
+              <Copy className="w-4 h-4 text-green-600" />
+            )}
+          </button>
         </div>
-
-        <a
-          href="https://play.google.com/console"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:text-blue-700"
-        >
-          <ExternalLink className="w-3 h-3" />
-          Open Google Play Console
-        </a>
       </div>
 
       {/* Submit Button */}
       <button
         onClick={() => onSubmit({
-          uriScheme: uriScheme + '://',
+          uriScheme: uriScheme,
+          packageName: packageName,
           sha256Fingerprints: fingerprints.split(',').map(f => f.trim()).filter(Boolean)
         })}
-        disabled={!uriScheme || !fingerprints}
-        className={`w-full py-2.5 rounded-lg font-medium transition-colors ${
-          uriScheme && fingerprints
-            ? 'bg-blue-500 text-white hover:bg-blue-600'
-            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-        }`}
+        disabled={!uriScheme || !packageName || !fingerprints}
+        className={`w-full mt-6 ${uriScheme && packageName && fingerprints ? BUTTON_STYLES.primary : BUTTON_STYLES.primaryDisabled}`}
       >
-        Continue
+        저장하고 계속하기
       </button>
     </div>
   );
@@ -3748,7 +3815,7 @@ function DeeplinkDashboardGuide({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Dashboard Setup Guide</div>
         <div className="text-xs text-gray-400">Setup Complete</div>
       </div>
@@ -3756,7 +3823,7 @@ function DeeplinkDashboardGuide({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="text-sm font-medium text-gray-900 mb-4">
         {platform === 'ios' ? '🍎' : '🤖'} {platform === 'ios' ? 'iOS' : 'Android'} Dashboard Setup
       </div>
@@ -4038,7 +4105,7 @@ function DeeplinkSdkSetup({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">SDK Setup Guide</div>
         <div className="text-xs text-gray-400">Setup Complete</div>
       </div>
@@ -4046,7 +4113,7 @@ function DeeplinkSdkSetup({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="text-sm font-medium text-gray-900 mb-4">
         {platform === 'ios' ? '🍎' : '🤖'} {platform === 'ios' ? 'iOS' : 'Android'} SDK Setup
         <span className="ml-2 text-xs font-normal text-gray-500">({framework})</span>
@@ -4124,7 +4191,7 @@ function DeeplinkTestChecklist({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Test Preparation</div>
         <div className="text-xs text-gray-400">Ready</div>
       </div>
@@ -4132,7 +4199,7 @@ function DeeplinkTestChecklist({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="text-sm font-medium text-gray-900 mb-4">📋 Pre-Test Checklist</div>
 
       <div className="space-y-3 mb-4">
@@ -4219,7 +4286,7 @@ function DeeplinkTestScenarios({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Deep Link Test</div>
         <div className="text-xs text-gray-400">Test Complete</div>
       </div>
@@ -4227,7 +4294,7 @@ function DeeplinkTestScenarios({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="text-sm font-medium text-gray-900 mb-4">🧪 Deep Link Test</div>
 
       {/* Dashboard Test Link */}
@@ -4331,7 +4398,7 @@ function DeeplinkComplete({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Deep Link Setup Complete</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -4339,7 +4406,7 @@ function DeeplinkComplete({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="text-center mb-4">
         <div className="text-4xl mb-2">🎉</div>
         <div className="text-lg font-medium text-gray-900">Deep Link Setup Complete!</div>
@@ -4380,7 +4447,7 @@ function DeeplinkComplete({
 function SDKVerify({ onConfirm, isCompleted = false }: { onConfirm: (status: string) => void; isCompleted?: boolean }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">SDK Verification</div>
         <div className="text-xs text-gray-400">Verification completed</div>
       </div>
@@ -4388,8 +4455,8 @@ function SDKVerify({ onConfirm, isCompleted = false }: { onConfirm: (status: str
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">SDK Verification</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>SDK Verification</div>
 
       <a
         href="https://dashboard.airbridge.io/logs"
@@ -4442,7 +4509,7 @@ function ChannelSelect({ onSelect, isCompleted = false }: { onSelect: (channels:
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Ad Channel Selection</div>
         <div className="text-xs text-gray-400">Selection completed</div>
       </div>
@@ -4468,12 +4535,12 @@ function ChannelSelect({ onSelect, isCompleted = false }: { onSelect: (channels:
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">Select Ad Channels to Integrate (multiple selection allowed)</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>Select Ad Channels to Integrate (multiple selection allowed)</div>
 
       {channels.map(group => (
         <div key={group.category} className="mb-4 last:mb-0">
-          <div className="text-xs text-gray-500 mb-2">{group.category}</div>
+          <div className={LABEL_STYLES.fieldDesc}>{group.category}</div>
           <div className="space-y-2">
             {group.items.map(item => {
               const isSelected = selected.includes(item.id);
@@ -4529,7 +4596,7 @@ function ChannelIntegrationOverview({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Channel Integration</div>
         <div className="text-xs text-gray-400">Setup started</div>
       </div>
@@ -4537,8 +4604,8 @@ function ChannelIntegrationOverview({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">Selected Channels for Integration</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>Selected Channels for Integration</div>
 
       <div className="space-y-2 mb-4">
         {selectedChannels.map((channelId, index) => {
@@ -4571,7 +4638,7 @@ function ChannelIntegrationOverview({
 
       <button
         onClick={onStart}
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-500 text-white hover:bg-blue-600"
+        className={BUTTON_STYLES.secondary}
       >
         Start Integration <ChevronRight className="w-4 h-4" />
       </button>
@@ -4606,7 +4673,7 @@ function ChannelProgress({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500">{channelNames[channel] || channel} Progress</div>
         <div className="text-xs text-gray-400 mt-1">Viewing progress</div>
       </div>
@@ -4614,7 +4681,7 @@ function ChannelProgress({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-medium text-gray-700">{channelNames[channel] || channel} Integration</div>
         <span className="text-xs text-gray-500">{completedSteps}/{totalSteps} completed</span>
@@ -4689,7 +4756,7 @@ function MetaChannelIntegration({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Meta Channel Integration</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -4697,7 +4764,7 @@ function MetaChannelIntegration({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xl">📘</span>
         <div className="text-sm font-medium text-gray-700">Meta Ads - Channel Integration</div>
@@ -4712,7 +4779,7 @@ function MetaChannelIntegration({
               value={metaAppId}
               onChange={e => setMetaAppId(e.target.value)}
               placeholder="Enter your Meta App ID"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+              className={INPUT_STYLES.base}
             />
             <a
               href="https://developers.facebook.com/apps"
@@ -4737,7 +4804,7 @@ function MetaChannelIntegration({
       {step === 'connect' && (
         <>
           <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <div className="text-sm font-medium text-gray-700 mb-2">Step 2: Connect with Facebook</div>
+            <div className={LABEL_STYLES.field}>Step 2: Connect with Facebook</div>
             <ol className="text-xs text-gray-600 space-y-2">
               <li className="flex items-start gap-2">
                 <span className="text-blue-500 font-medium">1.</span>
@@ -4762,7 +4829,7 @@ function MetaChannelIntegration({
             href="https://dashboard.airbridge.io/integrations/channels"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+            className={BUTTON_STYLES.primaryWithIconMb}
           >
             Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
           </a>
@@ -4799,7 +4866,7 @@ function MetaCostIntegration({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Meta Cost Integration</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -4807,7 +4874,7 @@ function MetaCostIntegration({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xl">📘</span>
         <div className="text-sm font-medium text-gray-700">Meta Ads - Cost Integration</div>
@@ -4825,7 +4892,7 @@ function MetaCostIntegration({
       </div>
 
       <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">Setup Steps:</div>
+        <div className={LABEL_STYLES.field}>Setup Steps:</div>
         <ol className="text-xs text-gray-600 space-y-2">
           <li className="flex items-start gap-2">
             <span className="text-blue-500 font-medium">1.</span>
@@ -4846,7 +4913,7 @@ function MetaCostIntegration({
         href="https://dashboard.airbridge.io/integrations/cost"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+        className={BUTTON_STYLES.primaryWithIconMb}
       >
         Open Cost Integration <ExternalLink className="w-4 h-4" />
       </a>
@@ -4881,7 +4948,7 @@ function MetaSkanIntegration({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Meta SKAN Integration</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -4889,7 +4956,7 @@ function MetaSkanIntegration({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xl">📘</span>
         <div className="text-sm font-medium text-gray-700">Meta Ads - SKAN Integration</div>
@@ -4907,7 +4974,7 @@ function MetaSkanIntegration({
       </div>
 
       <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">Setup Steps:</div>
+        <div className={LABEL_STYLES.field}>Setup Steps:</div>
         <ol className="text-xs text-gray-600 space-y-2">
           <li className="flex items-start gap-2">
             <span className="text-blue-500 font-medium">1.</span>
@@ -4928,7 +4995,7 @@ function MetaSkanIntegration({
         href="https://dashboard.airbridge.io/integrations/skan"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+        className={BUTTON_STYLES.primaryWithIconMb}
       >
         Open SKAN Integration <ExternalLink className="w-4 h-4" />
       </a>
@@ -4963,7 +5030,7 @@ function GoogleChannelIntegration({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Google Channel Integration</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -4971,14 +5038,14 @@ function GoogleChannelIntegration({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xl">🔵</span>
         <div className="text-sm font-medium text-gray-700">Google Ads - Channel Integration</div>
       </div>
 
       <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">Setup Steps:</div>
+        <div className={LABEL_STYLES.field}>Setup Steps:</div>
         <ol className="text-xs text-gray-600 space-y-2">
           <li className="flex items-start gap-2">
             <span className="text-blue-500 font-medium">1.</span>
@@ -5003,7 +5070,7 @@ function GoogleChannelIntegration({
         href="https://dashboard.airbridge.io/integrations/channels"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+        className={BUTTON_STYLES.primaryWithIconMb}
       >
         Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
       </a>
@@ -5038,7 +5105,7 @@ function GoogleCostIntegration({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Google Cost Integration</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -5046,7 +5113,7 @@ function GoogleCostIntegration({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xl">🔵</span>
         <div className="text-sm font-medium text-gray-700">Google Ads - Cost Integration</div>
@@ -5066,7 +5133,7 @@ function GoogleCostIntegration({
         href="https://dashboard.airbridge.io/integrations/cost"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+        className={BUTTON_STYLES.primaryWithIconMb}
       >
         Open Cost Integration <ExternalLink className="w-4 h-4" />
       </a>
@@ -5101,7 +5168,7 @@ function GoogleSkanIntegration({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Google SKAN Integration</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -5109,7 +5176,7 @@ function GoogleSkanIntegration({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xl">🔵</span>
         <div className="text-sm font-medium text-gray-700">Google Ads - SKAN Integration</div>
@@ -5129,7 +5196,7 @@ function GoogleSkanIntegration({
         href="https://dashboard.airbridge.io/integrations/skan"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+        className={BUTTON_STYLES.primaryWithIconMb}
       >
         Open SKAN Integration <ExternalLink className="w-4 h-4" />
       </a>
@@ -5166,7 +5233,7 @@ function AppleVersionCheck({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Apple Search Ads Version</div>
         <div className="text-xs text-gray-400">Version confirmed</div>
       </div>
@@ -5174,7 +5241,7 @@ function AppleVersionCheck({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xl">🍎</span>
         <div className="text-sm font-medium text-gray-700">Apple Search Ads - Version Check</div>
@@ -5244,7 +5311,7 @@ function AppleChannelIntegration({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Apple Channel Integration</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -5252,14 +5319,14 @@ function AppleChannelIntegration({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xl">🍎</span>
         <div className="text-sm font-medium text-gray-700">Apple Search Ads - Channel Integration</div>
       </div>
 
       <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">Setup Steps:</div>
+        <div className={LABEL_STYLES.field}>Setup Steps:</div>
         <ol className="text-xs text-gray-600 space-y-2">
           <li className="flex items-start gap-2">
             <span className="text-blue-500 font-medium">1.</span>
@@ -5284,7 +5351,7 @@ function AppleChannelIntegration({
         href="https://dashboard.airbridge.io/integrations/channels"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+        className={BUTTON_STYLES.primaryWithIconMb}
       >
         Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
       </a>
@@ -5319,7 +5386,7 @@ function AppleCostIntegration({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Apple Cost Integration</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -5327,7 +5394,7 @@ function AppleCostIntegration({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xl">🍎</span>
         <div className="text-sm font-medium text-gray-700">Apple Search Ads - Cost Integration</div>
@@ -5347,7 +5414,7 @@ function AppleCostIntegration({
         href="https://dashboard.airbridge.io/integrations/cost"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+        className={BUTTON_STYLES.primaryWithIconMb}
       >
         Open Cost Integration <ExternalLink className="w-4 h-4" />
       </a>
@@ -5382,7 +5449,7 @@ function TikTokChannelIntegration({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">TikTok Channel Integration</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -5390,7 +5457,7 @@ function TikTokChannelIntegration({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xl">🎵</span>
         <div className="text-sm font-medium text-gray-700">TikTok For Business - Channel Integration</div>
@@ -5410,7 +5477,7 @@ function TikTokChannelIntegration({
       </div>
 
       <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">Setup Steps:</div>
+        <div className={LABEL_STYLES.field}>Setup Steps:</div>
         <ol className="text-xs text-gray-600 space-y-2">
           <li className="flex items-start gap-2">
             <span className="text-blue-500 font-medium">1.</span>
@@ -5435,7 +5502,7 @@ function TikTokChannelIntegration({
         href="https://dashboard.airbridge.io/integrations/channels"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+        className={BUTTON_STYLES.primaryWithIconMb}
       >
         Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
       </a>
@@ -5470,7 +5537,7 @@ function TikTokCostIntegration({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">TikTok Cost Integration</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -5478,7 +5545,7 @@ function TikTokCostIntegration({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xl">🎵</span>
         <div className="text-sm font-medium text-gray-700">TikTok For Business - Cost Integration</div>
@@ -5498,7 +5565,7 @@ function TikTokCostIntegration({
         href="https://dashboard.airbridge.io/integrations/cost"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+        className={BUTTON_STYLES.primaryWithIconMb}
       >
         Open Cost Integration <ExternalLink className="w-4 h-4" />
       </a>
@@ -5533,7 +5600,7 @@ function TikTokSkanIntegration({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">TikTok SKAN Integration</div>
         <div className="text-xs text-gray-400">Completed</div>
       </div>
@@ -5541,7 +5608,7 @@ function TikTokSkanIntegration({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xl">🎵</span>
         <div className="text-sm font-medium text-gray-700">TikTok For Business - SKAN Integration</div>
@@ -5561,7 +5628,7 @@ function TikTokSkanIntegration({
         href="https://dashboard.airbridge.io/integrations/skan"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+        className={BUTTON_STYLES.primaryWithIconMb}
       >
         Open SKAN Integration <ExternalLink className="w-4 h-4" />
       </a>
@@ -5605,7 +5672,7 @@ function ChannelCompletion({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500">{channelNames[channel]} Setup</div>
         <div className="text-xs text-gray-400 mt-1">Completed</div>
       </div>
@@ -5613,7 +5680,7 @@ function ChannelCompletion({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 text-lg font-semibold mb-4 text-emerald-600">
         <CheckCircle2 className="w-6 h-6" />
         {channelNames[channel] || channel} Integration Complete!
@@ -5627,7 +5694,7 @@ function ChannelCompletion({
 
       <button
         onClick={onNext}
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-500 text-white hover:bg-blue-600"
+        className={BUTTON_STYLES.secondary}
       >
         {isLastChannel ? 'Complete Setup' : 'Continue to Next Channel'} <ChevronRight className="w-4 h-4" />
       </button>
@@ -5641,7 +5708,7 @@ function TokenDisplay({ tokens, onContinue, isCompleted = false }: { tokens: { a
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">API Tokens</div>
         <div className="text-xs text-gray-400">Token confirmation completed</div>
       </div>
@@ -5674,7 +5741,7 @@ function TokenDisplay({ tokens, onContinue, isCompleted = false }: { tokens: { a
   );
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 text-lg font-semibold mb-4 text-emerald-600">
         <CheckCircle2 className="w-6 h-6" />
         App Registration Complete!
@@ -5738,7 +5805,7 @@ function StandardEventSelect({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Standard Events</div>
         <div className="text-xs text-gray-400">Selection completed</div>
       </div>
@@ -5751,12 +5818,12 @@ function StandardEventSelect({
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">Select Standard Events to Track</div>
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>Select Standard Events to Track</div>
 
       {standardEvents.map(group => (
         <div key={group.category} className="mb-4 last:mb-0">
-          <div className="text-xs text-gray-500 mb-2">{group.category}</div>
+          <div className={LABEL_STYLES.fieldDesc}>{group.category}</div>
           <div className="space-y-2">
             {group.items.map(item => {
               const isSelected = selected.includes(item.id);
@@ -5823,7 +5890,7 @@ function CustomEventInput({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Custom Events</div>
         <div className="text-xs text-gray-400">Configuration completed</div>
       </div>
@@ -5842,7 +5909,7 @@ function CustomEventInput({
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <Plus className="w-5 h-5 text-purple-500" />
         <div className="text-sm font-medium text-gray-700">Add Custom Events (Optional)</div>
@@ -5865,7 +5932,7 @@ function CustomEventInput({
             value={newEventName}
             onChange={e => setNewEventName(e.target.value)}
             placeholder="e.g., tutorial_completed"
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
+            className={INPUT_STYLES.base}
           />
         </div>
 
@@ -5874,7 +5941,7 @@ function CustomEventInput({
           <select
             value={newEventCategory}
             onChange={e => setNewEventCategory(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 text-sm bg-white"
+            className={INPUT_STYLES.select}
           >
             <option value="engagement">Engagement</option>
             <option value="conversion">Conversion</option>
@@ -5898,7 +5965,7 @@ function CustomEventInput({
 
       {events.length > 0 && (
         <div className="mb-4">
-          <div className="text-xs text-gray-500 mb-2">Added Events ({events.length})</div>
+          <div className={LABEL_STYLES.fieldDesc}>Added Events ({events.length})</div>
           <div className="space-y-2">
             {events.map((event, index) => (
               <div key={index} className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
@@ -5952,7 +6019,7 @@ function EventVerify({
 
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Event Verification</div>
         <div className="text-xs text-gray-400">Verification completed</div>
       </div>
@@ -5968,14 +6035,14 @@ function EventVerify({
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 mb-4">
         <CheckCircle2 className="w-5 h-5 text-green-500" />
         <div className="text-sm font-medium text-gray-700">Verify Event Tracking</div>
       </div>
 
       <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">Test your events:</div>
+        <div className={LABEL_STYLES.field}>Test your events:</div>
         <ol className="text-xs text-gray-600 space-y-2">
           <li className="flex items-start gap-2">
             <span className="text-purple-500 font-medium">1.</span>
@@ -5996,7 +6063,7 @@ function EventVerify({
         href="https://dashboard.airbridge.io/raw-data/app-real-time-log"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-purple-600 text-white hover:bg-purple-700 mb-3"
+        className={BUTTON_STYLES.purple}
       >
         Open Real-time Logs <ExternalLink className="w-4 h-4" />
       </a>
@@ -6047,7 +6114,7 @@ function EventTaxonomySummary({
 }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Event Taxonomy Summary</div>
         <div className="text-xs text-gray-400">Setup completed</div>
       </div>
@@ -6058,7 +6125,7 @@ function EventTaxonomySummary({
   const customEvents = events.filter(e => !e.isStandard);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 text-lg font-semibold mb-4 text-purple-600">
         <CheckCircle2 className="w-6 h-6" />
         Event Taxonomy Complete!
@@ -6066,7 +6133,7 @@ function EventTaxonomySummary({
 
       <div className="space-y-4 mb-4">
         <div>
-          <div className="text-xs text-gray-500 mb-2">Standard Events ({standardEvents.length})</div>
+          <div className={LABEL_STYLES.fieldDesc}>Standard Events ({standardEvents.length})</div>
           <div className="flex flex-wrap gap-2">
             {standardEvents.map(event => (
               <span key={event.eventId} className="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-lg">
@@ -6078,7 +6145,7 @@ function EventTaxonomySummary({
 
         {customEvents.length > 0 && (
           <div>
-            <div className="text-xs text-gray-500 mb-2">Custom Events ({customEvents.length})</div>
+            <div className={LABEL_STYLES.fieldDesc}>Custom Events ({customEvents.length})</div>
             <div className="flex flex-wrap gap-2">
               {customEvents.map(event => (
                 <span key={event.eventId} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-lg">
@@ -6101,7 +6168,7 @@ function EventTaxonomySummary({
 
       <button
         onClick={onContinue}
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-500 text-white hover:bg-blue-600"
+        className={BUTTON_STYLES.secondary}
       >
         Continue to Ad Channel Integration <ChevronRight className="w-4 h-4" />
       </button>
@@ -6112,7 +6179,7 @@ function EventTaxonomySummary({
 // Dev Completion Summary Component
 function DevCompletionSummary({ appName }: { appName: string }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 text-lg font-semibold mb-4 text-emerald-600">
         <CheckCircle2 className="w-6 h-6" />
         Development Setup Complete!
@@ -6139,7 +6206,7 @@ function DevCompletionSummary({ appName }: { appName: string }) {
       </div>
 
       <div className="mt-4 pt-4 border-t border-gray-100">
-        <div className="text-sm font-medium text-gray-700 mb-3">What's Next?</div>
+        <div className={LABEL_STYLES.title}>What's Next?</div>
         <div className="flex gap-2">
           <button className="flex-1 py-2 px-3 text-sm rounded-lg transition-colors bg-blue-500 text-white hover:bg-blue-600">
             View Test Events
@@ -6163,7 +6230,7 @@ function CompletionSummary({ data }: { data: CompletionData }) {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 text-lg font-semibold text-green-600 mb-4">
         <CheckCircle2 className="w-6 h-6" />
         Airbridge Setup Complete!
@@ -6200,7 +6267,7 @@ function CompletionSummary({ data }: { data: CompletionData }) {
       </div>
 
       <div className="mt-4 pt-4 border-t border-gray-100">
-        <div className="text-sm font-medium text-gray-700 mb-3">Next Steps</div>
+        <div className={LABEL_STYLES.title}>Next Steps</div>
         <div className="flex gap-2">
           <button className="flex-1 py-2 px-3 text-sm rounded-lg transition-colors bg-blue-500 text-white hover:bg-blue-600">
             Create Tracking Link
@@ -6218,7 +6285,7 @@ function CompletionSummary({ data }: { data: CompletionData }) {
 function SingleSelect({ options, onSelect, isCompleted = false }: { options: { label: string; value: string; description?: string }[]; onSelect: (value: string) => void; isCompleted?: boolean }) {
   if (isCompleted) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+      <div className={CARD_STYLES.completed}>
         <div className="text-sm font-medium text-gray-500 mb-2">Options</div>
         <div className="text-xs text-gray-400">Selection completed</div>
       </div>
@@ -6226,7 +6293,7 @@ function SingleSelect({ options, onSelect, isCompleted = false }: { options: { l
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+    <div className={CARD_STYLES.base}>
       <div className="space-y-2">
         {options.map(option => (
           <button
@@ -6447,6 +6514,26 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
         // New app registration - update messages state
         setMessages(prev => [...prev, newMessage]);
       }
+      setIsTyping(false);
+    }, 600);
+  };
+
+  // Add bot message to a specific app by ID (avoids closure issues)
+  const addBotMessageToApp = (appId: string, content: MessageContent[]) => {
+    setIsTyping(true);
+    setTimeout(() => {
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        role: 'bot',
+        content,
+        timestamp: new Date(),
+      };
+
+      setRegisteredApps(prev => prev.map(app =>
+        app.id === appId
+          ? { ...app, messages: [...app.messages, newMessage] }
+          : app
+      ));
       setIsTyping(false);
     }, 600);
   };
@@ -6834,6 +6921,8 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     }
 
     const newAppId = Date.now().toString();
+    // Capture app name now to avoid closure issues with setTimeout
+    const appName = setupState.appInfo.appName;
     const newApp: RegisteredApp = {
       id: newAppId,
       appInfo: setupState.appInfo,
@@ -6867,9 +6956,10 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
       apiToken: generateToken(),
     };
 
+    // Use addBotMessageToApp with captured appId to avoid closure issues
     setTimeout(() => {
-      addBotMessage([
-        { type: 'text', text: `🎉 Your app **"${setupState.appInfo.appName}"** has been registered!` },
+      addBotMessageToApp(newAppId, [
+        { type: 'text', text: `🎉 Your app **"${appName}"** has been registered!` },
         { type: 'token-display', tokens },
       ]);
     }, 300);
@@ -7652,21 +7742,21 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '📋 iOS information has been saved!\n\nNow please complete the setup in the Airbridge dashboard.' },
+        { type: 'text', text: '📋 iOS 정보가 저장되었습니다!\n\n이제 Airbridge 대시보드에서 설정을 완료해 주세요.' },
         { type: 'deeplink-dashboard-guide', platform: 'ios', data: { uriScheme: data.uriScheme, appId: data.appId } },
       ]);
     }, 300);
   };
 
   // Deeplink Android submit handler
-  const handleDeeplinkAndroidSubmit = (data: { uriScheme: string; sha256Fingerprints: string[] }) => {
+  const handleDeeplinkAndroidSubmit = (data: { uriScheme: string; packageName: string; sha256Fingerprints: string[] }) => {
     setDeeplinkState(prev => ({ ...prev, androidData: data, currentPlatform: 'android' }));
     addUserMessage(`Android setup: ${data.uriScheme}`);
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '📋 Android information has been saved!\n\nNow please complete the setup in the Airbridge dashboard.' },
-        { type: 'deeplink-dashboard-guide', platform: 'android', data: { uriScheme: data.uriScheme, sha256Fingerprints: data.sha256Fingerprints } },
+        { type: 'text', text: '📋 Android 정보가 저장되었습니다!\n\n이제 Airbridge 대시보드에서 설정을 완료해 주세요.' },
+        { type: 'deeplink-dashboard-guide', platform: 'android', data: { uriScheme: data.uriScheme, packageName: data.packageName, sha256Fingerprints: data.sha256Fingerprints } },
       ]);
     }, 300);
   };
@@ -8381,13 +8471,16 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
   // Handle back navigation - removes the last bot message and user response pair
   const handleBack = () => {
+    // Determine which message array to use
+    const targetMessages = currentApp ? currentApp.messages : messages;
+
     // Need at least 2 messages to go back (user + bot pair)
-    if (messages.length < 2) return;
+    if (targetMessages.length < 2) return;
 
     // Find the last user message index
     let lastUserIndex = -1;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'user') {
+    for (let i = targetMessages.length - 1; i >= 0; i--) {
+      if (targetMessages[i].role === 'user') {
         lastUserIndex = i;
         break;
       }
@@ -8396,14 +8489,24 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     if (lastUserIndex === -1) return;
 
     // Remove messages from lastUserIndex to the end
-    setMessages(prev => prev.slice(0, lastUserIndex));
+    if (currentApp && currentAppId) {
+      // Update registered app's messages
+      setRegisteredApps(prev => prev.map(app =>
+        app.id === currentAppId
+          ? { ...app, messages: app.messages.slice(0, lastUserIndex) }
+          : app
+      ));
+    } else {
+      // Update new app registration messages
+      setMessages(prev => prev.slice(0, lastUserIndex));
+    }
 
     // Reset setup state based on remaining messages
     // This is a simplified approach - in production, we'd track state more carefully
   };
 
   // Check if we can go back (only for onboarding, not chat rooms)
-  const canGoBack = !currentChatId && messages.length >= 2 && messages.some(m => m.role === 'user');
+  const canGoBack = !currentChatId && currentMessages.length >= 2 && currentMessages.some(m => m.role === 'user');
 
   // Step order within each category for prerequisite checking
   const categoryStepOrder: Record<string, string[]> = {
@@ -8814,6 +8917,7 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
         return (
           <DeeplinkIosInput
             bundleId={content.bundleId}
+            appName={currentApp?.appInfo.appName || setupState.appInfo.appName}
             onSubmit={handleDeeplinkIosSubmit}
             isCompleted={isCompleted}
           />
@@ -8823,6 +8927,7 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
         return (
           <DeeplinkAndroidInput
             packageName={content.packageName}
+            appName={currentApp?.appInfo.appName || setupState.appInfo.appName}
             onSubmit={handleDeeplinkAndroidSubmit}
             isCompleted={isCompleted}
           />
