@@ -3,7 +3,11 @@ import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { LandingPage } from './components/LandingPage';
 import { TermsAgreement } from './components/TermsAgreement';
 import { OnboardingFlow } from './components/OnboardingFlow';
-import { ChatInterface } from './components/ChatInterface';
+import { Layout } from './components/layout/Layout';
+import { OnboardingManager } from './components/onboarding/OnboardingManager';
+import { FloatingChat } from './components/chat/FloatingChat';
+import { OnboardingProvider } from './components/context/OnboardingContext';
+import { ChatProvider } from './components/context/ChatContext';
 
 function LandingPageWrapper() {
   const navigate = useNavigate();
@@ -28,10 +32,8 @@ function TermsWrapper() {
 
 function SurveyWrapper() {
   const navigate = useNavigate();
-  const [userAnswers, setUserAnswers] = useState<Record<number, string | string[]>>({});
 
   const handleOnboardingComplete = (answers: Record<number, string | string[]>) => {
-    setUserAnswers(answers);
     // Store answers in sessionStorage for use in setup
     sessionStorage.setItem('surveyAnswers', JSON.stringify(answers));
     navigate('/setup');
@@ -44,7 +46,16 @@ function SetupWrapper() {
   const savedAnswers = sessionStorage.getItem('surveyAnswers');
   const userAnswers = savedAnswers ? JSON.parse(savedAnswers) : {};
 
-  return <ChatInterface userAnswers={userAnswers} />;
+  return (
+    <OnboardingProvider>
+      <ChatProvider>
+        <Layout currentPage="onboarding">
+          <OnboardingManager userAnswers={userAnswers} />
+        </Layout>
+        <FloatingChat />
+      </ChatProvider>
+    </OnboardingProvider>
+  );
 }
 
 export default function App() {
