@@ -1,0 +1,206 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e3f2fd', 'primaryTextColor': '#1565c0', 'primaryBorderColor': '#1976d2', 'lineColor': '#42a5f5', 'secondaryColor': '#fff3e0', 'tertiaryColor': '#f3e5f5'}}}%%
+flowchart TD
+    %% ===== START =====
+    START([🚀 Agentic Onboarding 시작]) --> ENV_SELECT
+
+    %% ===== PHASE 1: ENVIRONMENT & APP REGISTRATION =====
+    subgraph ENV_SELECT[" 🌐 1단계: 환경 선택 "]
+        E1{환경 선택}
+        E1 -->|Development| DEV_FLOW
+        E1 -->|Production| PROD_FLOW
+    end
+
+    %% ===== DEVELOPMENT MODE FLOW =====
+    subgraph DEV_FLOW[" 🔧 Development Mode "]
+        direction TB
+        D1[앱 이름 입력<br/>영소문자 + 숫자만]
+        D2[플랫폼 선택<br/>iOS / Android / Web]
+        D3[타임존 & 통화 확인<br/>자동 감지 또는 수동 설정]
+        D4[토큰 발급 완료<br/>App SDK Token<br/>Web SDK Token<br/>API Token]
+
+        D1 --> D2 --> D3 --> D4
+    end
+
+    %% ===== PRODUCTION MODE FLOW =====
+    subgraph PROD_FLOW[" 🚀 Production Mode "]
+        direction TB
+        P1[플랫폼 선택<br/>iOS / Android / Web<br/>다중 선택 가능]
+        P2[플랫폼별 앱 등록<br/>스토어 검색 또는 URL 입력]
+        P3[앱 정보 확인<br/>Bundle ID / Package Name]
+        P4[타임존 & 통화 설정]
+        P5[토큰 발급 완료]
+
+        P1 --> P2 --> P3 --> P4 --> P5
+    end
+
+    %% ===== CONVERGE TO SDK SETUP =====
+    DEV_FLOW --> SDK_CHOICE
+    PROD_FLOW --> SDK_CHOICE
+
+    %% ===== PHASE 2: SDK INSTALLATION =====
+    subgraph SDK_CHOICE[" 📦 2단계: SDK 설치 방식 선택 "]
+        S1{설치 주체 선택}
+        S1 -->|직접 설치| SDK_METHOD
+        S1 -->|개발자에게 공유| SDK_SHARE[설치 가이드 공유<br/>Slack/Email]
+    end
+
+    subgraph SDK_METHOD[" ⚙️ 설치 방법 선택 "]
+        SM1{방법 선택}
+        SM1 -->|GitHub Automation| GH_AUTO
+        SM1 -->|Manual| FRAMEWORK_SELECT
+    end
+
+    %% ===== GITHUB AUTOMATION PATH =====
+    subgraph GH_AUTO[" 🔄 GitHub Automation "]
+        direction TB
+        GH1[GitHub 연결<br/>OAuth 인증]
+        GH2[Repository 선택]
+        GH3[권한 부여<br/>Write Access]
+        GH4[자동 PR 생성<br/>SDK Install → Init → Deeplink → Events]
+
+        GH1 --> GH2 --> GH3 --> GH4
+    end
+
+    %% ===== FRAMEWORK SELECTION =====
+    subgraph FRAMEWORK_SELECT[" 🛠️ Framework 선택 "]
+        FS1{Framework}
+        FS1 -->|iOS Native| IOS_SDK
+        FS1 -->|Android Native| ANDROID_SDK
+        FS1 -->|Web Only| WEB_SDK
+        FS1 -->|React Native| CROSS_SDK
+        FS1 -->|Flutter| CROSS_SDK
+        FS1 -->|Unity| CROSS_SDK
+        FS1 -->|Expo| CROSS_SDK
+    end
+
+    %% ===== iOS NATIVE SDK =====
+    subgraph IOS_SDK[" 🍎 iOS Native SDK "]
+        direction TB
+        I1[SDK 설치<br/>CocoaPods / SPM]
+        I2[SDK 초기화<br/>AppDelegate 설정]
+        I3[딥링크 설정<br/>Associated Domains<br/>URL Types]
+
+        I1 --> I2 --> I3
+    end
+
+    %% ===== ANDROID NATIVE SDK =====
+    subgraph ANDROID_SDK[" 🤖 Android Native SDK "]
+        direction TB
+        A1[SDK 설치<br/>Gradle 의존성]
+        A2[SDK 초기화<br/>Application class]
+        A3[딥링크 설정<br/>Intent Filters<br/>App Links]
+
+        A1 --> A2 --> A3
+    end
+
+    %% ===== WEB SDK =====
+    subgraph WEB_SDK[" 🌐 Web SDK "]
+        direction TB
+        W1[설치 방법 선택<br/>Script 태그 / NPM]
+        W2[SDK 초기화<br/>Web Token 설정]
+        W3[옵션 설정<br/>UTM / Cookie / Attribution]
+
+        W1 --> W2 --> W3
+    end
+
+    %% ===== CROSS PLATFORM SDK =====
+    subgraph CROSS_SDK[" ⚛️ Cross-Platform SDK "]
+        direction TB
+        C1[패키지 설치<br/>npm / pub / unitypackage]
+        C2[네이티브 설정<br/>iOS + Android 각각]
+        C3[SDK 초기화 코드<br/>앱 진입점에 추가]
+        C4[딥링크 설정<br/>양 플랫폼 설정]
+
+        C1 --> C2 --> C3 --> C4
+    end
+
+    %% ===== CONVERGE TO SDK TEST =====
+    IOS_SDK --> SDK_TEST
+    ANDROID_SDK --> SDK_TEST
+    WEB_SDK --> SDK_TEST
+    CROSS_SDK --> SDK_TEST
+    GH_AUTO --> SDK_TEST
+
+    %% ===== PHASE 3: SDK TEST =====
+    subgraph SDK_TEST[" 🧪 3단계: SDK 테스트 "]
+        direction TB
+        T1[테스트 실행<br/>Install 확인<br/>Init 확인<br/>Event 전송 확인]
+        T2{테스트 결과}
+        T2 -->|성공| T_PASS[SDK 연동 완료 ✅]
+        T2 -->|실패| T_FAIL[트러블슈팅<br/>디버그 가이드]
+
+        T1 --> T2
+        T_FAIL --> T1
+    end
+
+    %% ===== DEV vs PROD DIVERGE =====
+    T_PASS --> MODE_CHECK
+
+    subgraph MODE_CHECK[" 📋 모드별 분기 "]
+        MC1{현재 모드}
+        MC1 -->|Development| DEV_COMPLETE
+        MC1 -->|Production| PROD_CONTINUE
+    end
+
+    %% ===== DEVELOPMENT COMPLETE =====
+    subgraph DEV_COMPLETE[" 🎉 Development 완료 "]
+        DC1[SDK 테스트 완료!<br/>Development 환경 준비됨]
+        DC2[Real-time Logs에서<br/>이벤트 확인 가능]
+        DC3{다음 단계}
+        DC3 -->|Production 앱 추가| PROD_FLOW
+        DC3 -->|종료| COMPLETE_DEV
+
+        DC1 --> DC2 --> DC3
+    end
+
+    %% ===== PRODUCTION CONTINUE =====
+    subgraph PROD_CONTINUE[" 📈 Production 추가 설정 "]
+        direction TB
+        PC1[Event Taxonomy 설정<br/>Standard Events<br/>Custom Events]
+    end
+
+    PROD_CONTINUE --> CHANNEL_INT
+
+    %% ===== PHASE 4: CHANNEL INTEGRATION (Production Only) =====
+    subgraph CHANNEL_INT[" 📺 4단계: 채널 연동 "]
+        direction TB
+        CH1[채널 선택<br/>Meta / Google / Apple / TikTok]
+        CH2[채널별 연동<br/>OAuth 인증]
+        CH3[Cost 연동<br/>광고 비용 데이터]
+        CH4[SKAN 설정<br/>iOS 프라이버시]
+
+        CH1 --> CH2 --> CH3 --> CH4
+    end
+
+    CHANNEL_INT --> VERIFICATION
+
+    %% ===== PHASE 5: VERIFICATION (Production Only) =====
+    subgraph VERIFICATION[" ✅ 5단계: 검증 "]
+        direction TB
+        V1[트래킹 링크 생성]
+        V2[딥링크 테스트<br/>앱 설치됨 / 미설치]
+        V3[어트리뷰션 테스트<br/>클릭 → 전환 확인]
+        V4[데이터 검증<br/>대시보드 확인]
+
+        V1 --> V2 --> V3 --> V4
+    end
+
+    VERIFICATION --> COMPLETE_PROD
+
+    %% ===== END =====
+    COMPLETE_DEV([🔧 Development 설정 완료])
+    COMPLETE_PROD([🚀 Production 온보딩 완료])
+
+    %% ===== STYLING =====
+    classDef devMode fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef prodMode fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef sdkStep fill:#fff3e0,stroke:#f57f17,stroke-width:1px
+    classDef testStep fill:#fce4ec,stroke:#c2185b,stroke-width:1px
+    classDef channelStep fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef complete fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+
+    class DEV_FLOW,DEV_COMPLETE devMode
+    class PROD_FLOW,PROD_CONTINUE,CHANNEL_INT,VERIFICATION prodMode
+    class SDK_CHOICE,SDK_METHOD,FRAMEWORK_SELECT,IOS_SDK,ANDROID_SDK,WEB_SDK,CROSS_SDK sdkStep
+    class SDK_TEST testStep
+    class COMPLETE_DEV,COMPLETE_PROD complete

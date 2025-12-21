@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, CheckCircle2, Circle, Sparkles, Copy, Check, ExternalLink,
-  Smartphone, Code, Tv, AlertCircle, ChevronRight, ChevronDown, ChevronLeft, Loader2, Plus, Lightbulb,
-  Maximize2, MessageCircle, X, Share2, MessageSquare, BookOpen
+  Smartphone, Code, Tv, AlertCircle, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Loader2, Plus, Lightbulb,
+  Maximize2, MessageCircle, X, Share2, MessageSquare, BookOpen, Key, HelpCircle, Link2
 } from 'lucide-react';
 import { AirbridgeBackground } from '../AirbridgeBackground';
 
@@ -27,8 +27,8 @@ const BUTTON_STYLES = {
 
 // Common Card Styles
 const CARD_STYLES = {
-  base: "bg-white border border-gray-200 rounded-xl p-5 mt-4",
-  completed: "bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60",
+  base: "bg-white border border-gray-200 rounded-xl p-5 mt-4 min-w-[280px] max-w-full w-full",
+  completed: "bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60 min-w-[280px] max-w-full w-full",
 };
 
 // Common Label Styles
@@ -139,9 +139,24 @@ type MessageContent =
   | { type: 'web-sdk-user-identity' }
   // Legacy Web SDK Install (kept for backwards compatibility)
   | { type: 'web-sdk-install'; appName: string; webToken: string }
+  // SDK Intent Selection (after app registration)
+  | { type: 'sdk-intent-select'; platforms: string[]; framework: string }
+  // iOS SDK Installation (Native only)
+  | { type: 'ios-sdk-install' }
+  | { type: 'ios-sdk-init'; appName: string; appToken: string }
+  | { type: 'ios-deeplink-setup'; appName: string; bundleId?: string }
+  // Android SDK Installation (Native only)
+  | { type: 'android-sdk-install' }
+  | { type: 'android-sdk-init'; appName: string; appToken: string }
+  | { type: 'android-deeplink-setup'; appName: string; packageName?: string }
   // SDK Test & Verification types
   | { type: 'sdk-test' }
   | { type: 'sdk-test-result'; passed: boolean; details: { install: boolean; init: boolean; events: boolean } }
+  // SDK Install Flow Confirmations (Guide-aligned)
+  | { type: 'sdk-install-confirm' }
+  | { type: 'sdk-init-confirm' }
+  | { type: 'deeplink-setup-choice' }
+  | { type: 'sdk-verification' }
   // Tracking Link types
   | { type: 'tracking-link-create'; channel: string }
   | { type: 'tracking-link-form'; channel: string }
@@ -176,7 +191,15 @@ type OnboardingStep = {
   title: string;
   description: string;
   status: 'pending' | 'in_progress' | 'completed';
-  category: 'sdk' | 'deeplink' | 'integration' | 'event-taxonomy';
+  category: 'sdk' | 'web-sdk' | 'ios-sdk' | 'android-sdk' | 'deeplink' | 'integration' | 'event-taxonomy';
+};
+
+// SDK Intent Types - used after app registration to determine SDK flow
+type SdkIntent = {
+  webTracking?: boolean;
+  installTracking?: boolean;
+  deepLinkNeeded?: boolean;
+  attImplemented?: boolean;  // iOS only
 };
 
 type CompletionData = {
@@ -290,6 +313,12 @@ type AppInfo = {
 };
 
 // Registered app with its own setup progress
+type AppTokens = {
+  appSdkToken: string;
+  webSdkToken: string;
+  apiToken: string;
+};
+
 type RegisteredApp = {
   id: string;
   appInfo: AppInfo;
@@ -301,59 +330,140 @@ type RegisteredApp = {
   channels: string[];
   isExpanded: boolean;
   messages: Message[]; // App-specific chat history
+  tokens: AppTokens; // Store generated tokens for SDK setup
+};
+
+// Check if framework is cross-platform (React Native, Flutter, Expo, Unity)
+const isCrossPlatformFramework = (framework: string): boolean => {
+  const crossPlatformFrameworks = ['react-native', 'flutter', 'expo', 'unity'];
+  return crossPlatformFrameworks.includes(framework.toLowerCase());
 };
 
 // Production mode steps - full onboarding flow
-const createAppSteps = (platforms: string[] = []): OnboardingStep[] => {
-  const steps: OnboardingStep[] = [
-    // SDK category
-    { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install SDK packages', status: 'pending', category: 'sdk' },
-  ];
+const createAppSteps = (platforms: string[] = [], framework: string = ''): OnboardingStep[] => {
+  const steps: OnboardingStep[] = [];
+  const isNative = !isCrossPlatformFramework(framework);
+  const hasIos = platforms.includes('ios');
+  const hasAndroid = platforms.includes('android');
+  const hasWeb = platforms.includes('web');
 
-  // Add Web SDK Install step if web platform is selected
-  if (platforms.includes('web')) {
-    steps.push({ id: 'web-sdk-install', phase: 2, title: 'Web SDK Installation', description: 'Install Web SDK', status: 'pending', category: 'sdk' });
+  // Web SDK steps (always separate)
+  if (hasWeb) {
+    steps.push(
+      { id: 'web-sdk-install', phase: 2, title: 'Web SDK 설치', description: 'Install Web SDK', status: 'pending', category: 'web-sdk' },
+      { id: 'web-sdk-init', phase: 2, title: 'Web SDK 초기화', description: 'Initialize Web SDK', status: 'pending', category: 'web-sdk' },
+    );
+  }
+
+  if (isNative) {
+    // Native frameworks: separate iOS and Android SDK flows with integrated deeplink
+    if (hasIos) {
+      steps.push(
+        { id: 'ios-sdk-install', phase: 2, title: 'iOS SDK 설치', description: 'Install iOS SDK (CocoaPods/SPM)', status: 'pending', category: 'ios-sdk' },
+        { id: 'ios-sdk-init', phase: 2, title: 'iOS SDK 초기화', description: 'Initialize iOS SDK', status: 'pending', category: 'ios-sdk' },
+        { id: 'ios-deeplink-setup', phase: 2, title: 'iOS 딥링크 설정', description: 'Configure iOS deep links', status: 'pending', category: 'ios-sdk' },
+      );
+    }
+    if (hasAndroid) {
+      steps.push(
+        { id: 'android-sdk-install', phase: 2, title: 'Android SDK 설치', description: 'Install Android SDK (Gradle)', status: 'pending', category: 'android-sdk' },
+        { id: 'android-sdk-init', phase: 2, title: 'Android SDK 초기화', description: 'Initialize Android SDK', status: 'pending', category: 'android-sdk' },
+        { id: 'android-deeplink-setup', phase: 2, title: 'Android 딥링크 설정', description: 'Configure Android deep links', status: 'pending', category: 'android-sdk' },
+      );
+    }
+  } else {
+    // Cross-platform frameworks: unified SDK flow
+    if (hasIos || hasAndroid) {
+      steps.push(
+        { id: 'sdk-install', phase: 2, title: 'SDK 설치', description: 'Install SDK packages', status: 'pending', category: 'sdk' },
+        { id: 'sdk-init', phase: 2, title: 'SDK 초기화', description: 'Add SDK code to your app', status: 'pending', category: 'sdk' },
+        { id: 'deeplink', phase: 2, title: '딥링크 설정', description: 'Configure deep links', status: 'pending', category: 'deeplink' },
+      );
+    }
+  }
+
+  // SDK Test (common for all)
+  if (hasIos || hasAndroid || hasWeb) {
+    steps.push({ id: 'sdk-test', phase: 2, title: 'SDK 테스트', description: 'Test SDK integration', status: 'pending', category: 'sdk' });
+  }
+
+  // Tracking Link and Deep Link Test
+  if (hasIos || hasAndroid) {
+    steps.push(
+      { id: 'tracking-link', phase: 4, title: '트래킹 링크', description: 'Create tracking links', status: 'pending', category: 'deeplink' },
+      { id: 'deeplink-test', phase: 5, title: '딥링크 테스트', description: 'Test deep link functionality', status: 'pending', category: 'deeplink' },
+    );
+  }
+
+  // Event Taxonomy category
+  steps.push({ id: 'event-taxonomy', phase: 3, title: '이벤트 설계', description: 'Define events to track', status: 'pending', category: 'event-taxonomy' });
+
+  // Integration category
+  steps.push(
+    { id: 'channel-select', phase: 4, title: '채널 선택', description: 'Select ad platforms', status: 'pending', category: 'integration' },
+    { id: 'channel-integration', phase: 4, title: '채널 연동', description: 'Connect to ad platforms', status: 'pending', category: 'integration' },
+    { id: 'cost-integration', phase: 4, title: '비용 연동', description: 'Enable cost data import', status: 'pending', category: 'integration' },
+  );
+
+  if (hasIos) {
+    steps.push({ id: 'skan-integration', phase: 4, title: 'SKAN 연동', description: 'iOS attribution setup', status: 'pending', category: 'integration' });
   }
 
   steps.push(
-    { id: 'sdk-init', phase: 2, title: 'SDK Initialization', description: 'Add SDK code to your app', status: 'pending', category: 'sdk' },
-    { id: 'sdk-test', phase: 2, title: 'SDK Test', description: 'Test SDK integration', status: 'pending', category: 'sdk' },
-    // Deep Link category
-    { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links', status: 'pending', category: 'deeplink' },
-    { id: 'tracking-link', phase: 4, title: 'Tracking Link', description: 'Create tracking links', status: 'pending', category: 'deeplink' },
-    { id: 'deeplink-test', phase: 5, title: 'Deep Link Test', description: 'Test deep link functionality', status: 'pending', category: 'deeplink' },
-    // Event Taxonomy category
-    { id: 'event-taxonomy', phase: 3, title: 'Event Taxonomy', description: 'Define events to track', status: 'pending', category: 'event-taxonomy' },
-    // Integration category
-    { id: 'channel-select', phase: 4, title: 'Channel Selection', description: 'Select ad platforms', status: 'pending', category: 'integration' },
-    { id: 'channel-integration', phase: 4, title: 'Channel Integration', description: 'Connect to ad platforms', status: 'pending', category: 'integration' },
-    { id: 'cost-integration', phase: 4, title: 'Cost Integration', description: 'Enable cost data import', status: 'pending', category: 'integration' },
-    { id: 'skan-integration', phase: 4, title: 'SKAN Integration', description: 'iOS attribution setup', status: 'pending', category: 'integration' },
-    { id: 'attribution-test', phase: 5, title: 'Attribution Test', description: 'Verify attribution setup', status: 'pending', category: 'integration' },
-    { id: 'data-verify', phase: 5, title: 'Data Verification', description: 'Confirm data collection', status: 'pending', category: 'integration' },
+    { id: 'attribution-test', phase: 5, title: '어트리뷰션 테스트', description: 'Verify attribution setup', status: 'pending', category: 'integration' },
+    { id: 'data-verify', phase: 5, title: '데이터 검증', description: 'Confirm data collection', status: 'pending', category: 'integration' },
   );
 
   return steps;
 };
 
 // Dev mode steps - simplified flow (SDK setup only)
-const createDevAppSteps = (platforms: string[] = []): OnboardingStep[] => {
-  const steps: OnboardingStep[] = [
-    // SDK category
-    { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install SDK packages', status: 'pending', category: 'sdk' },
-  ];
+const createDevAppSteps = (platforms: string[] = [], framework: string = ''): OnboardingStep[] => {
+  const steps: OnboardingStep[] = [];
+  const isNative = !isCrossPlatformFramework(framework);
+  const hasIos = platforms.includes('ios');
+  const hasAndroid = platforms.includes('android');
+  const hasWeb = platforms.includes('web');
 
-  // Add Web SDK Install step if web platform is selected
-  if (platforms.includes('web')) {
-    steps.push({ id: 'web-sdk-install', phase: 2, title: 'Web SDK Installation', description: 'Install Web SDK', status: 'pending', category: 'sdk' });
+  // Web SDK steps (always separate)
+  if (hasWeb) {
+    steps.push(
+      { id: 'web-sdk-install', phase: 2, title: 'Web SDK 설치', description: 'Install Web SDK', status: 'pending', category: 'web-sdk' },
+      { id: 'web-sdk-init', phase: 2, title: 'Web SDK 초기화', description: 'Initialize Web SDK', status: 'pending', category: 'web-sdk' },
+    );
   }
 
-  steps.push(
-    { id: 'sdk-init', phase: 2, title: 'SDK Initialization', description: 'Add SDK code to your app', status: 'pending', category: 'sdk' },
-    { id: 'sdk-test', phase: 2, title: 'SDK Test', description: 'Test SDK integration', status: 'pending', category: 'sdk' },
-    // Deep Link category
-    { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links', status: 'pending', category: 'deeplink' },
-  );
+  if (isNative) {
+    // Native frameworks: separate iOS and Android SDK flows with integrated deeplink
+    if (hasIos) {
+      steps.push(
+        { id: 'ios-sdk-install', phase: 2, title: 'iOS SDK 설치', description: 'Install iOS SDK', status: 'pending', category: 'ios-sdk' },
+        { id: 'ios-sdk-init', phase: 2, title: 'iOS SDK 초기화', description: 'Initialize iOS SDK', status: 'pending', category: 'ios-sdk' },
+        { id: 'ios-deeplink-setup', phase: 2, title: 'iOS 딥링크 설정', description: 'Configure iOS deep links', status: 'pending', category: 'ios-sdk' },
+      );
+    }
+    if (hasAndroid) {
+      steps.push(
+        { id: 'android-sdk-install', phase: 2, title: 'Android SDK 설치', description: 'Install Android SDK', status: 'pending', category: 'android-sdk' },
+        { id: 'android-sdk-init', phase: 2, title: 'Android SDK 초기화', description: 'Initialize Android SDK', status: 'pending', category: 'android-sdk' },
+        { id: 'android-deeplink-setup', phase: 2, title: 'Android 딥링크 설정', description: 'Configure Android deep links', status: 'pending', category: 'android-sdk' },
+      );
+    }
+  } else {
+    // Cross-platform frameworks: unified SDK flow
+    if (hasIos || hasAndroid) {
+      steps.push(
+        { id: 'sdk-install', phase: 2, title: 'SDK 설치', description: 'Install SDK packages', status: 'pending', category: 'sdk' },
+        { id: 'sdk-init', phase: 2, title: 'SDK 초기화', description: 'Add SDK code to your app', status: 'pending', category: 'sdk' },
+        { id: 'deeplink', phase: 2, title: '딥링크 설정', description: 'Configure deep links', status: 'pending', category: 'deeplink' },
+      );
+    }
+  }
+
+  // SDK Test (common for all)
+  if (hasIos || hasAndroid || hasWeb) {
+    steps.push({ id: 'sdk-test', phase: 2, title: 'SDK 테스트', description: 'Test SDK integration', status: 'pending', category: 'sdk' });
+  }
 
   return steps;
 };
@@ -870,6 +980,863 @@ function WebSdkInstall({ appName, webToken, onComplete, isCompleted = false }: {
 
   return (
     <WebSdkMethodSelect onSelect={() => onComplete()} isCompleted={false} />
+  );
+}
+
+// ===== iOS SDK Components (Native Only) =====
+
+// iOS SDK Install Component
+function IosSdkInstall({ onComplete, isCompleted = false }: {
+  onComplete: (method: 'cocoapods' | 'spm') => void;
+  isCompleted?: boolean;
+}) {
+  const [method, setMethod] = useState<'cocoapods' | 'spm' | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const copyToClipboard = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const cocoapodsCode = `# Podfile
+pod 'AirBridge'`;
+
+  const spmUrl = 'https://github.com/AirBridge/AirBridge-iOS-SDK';
+
+  if (isCompleted) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">iOS SDK 설치 완료</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${CARD_STYLES.base} shadow-sm`}>
+      <div className={LABEL_STYLES.title}>iOS SDK 설치 방법을 선택하세요</div>
+
+      <div className="space-y-3">
+        {/* CocoaPods Option */}
+        <button
+          onClick={() => setMethod('cocoapods')}
+          className={`w-full flex items-center gap-3 p-4 rounded-lg border transition-all text-left ${
+            method === 'cocoapods'
+              ? 'border-blue-500 bg-blue-50'
+              : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+          }`}
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-red-100">
+            <Code className="w-5 h-5 text-red-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">CocoaPods</div>
+            <div className="text-sm text-gray-500">가장 많이 사용되는 방법 (권장)</div>
+          </div>
+          {method === 'cocoapods' && <CheckCircle2 className="w-5 h-5 text-blue-500" />}
+        </button>
+
+        {/* SPM Option */}
+        <button
+          onClick={() => setMethod('spm')}
+          className={`w-full flex items-center gap-3 p-4 rounded-lg border transition-all text-left ${
+            method === 'spm'
+              ? 'border-blue-500 bg-blue-50'
+              : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+          }`}
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-100">
+            <Smartphone className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">Swift Package Manager</div>
+            <div className="text-sm text-gray-500">Xcode 내장 패키지 관리자</div>
+          </div>
+          {method === 'spm' && <CheckCircle2 className="w-5 h-5 text-blue-500" />}
+        </button>
+      </div>
+
+      {/* Show installation code based on selection */}
+      {method === 'cocoapods' && (
+        <div className="mt-4">
+          <div className={LABEL_STYLES.fieldDesc}>Podfile에 추가:</div>
+          <div className="relative">
+            <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
+              <code>{cocoapodsCode}</code>
+            </pre>
+            <button
+              onClick={() => copyToClipboard(cocoapodsCode, 'cocoapods')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            >
+              {copiedCode === 'cocoapods' ? (
+                <Check className="w-3 h-3 text-green-400" />
+              ) : (
+                <Copy className="w-3 h-3 text-gray-300" />
+              )}
+            </button>
+          </div>
+          <div className="mt-2">
+            <div className={LABEL_STYLES.fieldDesc}>설치 실행:</div>
+            <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
+              <code>pod install</code>
+            </pre>
+          </div>
+        </div>
+      )}
+
+      {method === 'spm' && (
+        <div className="mt-4">
+          <div className={LABEL_STYLES.fieldDesc}>Xcode에서 다음 URL 추가:</div>
+          <div className="relative">
+            <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
+              <code>{spmUrl}</code>
+            </pre>
+            <button
+              onClick={() => copyToClipboard(spmUrl, 'spm')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            >
+              {copiedCode === 'spm' ? (
+                <Check className="w-3 h-3 text-green-400" />
+              ) : (
+                <Copy className="w-3 h-3 text-gray-300" />
+              )}
+            </button>
+          </div>
+          <div className="mt-2 p-3 bg-blue-50 rounded-lg text-xs text-blue-800">
+            <p className="font-medium mb-1">SPM 설치 방법:</p>
+            <ol className="list-decimal list-inside space-y-1">
+              <li>Xcode → File → Add Package Dependencies</li>
+              <li>위 URL을 입력</li>
+              <li>"Add Package" 클릭</li>
+            </ol>
+          </div>
+        </div>
+      )}
+
+      {method && (
+        <div className="mt-6">
+          <button
+            onClick={() => onComplete(method)}
+            className={BUTTON_STYLES.primary}
+          >
+            설치 완료 →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// iOS SDK Init Component
+function IosSdkInit({ appName, appToken, onComplete, isCompleted = false }: {
+  appName: string;
+  appToken: string;
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const copyToClipboard = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const appDelegateCode = `import AirBridge
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+
+        AirBridge.getInstance("${appToken}", appName: "${appName}", withLaunchOptions: launchOptions)
+
+        return true
+    }
+}`;
+
+  const attCode = `// Info.plist에 추가
+<key>NSUserTrackingUsageDescription</key>
+<string>앱 사용 경험 개선을 위해 광고 식별자를 수집합니다.</string>`;
+
+  const attRequestCode = `import AppTrackingTransparency
+
+// ATT 권한 요청 (viewDidAppear에서 호출)
+ATTrackingManager.requestTrackingAuthorization { status in
+    switch status {
+    case .authorized:
+        print("ATT authorized")
+    case .denied, .restricted, .notDetermined:
+        print("ATT not authorized")
+    @unknown default:
+        break
+    }
+}`;
+
+  if (isCompleted) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">iOS SDK 초기화 완료</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${CARD_STYLES.base} shadow-sm`}>
+      <div className={LABEL_STYLES.title}>iOS SDK 초기화</div>
+
+      {/* Token Info */}
+      <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <div className="text-gray-400">App Name</div>
+            <div className="font-mono text-gray-900">{appName}</div>
+          </div>
+          <div>
+            <div className="text-gray-400">App Token</div>
+            <div className="font-mono text-gray-900 truncate">{appToken}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* AppDelegate Code */}
+      <div className="mb-4">
+        <div className={LABEL_STYLES.fieldDesc}>AppDelegate.swift에 추가:</div>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto">
+            <code>{appDelegateCode}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(appDelegateCode, 'appdelegate')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'appdelegate' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* ATT Section */}
+      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+        <div className="flex items-start gap-2 mb-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5" />
+          <div className="text-sm font-medium text-amber-800">ATT (App Tracking Transparency)</div>
+        </div>
+        <p className="text-xs text-amber-700 mb-3">
+          iOS 14.5+ 에서는 IDFA 수집을 위해 ATT 권한 요청이 필요합니다.
+        </p>
+
+        <div className="space-y-2">
+          <div className={LABEL_STYLES.fieldDesc}>Info.plist:</div>
+          <div className="relative">
+            <pre className="bg-gray-900 text-gray-100 p-2 rounded-lg text-xs overflow-x-auto">
+              <code>{attCode}</code>
+            </pre>
+            <button
+              onClick={() => copyToClipboard(attCode, 'att-plist')}
+              className="absolute top-1 right-1 p-1 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            >
+              {copiedCode === 'att-plist' ? (
+                <Check className="w-3 h-3 text-green-400" />
+              ) : (
+                <Copy className="w-3 h-3 text-gray-300" />
+              )}
+            </button>
+          </div>
+
+          <div className={LABEL_STYLES.fieldDesc}>ATT 요청 코드:</div>
+          <div className="relative">
+            <pre className="bg-gray-900 text-gray-100 p-2 rounded-lg text-xs overflow-x-auto max-h-32 overflow-y-auto">
+              <code>{attRequestCode}</code>
+            </pre>
+            <button
+              onClick={() => copyToClipboard(attRequestCode, 'att-request')}
+              className="absolute top-1 right-1 p-1 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            >
+              {copiedCode === 'att-request' ? (
+                <Check className="w-3 h-3 text-green-400" />
+              ) : (
+                <Copy className="w-3 h-3 text-gray-300" />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button
+        onClick={onComplete}
+        className={BUTTON_STYLES.primary}
+      >
+        초기화 완료 →
+      </button>
+    </div>
+  );
+}
+
+// iOS Deep Link Setup Component
+function IosDeeplinkSetup({ appName, bundleId, onComplete, isCompleted = false }: {
+  appName: string;
+  bundleId?: string;
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [teamId, setTeamId] = useState('YOUR_TEAM_ID');
+
+  const copyToClipboard = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const associatedDomainsCode = `// Xcode → Target → Signing & Capabilities → Associated Domains
+
+applinks:${appName}.airbridge.io
+applinks:${appName}.abr.ge`;
+
+  const urlSchemeCode = `// Info.plist
+<key>CFBundleURLTypes</key>
+<array>
+    <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+            <string>${appName}</string>
+        </array>
+    </dict>
+</array>`;
+
+  const handleDeeplinkCode = `// SceneDelegate.swift 또는 AppDelegate.swift
+
+// Universal Link 처리
+func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+    AirBridge.deeplink().handleUniversalLink(userActivity.webpageURL) { url in
+        // 딥링크 URL 처리
+        print("Deeplink URL: \\(url)")
+    }
+}
+
+// URL Scheme 처리
+func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+    if let url = URLContexts.first?.url {
+        AirBridge.deeplink().handleURLSchemeDeeplink(url) { url in
+            // 딥링크 URL 처리
+            print("URL Scheme: \\(url)")
+        }
+    }
+}`;
+
+  if (isCompleted) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">iOS 딥링크 설정 완료</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${CARD_STYLES.base} shadow-sm`}>
+      <div className={LABEL_STYLES.title}>iOS 딥링크 설정</div>
+
+      {/* Step 1: Associated Domains */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">1</div>
+          <span className="text-sm font-medium text-gray-900">Associated Domains 설정</span>
+        </div>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
+            <code>{associatedDomainsCode}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(associatedDomainsCode, 'associated')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'associated' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Step 2: URL Scheme */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">2</div>
+          <span className="text-sm font-medium text-gray-900">URL Scheme 설정</span>
+        </div>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
+            <code>{urlSchemeCode}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(urlSchemeCode, 'urlscheme')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'urlscheme' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Step 3: Handle Deeplink */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">3</div>
+          <span className="text-sm font-medium text-gray-900">딥링크 핸들링 코드</span>
+        </div>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto">
+            <code>{handleDeeplinkCode}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(handleDeeplinkCode, 'handle')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'handle' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Team ID Input */}
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-start gap-2 mb-2">
+          <Lightbulb className="w-4 h-4 text-blue-600 mt-0.5" />
+          <div className="text-sm font-medium text-blue-800">Team ID 입력</div>
+        </div>
+        <p className="text-xs text-blue-700 mb-2">
+          Apple Developer 계정의 Team ID를 입력해주세요. 입력하시면 자동으로 등록됩니다.
+        </p>
+        <input
+          type="text"
+          value={teamId}
+          onChange={(e) => setTeamId(e.target.value)}
+          placeholder="예: ABCD1234EF"
+          className={INPUT_STYLES.base}
+        />
+      </div>
+
+      <button
+        onClick={onComplete}
+        className={BUTTON_STYLES.primary}
+      >
+        딥링크 설정 완료 →
+      </button>
+    </div>
+  );
+}
+
+// ===== Android SDK Components (Native Only) =====
+
+// Android SDK Install Component
+function AndroidSdkInstall({ onComplete, isCompleted = false }: {
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const copyToClipboard = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const gradleCode = `// build.gradle (app level)
+dependencies {
+    implementation 'io.airbridge:sdk-android:2.+'
+}`;
+
+  const settingsGradleCode = `// settings.gradle (Project Settings)
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://sdk-download.airbridge.io/maven' }
+    }
+}`;
+
+  if (isCompleted) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Android SDK 설치 완료</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${CARD_STYLES.base} shadow-sm`}>
+      <div className={LABEL_STYLES.title}>Android SDK 설치</div>
+
+      {/* Step 1: Add Repository */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-green-500 text-white text-xs flex items-center justify-center">1</div>
+          <span className="text-sm font-medium text-gray-900">Maven Repository 추가</span>
+        </div>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
+            <code>{settingsGradleCode}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(settingsGradleCode, 'settings')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'settings' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Step 2: Add Dependency */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-green-500 text-white text-xs flex items-center justify-center">2</div>
+          <span className="text-sm font-medium text-gray-900">SDK 의존성 추가</span>
+        </div>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
+            <code>{gradleCode}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(gradleCode, 'gradle')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'gradle' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Sync Note */}
+      <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+        <div className="flex items-center gap-2 text-green-800 text-sm">
+          <Lightbulb className="w-4 h-4" />
+          <span>Gradle Sync를 실행해주세요</span>
+        </div>
+      </div>
+
+      <button
+        onClick={onComplete}
+        className={BUTTON_STYLES.primary}
+      >
+        설치 완료 →
+      </button>
+    </div>
+  );
+}
+
+// Android SDK Init Component
+function AndroidSdkInit({ appName, appToken, onComplete, isCompleted = false }: {
+  appName: string;
+  appToken: string;
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const copyToClipboard = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const applicationCode = `import co.ab180.airbridge.Airbridge
+import co.ab180.airbridge.AirbridgeConfig
+
+class MyApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+
+        val config = AirbridgeConfig.Builder("${appName}", "${appToken}")
+            .build()
+        Airbridge.init(this, config)
+    }
+}`;
+
+  const manifestApplicationCode = `<!-- AndroidManifest.xml -->
+<application
+    android:name=".MyApplication"
+    ... >
+    ...
+</application>`;
+
+  if (isCompleted) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Android SDK 초기화 완료</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${CARD_STYLES.base} shadow-sm`}>
+      <div className={LABEL_STYLES.title}>Android SDK 초기화</div>
+
+      {/* Token Info */}
+      <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <div className="text-gray-400">App Name</div>
+            <div className="font-mono text-gray-900">{appName}</div>
+          </div>
+          <div>
+            <div className="text-gray-400">App Token</div>
+            <div className="font-mono text-gray-900 truncate">{appToken}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Step 1: Create Application Class */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-green-500 text-white text-xs flex items-center justify-center">1</div>
+          <span className="text-sm font-medium text-gray-900">Application 클래스 생성</span>
+        </div>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto">
+            <code>{applicationCode}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(applicationCode, 'application')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'application' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Step 2: Update Manifest */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-green-500 text-white text-xs flex items-center justify-center">2</div>
+          <span className="text-sm font-medium text-gray-900">AndroidManifest.xml 업데이트</span>
+        </div>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
+            <code>{manifestApplicationCode}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(manifestApplicationCode, 'manifest')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'manifest' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      <button
+        onClick={onComplete}
+        className={BUTTON_STYLES.primary}
+      >
+        초기화 완료 →
+      </button>
+    </div>
+  );
+}
+
+// Android Deep Link Setup Component
+function AndroidDeeplinkSetup({ appName, packageName, onComplete, isCompleted = false }: {
+  appName: string;
+  packageName?: string;
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [sha256, setSha256] = useState('');
+
+  const copyToClipboard = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const intentFilterCode = `<!-- AndroidManifest.xml -->
+<activity android:name=".MainActivity">
+    <!-- URL Scheme -->
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="${appName}" />
+    </intent-filter>
+
+    <!-- App Links -->
+    <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" android:host="${appName}.airbridge.io" />
+        <data android:scheme="https" android:host="${appName}.abr.ge" />
+    </intent-filter>
+</activity>`;
+
+  const handleDeeplinkCode = `// MainActivity.kt
+override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+
+    // 딥링크 핸들링
+    Airbridge.handleDeeplink(intent) { uri ->
+        // 딥링크 URL 처리
+        Log.d("Deeplink", "URI: $uri")
+    }
+}
+
+override fun onNewIntent(intent: Intent?) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+
+    Airbridge.handleDeeplink(intent) { uri ->
+        Log.d("Deeplink", "New Intent URI: $uri")
+    }
+}`;
+
+  const getSha256Command = `# Debug 키 SHA256 가져오기
+keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android
+
+# Release 키 SHA256 가져오기
+keytool -list -v -keystore your-release-key.keystore -alias your-alias`;
+
+  if (isCompleted) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Android 딥링크 설정 완료</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${CARD_STYLES.base} shadow-sm`}>
+      <div className={LABEL_STYLES.title}>Android 딥링크 설정</div>
+
+      {/* Step 1: Intent Filters */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-green-500 text-white text-xs flex items-center justify-center">1</div>
+          <span className="text-sm font-medium text-gray-900">Intent Filter 설정</span>
+        </div>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto max-h-56 overflow-y-auto">
+            <code>{intentFilterCode}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(intentFilterCode, 'intent')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'intent' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Step 2: Handle Deeplink */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-green-500 text-white text-xs flex items-center justify-center">2</div>
+          <span className="text-sm font-medium text-gray-900">딥링크 핸들링 코드</span>
+        </div>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto">
+            <code>{handleDeeplinkCode}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(handleDeeplinkCode, 'handle')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'handle' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Step 3: SHA256 Fingerprint */}
+      <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+        <div className="flex items-start gap-2 mb-2">
+          <Key className="w-4 h-4 text-green-600 mt-0.5" />
+          <div className="text-sm font-medium text-green-800">SHA256 Fingerprint 입력</div>
+        </div>
+        <p className="text-xs text-green-700 mb-2">
+          App Links 검증을 위한 SHA256 fingerprint를 입력해주세요. 자동으로 등록됩니다.
+        </p>
+        <div className="relative mb-2">
+          <pre className="bg-gray-900 text-gray-100 p-2 rounded-lg text-xs overflow-x-auto">
+            <code>{getSha256Command}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(getSha256Command, 'sha256cmd')}
+            className="absolute top-1 right-1 p-1 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'sha256cmd' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+        <input
+          type="text"
+          value={sha256}
+          onChange={(e) => setSha256(e.target.value)}
+          placeholder="SHA256 fingerprint 입력 (예: XX:XX:XX:...)"
+          className={INPUT_STYLES.base}
+        />
+      </div>
+
+      <button
+        onClick={onComplete}
+        className={BUTTON_STYLES.primary}
+      >
+        딥링크 설정 완료 →
+      </button>
+    </div>
   );
 }
 
@@ -1645,6 +2612,217 @@ Please complete the SDK installation and let me know when it's done!
   );
 }
 
+// SDK Install Confirm Component - "설치 완료하셨나요?" confirmation
+function SdkInstallConfirm({ onConfirm, isCompleted = false }: {
+  onConfirm: (status: 'done' | 'error') => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="text-sm font-medium text-gray-500">SDK 설치 완료</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={CARD_STYLES.base}>
+      <div className="text-sm font-medium text-gray-900 mb-3">설치 완료하셨나요?</div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => onConfirm('done')}
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600"
+        >
+          <Check className="w-4 h-4" />
+          네, 다음 단계로!
+        </button>
+        <button
+          onClick={() => onConfirm('error')}
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          <AlertCircle className="w-4 h-4" />
+          에러가 발생했어요
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// SDK Init Confirm Component - "추가 완료!" confirmation
+function SdkInitConfirm({ onConfirm, isCompleted = false }: {
+  onConfirm: (status: 'done' | 'token-help') => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="text-sm font-medium text-gray-500">SDK 초기화 완료</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={CARD_STYLES.base}>
+      <div className="flex gap-2">
+        <button
+          onClick={() => onConfirm('done')}
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600"
+        >
+          <Check className="w-4 h-4" />
+          추가 완료!
+        </button>
+        <button
+          onClick={() => onConfirm('token-help')}
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          <HelpCircle className="w-4 h-4" />
+          App Token을 모르겠어요
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Deeplink Setup Choice Component - "지금 설정" / "나중에 설정" choice
+function DeeplinkSetupChoice({ onSelect, isCompleted = false }: {
+  onSelect: (choice: 'now' | 'later') => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="text-sm font-medium text-gray-500">딥링크 설정 선택 완료</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={CARD_STYLES.base}>
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-100 flex-shrink-0">
+            <Link2 className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-medium text-gray-900 mb-1">딥링크 설정</h4>
+            <p className="text-sm text-gray-600 mb-4">
+              딥링크를 사용하면 광고 클릭 시 앱 내 특정 화면으로 바로 이동할 수 있어요.
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={() => onSelect('now')}
+                className="w-full flex items-center justify-between py-3 px-4 rounded-lg font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600"
+              >
+                <span>지금 설정할게요</span>
+                <span className="text-xs bg-blue-600 px-2 py-0.5 rounded-full">권장</span>
+              </button>
+              <button
+                onClick={() => onSelect('later')}
+                className="w-full py-3 px-4 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                나중에 설정할게요 (채널 연동 먼저)
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-3">
+              예시: 상품 광고 클릭 → 해당 상품 페이지로 이동
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// SDK Verification with Real-time Logs Checklist
+function SdkVerification({ onResult, isCompleted = false }: {
+  onResult: (result: 'success' | 'fail' | 'unsure') => void;
+  isCompleted?: boolean;
+}) {
+  const [checklist, setChecklist] = useState({
+    install: false,
+    open: false,
+  });
+
+  if (isCompleted) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="text-sm font-medium text-gray-500">SDK 검증 완료</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={CARD_STYLES.base}>
+      <div className="bg-gray-50 rounded-lg p-4">
+        <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          SDK 검증
+        </h4>
+
+        <a
+          href="#"
+          className="inline-flex items-center gap-2 px-4 py-2 mb-4 rounded-lg font-medium transition-colors bg-blue-100 text-blue-700 hover:bg-blue-200"
+        >
+          <ExternalLink className="w-4 h-4" />
+          Real-time Logs 열기
+        </a>
+
+        <div className="space-y-2 mb-4">
+          <p className="text-sm font-medium text-gray-700">확인할 이벤트:</p>
+          <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors">
+            <input
+              type="checkbox"
+              checked={checklist.install}
+              onChange={(e) => setChecklist(prev => ({ ...prev, install: e.target.checked }))}
+              className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+            />
+            <span className={`text-sm ${checklist.install ? 'text-green-600 font-medium' : 'text-gray-700'}`}>
+              Install 이벤트
+            </span>
+            {checklist.install && <Check className="w-4 h-4 text-green-500" />}
+          </label>
+          <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors">
+            <input
+              type="checkbox"
+              checked={checklist.open}
+              onChange={(e) => setChecklist(prev => ({ ...prev, open: e.target.checked }))}
+              className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+            />
+            <span className={`text-sm ${checklist.open ? 'text-green-600 font-medium' : 'text-gray-700'}`}>
+              Open 이벤트
+            </span>
+            {checklist.open && <Check className="w-4 h-4 text-green-500" />}
+          </label>
+        </div>
+
+        <div className="border-t border-gray-200 pt-4">
+          <p className="text-sm font-medium text-gray-700 mb-3">이벤트가 보이시나요?</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onResult('success')}
+              className="flex-1 py-2.5 px-4 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600 text-sm"
+            >
+              네, 보여요!
+            </button>
+            <button
+              onClick={() => onResult('fail')}
+              className="flex-1 py-2.5 px-4 rounded-lg font-medium transition-colors bg-red-100 text-red-700 hover:bg-red-200 text-sm"
+            >
+              아니요, 안 보여요
+            </button>
+            <button
+              onClick={() => onResult('unsure')}
+              className="flex-1 py-2.5 px-4 rounded-lg font-medium transition-colors border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm"
+            >
+              잘 모르겠어요
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Category Navigation Component
 function CategoryNavigation({ onSelect, isCompleted = false }: {
   onSelect: (category: string) => void;
@@ -2347,9 +3525,10 @@ function DataVerify({ onComplete, isCompleted = false }: {
 }
 
 // Onboarding Complete Component
-function OnboardingComplete({ appName, onViewDashboard }: {
+function OnboardingComplete({ appName, onViewDashboard, onAddAnotherApp }: {
   appName: string;
   onViewDashboard: () => void;
+  onAddAnotherApp?: () => void;
 }) {
   return (
     <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 mt-4">
@@ -2397,6 +3576,13 @@ function OnboardingComplete({ appName, onViewDashboard }: {
           <ExternalLink className="w-4 h-4" />
           View Dashboard
         </button>
+        <button
+          onClick={onAddAnotherApp}
+          className="w-full py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          Add Another App
+        </button>
         <a
           href="https://help.airbridge.io"
           target="_blank"
@@ -2411,9 +3597,141 @@ function OnboardingComplete({ appName, onViewDashboard }: {
   );
 }
 
+// Language icons and colors for code blocks
+const LANGUAGE_CONFIG: Record<string, { icon: string; color: string; bgColor: string; label: string }> = {
+  'kotlin': { icon: 'K', color: '#A97BFF', bgColor: 'rgba(169, 123, 255, 0.15)', label: 'Kotlin' },
+  'java': { icon: 'J', color: '#ED8B00', bgColor: 'rgba(237, 139, 0, 0.15)', label: 'Java' },
+  'swift': { icon: 'S', color: '#FA7343', bgColor: 'rgba(250, 115, 67, 0.15)', label: 'Swift' },
+  'typescript': { icon: 'TS', color: '#3178C6', bgColor: 'rgba(49, 120, 198, 0.15)', label: 'TypeScript' },
+  'javascript': { icon: 'JS', color: '#F7DF1E', bgColor: 'rgba(247, 223, 30, 0.15)', label: 'JavaScript' },
+  'dart': { icon: 'D', color: '#0175C2', bgColor: 'rgba(1, 117, 194, 0.15)', label: 'Dart' },
+  'csharp': { icon: 'C#', color: '#68217A', bgColor: 'rgba(104, 33, 122, 0.15)', label: 'C#' },
+  'bash': { icon: '$', color: '#4EAA25', bgColor: 'rgba(78, 170, 37, 0.15)', label: 'Terminal' },
+  'shell': { icon: '$', color: '#4EAA25', bgColor: 'rgba(78, 170, 37, 0.15)', label: 'Shell' },
+  'yaml': { icon: 'Y', color: '#CB171E', bgColor: 'rgba(203, 23, 30, 0.15)', label: 'YAML' },
+  'json': { icon: '{ }', color: '#000000', bgColor: 'rgba(0, 0, 0, 0.15)', label: 'JSON' },
+  'xml': { icon: '<>', color: '#E44D26', bgColor: 'rgba(228, 77, 38, 0.15)', label: 'XML' },
+  'gradle': { icon: 'G', color: '#02303A', bgColor: 'rgba(2, 48, 58, 0.15)', label: 'Gradle' },
+  'ruby': { icon: 'R', color: '#CC342D', bgColor: 'rgba(204, 52, 45, 0.15)', label: 'Ruby' },
+  'default': { icon: '#', color: '#6B7280', bgColor: 'rgba(107, 114, 128, 0.15)', label: 'Code' },
+};
+
+// Simple syntax highlighting for code
+function highlightCode(code: string, language: string): React.ReactNode[] {
+  const lines = code.split('\n');
+
+  return lines.map((line, lineIndex) => {
+    // Keywords by language
+    const keywords: Record<string, string[]> = {
+      kotlin: ['import', 'class', 'fun', 'override', 'val', 'var', 'private', 'public', 'internal', 'protected', 'this', 'super', 'return', 'if', 'else', 'when', 'for', 'while', 'true', 'false', 'null', 'companion', 'object', 'data', 'sealed', 'open', 'abstract', 'interface', 'enum'],
+      java: ['import', 'class', 'public', 'private', 'protected', 'void', 'static', 'final', 'new', 'return', 'if', 'else', 'for', 'while', 'true', 'false', 'null', 'this', 'super', 'extends', 'implements', 'interface', 'abstract', 'package'],
+      swift: ['import', 'class', 'struct', 'func', 'override', 'var', 'let', 'private', 'public', 'internal', 'fileprivate', 'self', 'return', 'if', 'else', 'guard', 'for', 'while', 'true', 'false', 'nil', 'init', 'deinit', 'enum', 'protocol', 'extension', 'static', 'lazy', 'weak', 'unowned'],
+      typescript: ['import', 'export', 'from', 'class', 'function', 'const', 'let', 'var', 'return', 'if', 'else', 'for', 'while', 'true', 'false', 'null', 'undefined', 'this', 'new', 'async', 'await', 'interface', 'type', 'extends', 'implements'],
+      javascript: ['import', 'export', 'from', 'class', 'function', 'const', 'let', 'var', 'return', 'if', 'else', 'for', 'while', 'true', 'false', 'null', 'undefined', 'this', 'new', 'async', 'await'],
+      dart: ['import', 'class', 'void', 'var', 'final', 'const', 'static', 'return', 'if', 'else', 'for', 'while', 'true', 'false', 'null', 'this', 'super', 'async', 'await', 'Future', 'Widget', 'State', 'override', 'required'],
+      csharp: ['using', 'namespace', 'class', 'public', 'private', 'protected', 'void', 'static', 'new', 'return', 'if', 'else', 'for', 'while', 'true', 'false', 'null', 'this', 'base', 'override', 'virtual', 'abstract', 'interface'],
+    };
+
+    const langKeywords = keywords[language] || [];
+
+    // Split line into tokens and highlight
+    const tokens: React.ReactNode[] = [];
+    let remaining = line;
+    let key = 0;
+
+    while (remaining.length > 0) {
+      // Check for comments
+      if (remaining.startsWith('//') || remaining.startsWith('#')) {
+        tokens.push(<span key={key++} style={{ color: '#6B7280' }}>{remaining}</span>);
+        break;
+      }
+
+      // Check for strings (double quotes)
+      const doubleQuoteMatch = remaining.match(/^"([^"\\]|\\.)*"/);
+      if (doubleQuoteMatch) {
+        tokens.push(<span key={key++} style={{ color: '#A5D6A7' }}>{doubleQuoteMatch[0]}</span>);
+        remaining = remaining.slice(doubleQuoteMatch[0].length);
+        continue;
+      }
+
+      // Check for strings (single quotes)
+      const singleQuoteMatch = remaining.match(/^'([^'\\]|\\.)*'/);
+      if (singleQuoteMatch) {
+        tokens.push(<span key={key++} style={{ color: '#A5D6A7' }}>{singleQuoteMatch[0]}</span>);
+        remaining = remaining.slice(singleQuoteMatch[0].length);
+        continue;
+      }
+
+      // Check for template literals
+      const templateMatch = remaining.match(/^`([^`\\]|\\.)*`/);
+      if (templateMatch) {
+        tokens.push(<span key={key++} style={{ color: '#A5D6A7' }}>{templateMatch[0]}</span>);
+        remaining = remaining.slice(templateMatch[0].length);
+        continue;
+      }
+
+      // Check for keywords
+      let foundKeyword = false;
+      for (const kw of langKeywords) {
+        const kwRegex = new RegExp(`^\\b${kw}\\b`);
+        if (kwRegex.test(remaining)) {
+          tokens.push(<span key={key++} style={{ color: '#C792EA' }}>{kw}</span>);
+          remaining = remaining.slice(kw.length);
+          foundKeyword = true;
+          break;
+        }
+      }
+      if (foundKeyword) continue;
+
+      // Check for function calls
+      const funcMatch = remaining.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/);
+      if (funcMatch) {
+        tokens.push(<span key={key++} style={{ color: '#82AAFF' }}>{funcMatch[1]}</span>);
+        remaining = remaining.slice(funcMatch[1].length);
+        continue;
+      }
+
+      // Check for numbers
+      const numMatch = remaining.match(/^\d+(\.\d+)?/);
+      if (numMatch) {
+        tokens.push(<span key={key++} style={{ color: '#F78C6C' }}>{numMatch[0]}</span>);
+        remaining = remaining.slice(numMatch[0].length);
+        continue;
+      }
+
+      // Check for class names (PascalCase)
+      const classMatch = remaining.match(/^[A-Z][a-zA-Z0-9_]*/);
+      if (classMatch) {
+        tokens.push(<span key={key++} style={{ color: '#FFCB6B' }}>{classMatch[0]}</span>);
+        remaining = remaining.slice(classMatch[0].length);
+        continue;
+      }
+
+      // Default: take one character
+      tokens.push(<span key={key++}>{remaining[0]}</span>);
+      remaining = remaining.slice(1);
+    }
+
+    return (
+      <div key={lineIndex} className="table-row">
+        <span className="table-cell pr-4 text-right select-none" style={{ color: '#4B5563', minWidth: '2.5rem' }}>
+          {lineIndex + 1}
+        </span>
+        <span className="table-cell">{tokens}</span>
+      </div>
+    );
+  });
+}
+
 // Code Block Component
-function CodeBlock({ title, code }: { title: string; code: string; language: string }) {
+function CodeBlock({ title, code, language }: { title: string; code: string; language: string }) {
   const [copied, setCopied] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const langConfig = LANGUAGE_CONFIG[language] || LANGUAGE_CONFIG['default'];
+  const lines = code.split('\n');
+  const shouldCollapse = lines.length > 15;
+  const displayCode = shouldCollapse && !isExpanded ? lines.slice(0, 12).join('\n') : code;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
@@ -2422,21 +3740,121 @@ function CodeBlock({ title, code }: { title: string; code: string; language: str
   };
 
   return (
-    <div className="rounded-xl overflow-hidden mt-4" style={{ backgroundColor: '#111827' }}>
-      <div className="flex items-center justify-between px-4 py-2" style={{ backgroundColor: '#1f2937' }}>
-        <span className="text-sm" style={{ color: '#9ca3af' }}>{title}</span>
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 text-sm hover:text-white transition-colors"
-          style={{ color: '#9ca3af' }}
-        >
-          {copied ? <Check className="w-4 h-4" style={{ color: '#4ade80' }} /> : <Copy className="w-4 h-4" />}
-          {copied ? 'Copied' : 'Copy'}
-        </button>
+    <div className="rounded-xl overflow-hidden mt-4 shadow-lg" style={{
+      background: 'linear-gradient(180deg, #1E1E2E 0%, #181825 100%)',
+      border: '1px solid #313244'
+    }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2.5" style={{
+        background: 'linear-gradient(90deg, #1E1E2E 0%, #242435 100%)',
+        borderBottom: '1px solid #313244'
+      }}>
+        <div className="flex items-center gap-3">
+          {/* Window controls */}
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#F38BA8' }} />
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FAB387' }} />
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#A6E3A1' }} />
+          </div>
+
+          {/* Title */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium" style={{ color: '#CDD6F4' }}>{title}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Language badge */}
+          <div
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium"
+            style={{
+              backgroundColor: langConfig.bgColor,
+              color: langConfig.color,
+            }}
+          >
+            <span className="font-bold" style={{ fontSize: '10px' }}>{langConfig.icon}</span>
+            <span>{langConfig.label}</span>
+          </div>
+
+          {/* Copy button */}
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+            style={{
+              backgroundColor: copied ? 'rgba(166, 227, 161, 0.15)' : 'rgba(205, 214, 244, 0.1)',
+              color: copied ? '#A6E3A1' : '#CDD6F4',
+            }}
+          >
+            {copied ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
-      <pre className="p-4 text-sm overflow-x-auto" style={{ backgroundColor: '#111827', color: '#f3f4f6' }}>
-        <code>{code}</code>
-      </pre>
+
+      {/* Code content */}
+      <div className="relative">
+        <pre
+          className="p-4 text-[13px] leading-relaxed overflow-x-auto font-mono"
+          style={{
+            backgroundColor: 'transparent',
+            color: '#CDD6F4',
+            tabSize: 2,
+          }}
+        >
+          <code className="table w-full">
+            {highlightCode(displayCode, language)}
+          </code>
+        </pre>
+
+        {/* Expand/Collapse overlay */}
+        {shouldCollapse && !isExpanded && (
+          <div
+            className="absolute bottom-0 left-0 right-0 h-20 flex items-end justify-center pb-3"
+            style={{
+              background: 'linear-gradient(to bottom, transparent, #181825 70%)',
+            }}
+          >
+            <button
+              onClick={() => setIsExpanded(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
+              style={{
+                backgroundColor: 'rgba(137, 180, 250, 0.15)',
+                color: '#89B4FA',
+                border: '1px solid rgba(137, 180, 250, 0.3)',
+              }}
+            >
+              <ChevronDown className="w-3.5 h-3.5" />
+              <span>Show {lines.length - 12} more lines</span>
+            </button>
+          </div>
+        )}
+
+        {shouldCollapse && isExpanded && (
+          <div className="flex justify-center py-2" style={{ backgroundColor: '#181825' }}>
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
+              style={{
+                backgroundColor: 'rgba(137, 180, 250, 0.15)',
+                color: '#89B4FA',
+                border: '1px solid rgba(137, 180, 250, 0.3)',
+              }}
+            >
+              <ChevronUp className="w-3.5 h-3.5" />
+              <span>Show less</span>
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -3195,125 +4613,122 @@ function AppInfoForm({ onSubmit, platforms, isCompleted = false }: { onSubmit: (
   );
 }
 
-// Dashboard Action Component
+// App Registration Component (Auto-registration in Chat UI)
 function DashboardAction({
   appName, bundleId, packageName, onConfirm, isCompleted = false
 }: {
   appName: string; bundleId: string; packageName: string; onConfirm: (status: string) => void; isCompleted?: boolean
 }) {
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [checking, setChecking] = useState(true);
-  const [detected, setDetected] = useState(false);
+  const [registrationStep, setRegistrationStep] = useState(0);
+  const [isRegistering, setIsRegistering] = useState(true);
 
-  // Simulate auto-detection of app registration
+  // Auto-registration simulation
   useEffect(() => {
     if (isCompleted) return;
-    const checkInterval = setInterval(() => {
-      // In real implementation, this would call an API to check registration status
-      // For demo, we simulate detection after 5 seconds
-    }, 2000);
 
-    const detectionTimer = setTimeout(() => {
-      setChecking(false);
-      setDetected(true);
-      clearInterval(checkInterval);
-      // Auto-proceed after detection
-      setTimeout(() => {
-        onConfirm('completed');
-      }, 1500);
-    }, 5000);
+    const steps = [
+      { delay: 800, step: 1 },   // Validating app info
+      { delay: 1200, step: 2 },  // Creating app
+      { delay: 800, step: 3 },   // Generating tokens
+      { delay: 600, step: 4 },   // Complete
+    ];
 
-    return () => {
-      clearInterval(checkInterval);
-      clearTimeout(detectionTimer);
-    };
+    let timeouts: NodeJS.Timeout[] = [];
+    let totalDelay = 0;
+
+    steps.forEach(({ delay, step }) => {
+      totalDelay += delay;
+      const timeout = setTimeout(() => {
+        setRegistrationStep(step);
+        if (step === 4) {
+          setIsRegistering(false);
+          setTimeout(() => onConfirm('completed'), 800);
+        }
+      }, totalDelay);
+      timeouts.push(timeout);
+    });
+
+    return () => timeouts.forEach(t => clearTimeout(t));
   }, [onConfirm, isCompleted]);
 
   if (isCompleted) {
     return (
       <div className={CARD_STYLES.completed}>
-        <div className="text-sm font-medium text-gray-500 mb-2">Dashboard Action</div>
-        <div className="text-xs text-gray-400">Action completed</div>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">앱 등록 완료</span>
+        </div>
       </div>
     );
   }
 
-  const copyToClipboard = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  const CopyButton = ({ text, field }: { text: string; field: string }) => (
-    <button
-      onClick={() => copyToClipboard(text, field)}
-      className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-    >
-      {copiedField === field ? (
-        <Check className="w-4 h-4 text-green-500" />
-      ) : (
-        <Copy className="w-4 h-4 text-gray-400" />
-      )}
-    </button>
-  );
+  const registrationSteps = [
+    { label: '앱 정보 검증 중...', icon: '🔍' },
+    { label: '앱 생성 중...', icon: '📱' },
+    { label: '토큰 생성 중...', icon: '🔑' },
+    { label: '등록 완료!', icon: '✅' },
+  ];
 
   return (
     <div className={CARD_STYLES.base}>
-      <a
-        href="https://dashboard.airbridge.io"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2 w-full py-4 rounded-lg font-medium transition-colors mb-4 bg-blue-500 text-white hover:bg-blue-600"
-      >
-        <ExternalLink className="w-4 h-4" />
-        Open Airbridge Dashboard
-      </a>
+      <div className={LABEL_STYLES.title}>앱 등록</div>
 
-      <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-        <div className={LABEL_STYLES.field}>Information to Copy</div>
-
+      {/* App Info Summary */}
+      <div className="bg-gray-50 rounded-lg p-3 space-y-2 mb-4">
         <div className="flex items-center justify-between py-2 px-3 bg-white rounded-lg">
           <div>
             <span className="text-xs text-gray-500">App Name</span>
             <div className="font-medium">{appName || '-'}</div>
           </div>
-          {appName && <CopyButton text={appName} field="appName" />}
+          <CheckCircle2 className="w-4 h-4 text-green-500" />
         </div>
 
         {bundleId && (
           <div className="flex items-center justify-between py-2 px-3 bg-white rounded-lg">
             <div>
-              <span className="text-xs text-gray-500">Bundle ID</span>
+              <span className="text-xs text-gray-500">Bundle ID (iOS)</span>
               <div className="font-mono text-sm">{bundleId}</div>
             </div>
-            <CopyButton text={bundleId} field="bundleId" />
+            <CheckCircle2 className="w-4 h-4 text-green-500" />
           </div>
         )}
 
         {packageName && (
           <div className="flex items-center justify-between py-2 px-3 bg-white rounded-lg">
             <div>
-              <span className="text-xs text-gray-500">Package Name</span>
+              <span className="text-xs text-gray-500">Package Name (Android)</span>
               <div className="font-mono text-sm">{packageName}</div>
             </div>
-            <CopyButton text={packageName} field="packageName" />
+            <CheckCircle2 className="w-4 h-4 text-green-500" />
           </div>
         )}
       </div>
 
+      {/* Registration Progress */}
       <div className="mt-4 pt-4 border-t border-gray-100">
-        {checking && !detected && (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Waiting for app registration...</span>
-          </div>
-        )}
-        {detected && (
-          <div className="flex items-center gap-2 text-sm text-emerald-500">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>App registration detected! Proceeding to next step...</span>
-          </div>
-        )}
+        <div className="space-y-2">
+          {registrationSteps.map((step, index) => (
+            <div
+              key={index}
+              className={`flex items-center gap-2 text-sm transition-all ${
+                registrationStep > index
+                  ? 'text-green-600'
+                  : registrationStep === index
+                  ? 'text-blue-600'
+                  : 'text-gray-300'
+              }`}
+            >
+              {registrationStep > index ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : registrationStep === index ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <div className="w-4 h-4 rounded-full border border-gray-300" />
+              )}
+              <span>{step.icon} {step.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -3372,6 +4787,7 @@ function FrameworkSelect({ onSelect, isCompleted = false }: { onSelect: (framewo
 // SDK Init Code Component
 function SDKInitCode({ appName, appToken, onConfirm, isCompleted = false }: { appName: string; appToken: string; onConfirm: (status: string) => void; isCompleted?: boolean }) {
   const [copied, setCopied] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState<string | null>(null);
 
   if (isCompleted) {
     return (
@@ -3395,9 +4811,49 @@ Airbridge.init({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleTokenCopy = (value: string, field: string) => {
+    navigator.clipboard.writeText(value);
+    setTokenCopied(field);
+    setTimeout(() => setTokenCopied(null), 2000);
+  };
+
   return (
     <div className={CARD_STYLES.base}>
       <div className={LABEL_STYLES.title}>SDK Initialization Code</div>
+
+      {/* Token Info Card - Show tokens directly */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+        <div className="text-sm font-medium text-blue-800 mb-3 flex items-center gap-2">
+          <Key className="w-4 h-4" />
+          Your App Credentials
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-blue-100">
+            <div>
+              <div className="text-xs text-gray-500">App Name</div>
+              <div className="text-sm font-mono font-medium text-gray-900">{appName}</div>
+            </div>
+            <button
+              onClick={() => handleTokenCopy(appName, 'appName')}
+              className="p-2 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              {tokenCopied === 'appName' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-gray-400" />}
+            </button>
+          </div>
+          <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-blue-100">
+            <div>
+              <div className="text-xs text-gray-500">App Token</div>
+              <div className="text-sm font-mono font-medium text-gray-900">{appToken}</div>
+            </div>
+            <button
+              onClick={() => handleTokenCopy(appToken, 'appToken')}
+              className="p-2 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              {tokenCopied === 'appToken' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-gray-400" />}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#111827' }}>
         <div className="flex items-center justify-between px-4 py-2" style={{ backgroundColor: '#1f2937' }}>
@@ -3416,25 +4872,13 @@ Airbridge.init({
         </pre>
       </div>
 
-      <p className="text-xs text-gray-500 mt-3 flex items-center gap-1">
-        <AlertCircle className="w-3 h-3" />
-        You can find App Token in Dashboard Settings
-      </p>
-
-      <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-        {[
-          { label: 'Done!', value: 'completed' },
-          { label: 'I can\'t find App Token', value: 'help-token' },
-        ].map(option => (
-          <button
-            key={option.value}
-            onClick={() => onConfirm(option.value)}
-            className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
-          >
-            <Circle className="w-5 h-5 text-gray-400" />
-            <span className="text-sm">{option.label}</span>
-          </button>
-        ))}
+      <div className="mt-4">
+        <button
+          onClick={() => onConfirm('completed')}
+          className={BUTTON_STYLES.primary}
+        >
+          Done - I've added the code
+        </button>
       </div>
     </div>
   );
@@ -3791,7 +5235,7 @@ function DeeplinkAndroidInput({
   );
 }
 
-// Deep Link Dashboard Guide Component
+// Deep Link Auto-Configuration Component (Chat UI에서 자동 등록)
 function DeeplinkDashboardGuide({
   platform,
   data,
@@ -3805,45 +5249,65 @@ function DeeplinkDashboardGuide({
   onComplete: () => void;
   isCompleted?: boolean;
 }) {
-  const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [configStep, setConfigStep] = useState(0);
+  const [isConfiguring, setIsConfiguring] = useState(true);
 
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopySuccess(id);
-    setTimeout(() => setCopySuccess(null), 2000);
-  };
+  // Auto-configuration simulation
+  useEffect(() => {
+    if (isCompleted) return;
+
+    const steps = [
+      { delay: 600, step: 1 },   // Validating deep link info
+      { delay: 800, step: 2 },   // Registering URI Scheme
+      { delay: 600, step: 3 },   // Configuring App Links/Universal Links
+      { delay: 500, step: 4 },   // Complete
+    ];
+
+    let timeouts: NodeJS.Timeout[] = [];
+    let totalDelay = 0;
+
+    steps.forEach(({ delay, step }) => {
+      totalDelay += delay;
+      const timeout = setTimeout(() => {
+        setConfigStep(step);
+        if (step === 4) {
+          setIsConfiguring(false);
+          setTimeout(() => onComplete(), 600);
+        }
+      }, totalDelay);
+      timeouts.push(timeout);
+    });
+
+    return () => timeouts.forEach(t => clearTimeout(t));
+  }, [onComplete, isCompleted]);
 
   if (isCompleted) {
     return (
       <div className={CARD_STYLES.completed}>
-        <div className="text-sm font-medium text-gray-500 mb-2">Dashboard Setup Guide</div>
-        <div className="text-xs text-gray-400">Setup Complete</div>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">
+            {platform === 'ios' ? 'iOS' : 'Android'} 딥링크 설정 완료
+          </span>
+        </div>
       </div>
     );
   }
 
+  const configSteps = [
+    { label: '딥링크 정보 검증 중...', icon: '🔍' },
+    { label: 'URI Scheme 등록 중...', icon: '🔗' },
+    { label: platform === 'ios' ? 'Universal Links 설정 중...' : 'App Links 설정 중...', icon: '⚙️' },
+    { label: '설정 완료!', icon: '✅' },
+  ];
+
   return (
     <div className={CARD_STYLES.base}>
-      <div className="text-sm font-medium text-gray-900 mb-4">
-        {platform === 'ios' ? '🍎' : '🤖'} {platform === 'ios' ? 'iOS' : 'Android'} Dashboard Setup
+      <div className={LABEL_STYLES.title}>
+        {platform === 'ios' ? '🍎' : '🤖'} {platform === 'ios' ? 'iOS' : 'Android'} 딥링크 자동 설정
       </div>
 
-      {/* Dashboard Link */}
-      <a
-        href={`https://dashboard.airbridge.io/app/${appName}/tracking-link/deeplinks`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2 w-full py-2.5 mb-4 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
-      >
-        <ExternalLink className="w-4 h-4" />
-        Open Airbridge Dashboard
-      </a>
-
-      <div className="text-xs text-gray-500 mb-4">
-        Navigate to [Tracking Link] → [Deep Links] and enter the following information:
-      </div>
-
-      {/* Values to Enter */}
+      {/* Configuration Summary */}
       <div className="space-y-3 mb-4">
         {/* URI Scheme */}
         <div className="p-3 bg-gray-50 rounded-lg">
@@ -3851,16 +5315,11 @@ function DeeplinkDashboardGuide({
             <span className="text-xs font-medium text-gray-700">
               {platform === 'ios' ? 'iOS' : 'Android'} URI Scheme
             </span>
-            <button
-              onClick={() => handleCopy(data.uriScheme, 'uriScheme')}
-              className="p-1 hover:bg-gray-200 rounded transition-colors"
-            >
-              {copySuccess === 'uriScheme' ? (
-                <Check className="w-3.5 h-3.5 text-green-600" />
-              ) : (
-                <Copy className="w-3.5 h-3.5 text-gray-500" />
-              )}
-            </button>
+            {configStep >= 2 ? (
+              <CheckCircle2 className="w-4 h-4 text-green-500" />
+            ) : (
+              <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+            )}
           </div>
           <code className="text-sm text-gray-900">{data.uriScheme}</code>
         </div>
@@ -3870,18 +5329,32 @@ function DeeplinkDashboardGuide({
           <div className="p-3 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-gray-700">iOS App ID</span>
-              <button
-                onClick={() => handleCopy(data.appId!, 'appId')}
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
-              >
-                {copySuccess === 'appId' ? (
-                  <Check className="w-3.5 h-3.5 text-green-600" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5 text-gray-500" />
-                )}
-              </button>
+              {configStep >= 3 ? (
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+              ) : configStep >= 1 ? (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+              ) : (
+                <div className="w-4 h-4 rounded-full border border-gray-300" />
+              )}
             </div>
             <code className="text-sm text-gray-900">{data.appId}</code>
+          </div>
+        )}
+
+        {/* Android Package Name */}
+        {platform === 'android' && data.packageName && (
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-gray-700">Package Name</span>
+              {configStep >= 3 ? (
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+              ) : configStep >= 1 ? (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+              ) : (
+                <div className="w-4 h-4 rounded-full border border-gray-300" />
+              )}
+            </div>
+            <code className="text-sm text-gray-900">{data.packageName}</code>
           </div>
         )}
 
@@ -3890,31 +5363,47 @@ function DeeplinkDashboardGuide({
           <div className="p-3 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-gray-700">SHA256 Fingerprints</span>
-              <button
-                onClick={() => handleCopy(data.sha256Fingerprints!.join(',\n'), 'fingerprints')}
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
-              >
-                {copySuccess === 'fingerprints' ? (
-                  <Check className="w-3.5 h-3.5 text-green-600" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5 text-gray-500" />
-                )}
-              </button>
+              {configStep >= 3 ? (
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+              ) : configStep >= 1 ? (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+              ) : (
+                <div className="w-4 h-4 rounded-full border border-gray-300" />
+              )}
             </div>
             <code className="text-xs text-gray-900 break-all">
-              {data.sha256Fingerprints.join(',\n')}
+              {data.sha256Fingerprints.join(', ')}
             </code>
           </div>
         )}
       </div>
 
-      {/* Completion Button */}
-      <button
-        onClick={onComplete}
-        className="w-full py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors"
-      >
-        Dashboard Setup Complete
-      </button>
+      {/* Configuration Progress */}
+      <div className="pt-4 border-t border-gray-100">
+        <div className="space-y-2">
+          {configSteps.map((step, index) => (
+            <div
+              key={index}
+              className={`flex items-center gap-2 text-sm transition-all ${
+                configStep > index
+                  ? 'text-green-600'
+                  : configStep === index
+                  ? 'text-blue-600'
+                  : 'text-gray-300'
+              }`}
+            >
+              {configStep > index ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : configStep === index ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <div className="w-4 h-4 rounded-full border border-gray-300" />
+              )}
+              <span>{step.icon} {step.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -4297,16 +5786,16 @@ function DeeplinkTestScenarios({
     <div className={CARD_STYLES.base}>
       <div className="text-sm font-medium text-gray-900 mb-4">🧪 Deep Link Test</div>
 
-      {/* Dashboard Test Link */}
-      <a
-        href={`https://dashboard.airbridge.io/app/${appName}/tracking-link/deeplinks`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2 w-full py-2.5 mb-4 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
-      >
-        <ExternalLink className="w-4 h-4" />
-        Click Test Button in Dashboard
-      </a>
+      {/* Test Link Info */}
+      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+        <div className="text-xs font-medium text-blue-800 mb-2">📱 테스트 링크</div>
+        <code className="text-xs text-blue-700 break-all block bg-white p-2 rounded">
+          https://{appName}.abr.ge/test
+        </code>
+        <p className="text-xs text-blue-600 mt-2">
+          위 링크를 디바이스에서 클릭하여 각 시나리오를 테스트하세요.
+        </p>
+      </div>
 
       {/* Test Scenarios */}
       <div className="space-y-3 mb-4">
@@ -4361,11 +5850,11 @@ function DeeplinkTestScenarios({
       {/* Help for Failed Tests */}
       {Object.values(testResults).some(r => r === 'failed') && (
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
-          <div className="text-xs font-medium text-amber-700 mb-2">⚠️ If Test Failed, Check:</div>
+          <div className="text-xs font-medium text-amber-700 mb-2">⚠️ 테스트 실패 시 확인사항:</div>
           <ul className="text-xs text-amber-600 space-y-1 list-disc list-inside">
-            <li>Dashboard information is accurate</li>
-            <li>SDK configuration is correct</li>
-            <li>App signing keystore is correct (Android)</li>
+            <li>딥링크 설정 정보가 정확한지 확인</li>
+            <li>SDK 설정이 올바른지 확인</li>
+            <li>앱 서명 키스토어가 올바른지 확인 (Android)</li>
           </ul>
         </div>
       )}
@@ -4752,7 +6241,33 @@ function MetaChannelIntegration({
   isCompleted?: boolean;
 }) {
   const [metaAppId, setMetaAppId] = useState('');
-  const [step, setStep] = useState<'input' | 'connect' | 'done'>('input');
+  const [step, setStep] = useState<'input' | 'connect' | 'connecting' | 'done'>('input');
+  const [connectStep, setConnectStep] = useState(0);
+
+  const connectSteps = [
+    { label: 'Meta 로그인 창 열기...', icon: '🔐' },
+    { label: 'Facebook 계정 인증 중...', icon: '👤' },
+    { label: '광고 계정 연결 중...', icon: '📊' },
+    { label: '권한 설정 완료!', icon: '✅' },
+  ];
+
+  const startOAuthSimulation = () => {
+    setStep('connecting');
+    setConnectStep(0);
+
+    const timeouts = [
+      setTimeout(() => setConnectStep(1), 800),
+      setTimeout(() => setConnectStep(2), 1600),
+      setTimeout(() => setConnectStep(3), 2400),
+      setTimeout(() => {
+        setConnectStep(4);
+        setStep('done');
+        setTimeout(() => onComplete(), 500);
+      }, 3200),
+    ];
+
+    return () => timeouts.forEach(clearTimeout);
+  };
 
   if (isCompleted) {
     return (
@@ -4803,52 +6318,61 @@ function MetaChannelIntegration({
 
       {step === 'connect' && (
         <>
-          <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <div className={LABEL_STYLES.field}>Step 2: Connect with Facebook</div>
-            <ol className="text-xs text-gray-600 space-y-2">
-              <li className="flex items-start gap-2">
-                <span className="text-blue-500 font-medium">1.</span>
-                Open Airbridge Dashboard and navigate to Integrations → Ad Channels
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-500 font-medium">2.</span>
-                Find Meta Ads and click [Connect] button
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-500 font-medium">3.</span>
-                Login with your Facebook account
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-500 font-medium">4.</span>
-                Select your ad account and grant permissions
-              </li>
-            </ol>
+          <div className="bg-blue-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-blue-800">
+                Meta 계정과 연동하면 광고 성과 데이터를 Airbridge에서 확인할 수 있습니다.
+                아래 버튼을 클릭하면 Meta OAuth 인증이 시작됩니다.
+              </div>
+            </div>
           </div>
 
-          <a
-            href="https://dashboard.airbridge.io/integrations/channels"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={BUTTON_STYLES.primaryWithIconMb}
+          <button
+            onClick={startOAuthSimulation}
+            className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-[#1877F2] text-white hover:bg-[#166FE5] mb-3"
           >
-            Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
-          </a>
+            <span>f</span> Connect with Meta
+          </button>
 
-          <div className="flex gap-2">
-            <button
-              onClick={onComplete}
-              className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-            >
-              Done
-            </button>
-            <button
-              onClick={() => onHelp('meta-permission')}
-              className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-            >
-              I need help
-            </button>
-          </div>
+          <button
+            onClick={() => onHelp('meta-permission')}
+            className="w-full py-2 text-xs text-gray-500 hover:text-gray-700"
+          >
+            연동에 문제가 있나요?
+          </button>
         </>
+      )}
+
+      {step === 'connecting' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">Meta 계정 연동 중...</div>
+          {connectSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                connectStep > idx ? 'bg-green-100' : connectStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {connectStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                connectStep > idx ? 'text-green-600' : connectStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {connectStep === idx && idx < 3 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">Meta 연동 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">광고 계정이 성공적으로 연결되었습니다.</div>
+        </div>
       )}
     </div>
   );
@@ -4864,6 +6388,28 @@ function MetaCostIntegration({
   onSkip: () => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'enabling' | 'done'>('intro');
+  const [enableStep, setEnableStep] = useState(0);
+
+  const enableSteps = [
+    { label: 'Cost Integration 활성화 중...', icon: '💰' },
+    { label: '광고 비용 데이터 권한 요청 중...', icon: '📊' },
+    { label: '설정 완료!', icon: '✅' },
+  ];
+
+  const startEnabling = () => {
+    setStep('enabling');
+    setEnableStep(0);
+
+    setTimeout(() => setEnableStep(1), 600);
+    setTimeout(() => setEnableStep(2), 1200);
+    setTimeout(() => {
+      setEnableStep(3);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 1800);
+  };
+
   if (isCompleted) {
     return (
       <div className={CARD_STYLES.completed}>
@@ -4881,57 +6427,65 @@ function MetaCostIntegration({
         <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-800 rounded">Recommended</span>
       </div>
 
-      <div className="bg-blue-50 rounded-lg p-3 mb-4">
-        <div className="flex items-start gap-2">
-          <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-          <div className="text-xs text-blue-800">
-            Cost Integration allows you to see your ad spend data directly in Airbridge reports.
-            This helps you calculate ROI and ROAS for your Meta campaigns.
+      {step === 'intro' && (
+        <>
+          <div className="bg-blue-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-blue-800">
+                Cost Integration을 활성화하면 광고 비용 데이터를 Airbridge 리포트에서 직접 확인할 수 있습니다.
+                ROI와 ROAS 계산에 활용됩니다.
+              </div>
+            </div>
           </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={startEnabling}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600"
+            >
+              Enable Cost Integration
+            </button>
+            <button
+              onClick={onSkip}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              Skip for now
+            </button>
+          </div>
+        </>
+      )}
+
+      {step === 'enabling' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">Cost Integration 설정 중...</div>
+          {enableSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                enableStep > idx ? 'bg-green-100' : enableStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {enableStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                enableStep > idx ? 'text-green-600' : enableStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {enableStep === idx && idx < 2 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className={LABEL_STYLES.field}>Setup Steps:</div>
-        <ol className="text-xs text-gray-600 space-y-2">
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">1.</span>
-            Go to Integrations → Cost Integration in Dashboard
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">2.</span>
-            Find Meta Ads and click [Enable]
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">3.</span>
-            Grant additional permissions for cost data access
-          </li>
-        </ol>
-      </div>
-
-      <a
-        href="https://dashboard.airbridge.io/integrations/cost"
-        target="_blank"
-        rel="noopener noreferrer"
-        className={BUTTON_STYLES.primaryWithIconMb}
-      >
-        Open Cost Integration <ExternalLink className="w-4 h-4" />
-      </a>
-
-      <div className="flex gap-2">
-        <button
-          onClick={onComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-        >
-          Done
-        </button>
-        <button
-          onClick={onSkip}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          Skip for now
-        </button>
-      </div>
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">Cost Integration 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">광고 비용 데이터가 연동되었습니다.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -4946,6 +6500,30 @@ function MetaSkanIntegration({
   onSkip: () => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'configuring' | 'done'>('intro');
+  const [configStep, setConfigStep] = useState(0);
+
+  const configSteps = [
+    { label: 'SKAN 설정 확인 중...', icon: '📋' },
+    { label: 'Conversion Value 설정 중...', icon: '🔢' },
+    { label: 'Meta Postback 연결 중...', icon: '🔗' },
+    { label: '설정 완료!', icon: '✅' },
+  ];
+
+  const startConfiguring = () => {
+    setStep('configuring');
+    setConfigStep(0);
+
+    setTimeout(() => setConfigStep(1), 600);
+    setTimeout(() => setConfigStep(2), 1200);
+    setTimeout(() => setConfigStep(3), 1800);
+    setTimeout(() => {
+      setConfigStep(4);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 2400);
+  };
+
   if (isCompleted) {
     return (
       <div className={CARD_STYLES.completed}>
@@ -4963,57 +6541,65 @@ function MetaSkanIntegration({
         <span className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded">iOS Required</span>
       </div>
 
-      <div className="bg-amber-50 rounded-lg p-3 mb-4">
-        <div className="flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-          <div className="text-xs text-amber-800">
-            SKAN (SKAdNetwork) Integration is required for iOS 14.5+ attribution.
-            Without this, you won't be able to track conversions from iOS users who opt-out of tracking.
+      {step === 'intro' && (
+        <>
+          <div className="bg-amber-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-amber-800">
+                SKAN (SKAdNetwork)은 iOS 14.5+ 사용자 어트리뷰션에 필수입니다.
+                이 설정 없이는 추적 거부 사용자의 전환을 측정할 수 없습니다.
+              </div>
+            </div>
           </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={startConfiguring}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600"
+            >
+              Configure SKAN
+            </button>
+            <button
+              onClick={onSkip}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              Skip for now
+            </button>
+          </div>
+        </>
+      )}
+
+      {step === 'configuring' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">SKAN 설정 중...</div>
+          {configSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                configStep > idx ? 'bg-green-100' : configStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {configStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                configStep > idx ? 'text-green-600' : configStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {configStep === idx && idx < 3 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className={LABEL_STYLES.field}>Setup Steps:</div>
-        <ol className="text-xs text-gray-600 space-y-2">
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">1.</span>
-            Go to Integrations → SKAN Integration in Dashboard
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">2.</span>
-            Find Meta Ads and configure conversion values
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">3.</span>
-            Enable SKAN postback forwarding to Meta
-          </li>
-        </ol>
-      </div>
-
-      <a
-        href="https://dashboard.airbridge.io/integrations/skan"
-        target="_blank"
-        rel="noopener noreferrer"
-        className={BUTTON_STYLES.primaryWithIconMb}
-      >
-        Open SKAN Integration <ExternalLink className="w-4 h-4" />
-      </a>
-
-      <div className="flex gap-2">
-        <button
-          onClick={onComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-        >
-          Done
-        </button>
-        <button
-          onClick={onSkip}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          Skip for now
-        </button>
-      </div>
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">SKAN 설정 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">iOS 어트리뷰션이 활성화되었습니다.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -5028,6 +6614,30 @@ function GoogleChannelIntegration({
   onHelp: (issue: string) => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'connecting' | 'done'>('intro');
+  const [connectStep, setConnectStep] = useState(0);
+
+  const connectSteps = [
+    { label: 'Google 로그인 창 열기...', icon: '🔐' },
+    { label: 'Google 계정 인증 중...', icon: '👤' },
+    { label: 'Google Ads 계정 연결 중...', icon: '📊' },
+    { label: '연결 완료!', icon: '✅' },
+  ];
+
+  const startOAuthSimulation = () => {
+    setStep('connecting');
+    setConnectStep(0);
+
+    setTimeout(() => setConnectStep(1), 800);
+    setTimeout(() => setConnectStep(2), 1600);
+    setTimeout(() => setConnectStep(3), 2400);
+    setTimeout(() => {
+      setConnectStep(4);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 3200);
+  };
+
   if (isCompleted) {
     return (
       <div className={CARD_STYLES.completed}>
@@ -5044,51 +6654,69 @@ function GoogleChannelIntegration({
         <div className="text-sm font-medium text-gray-700">Google Ads - Channel Integration</div>
       </div>
 
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className={LABEL_STYLES.field}>Setup Steps:</div>
-        <ol className="text-xs text-gray-600 space-y-2">
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">1.</span>
-            Open Airbridge Dashboard → Integrations → Ad Channels
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">2.</span>
-            Find Google Ads and click [Connect]
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">3.</span>
-            Sign in with your Google account
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">4.</span>
-            Select your Google Ads account
-          </li>
-        </ol>
-      </div>
+      {step === 'intro' && (
+        <>
+          <div className="bg-blue-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-blue-800">
+                Google Ads 계정과 연동하면 광고 캠페인 성과를 Airbridge에서 확인할 수 있습니다.
+              </div>
+            </div>
+          </div>
 
-      <a
-        href="https://dashboard.airbridge.io/integrations/channels"
-        target="_blank"
-        rel="noopener noreferrer"
-        className={BUTTON_STYLES.primaryWithIconMb}
-      >
-        Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
-      </a>
+          <button
+            onClick={startOAuthSimulation}
+            className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50 mb-3"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Connect with Google
+          </button>
 
-      <div className="flex gap-2">
-        <button
-          onClick={onComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-        >
-          Done
-        </button>
-        <button
-          onClick={() => onHelp('google-permission')}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          I need help
-        </button>
-      </div>
+          <button
+            onClick={() => onHelp('google-permission')}
+            className="w-full py-2 text-xs text-gray-500 hover:text-gray-700"
+          >
+            연동에 문제가 있나요?
+          </button>
+        </>
+      )}
+
+      {step === 'connecting' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">Google 계정 연동 중...</div>
+          {connectSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                connectStep > idx ? 'bg-green-100' : connectStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {connectStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                connectStep > idx ? 'text-green-600' : connectStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {connectStep === idx && idx < 3 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">Google Ads 연동 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">광고 계정이 성공적으로 연결되었습니다.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -5103,6 +6731,28 @@ function GoogleCostIntegration({
   onSkip: () => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'enabling' | 'done'>('intro');
+  const [enableStep, setEnableStep] = useState(0);
+
+  const enableSteps = [
+    { label: 'Cost Integration 활성화 중...', icon: '💰' },
+    { label: 'Google Ads 비용 데이터 연결 중...', icon: '📊' },
+    { label: '설정 완료!', icon: '✅' },
+  ];
+
+  const startEnabling = () => {
+    setStep('enabling');
+    setEnableStep(0);
+
+    setTimeout(() => setEnableStep(1), 600);
+    setTimeout(() => setEnableStep(2), 1200);
+    setTimeout(() => {
+      setEnableStep(3);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 1800);
+  };
+
   if (isCompleted) {
     return (
       <div className={CARD_STYLES.completed}>
@@ -5120,38 +6770,64 @@ function GoogleCostIntegration({
         <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-800 rounded">Recommended</span>
       </div>
 
-      <div className="bg-blue-50 rounded-lg p-3 mb-4">
-        <div className="flex items-start gap-2">
-          <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-          <div className="text-xs text-blue-800">
-            See your Google Ads spend data directly in Airbridge. Calculate ROI and compare performance across channels.
+      {step === 'intro' && (
+        <>
+          <div className="bg-blue-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-blue-800">
+                Google Ads 비용 데이터를 Airbridge에서 직접 확인하고 ROI를 계산할 수 있습니다.
+              </div>
+            </div>
           </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={startEnabling}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600"
+            >
+              Enable Cost Integration
+            </button>
+            <button
+              onClick={onSkip}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              Skip for now
+            </button>
+          </div>
+        </>
+      )}
+
+      {step === 'enabling' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">Cost Integration 설정 중...</div>
+          {enableSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                enableStep > idx ? 'bg-green-100' : enableStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {enableStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                enableStep > idx ? 'text-green-600' : enableStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {enableStep === idx && idx < 2 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
-      <a
-        href="https://dashboard.airbridge.io/integrations/cost"
-        target="_blank"
-        rel="noopener noreferrer"
-        className={BUTTON_STYLES.primaryWithIconMb}
-      >
-        Open Cost Integration <ExternalLink className="w-4 h-4" />
-      </a>
-
-      <div className="flex gap-2">
-        <button
-          onClick={onComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-        >
-          Done
-        </button>
-        <button
-          onClick={onSkip}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          Skip for now
-        </button>
-      </div>
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">Cost Integration 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">Google Ads 비용 데이터가 연동되었습니다.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -5166,6 +6842,30 @@ function GoogleSkanIntegration({
   onSkip: () => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'configuring' | 'done'>('intro');
+  const [configStep, setConfigStep] = useState(0);
+
+  const configSteps = [
+    { label: 'SKAN 설정 확인 중...', icon: '📋' },
+    { label: 'Conversion Value 설정 중...', icon: '🔢' },
+    { label: 'Google Postback 연결 중...', icon: '🔗' },
+    { label: '설정 완료!', icon: '✅' },
+  ];
+
+  const startConfiguring = () => {
+    setStep('configuring');
+    setConfigStep(0);
+
+    setTimeout(() => setConfigStep(1), 600);
+    setTimeout(() => setConfigStep(2), 1200);
+    setTimeout(() => setConfigStep(3), 1800);
+    setTimeout(() => {
+      setConfigStep(4);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 2400);
+  };
+
   if (isCompleted) {
     return (
       <div className={CARD_STYLES.completed}>
@@ -5183,38 +6883,64 @@ function GoogleSkanIntegration({
         <span className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded">iOS Required</span>
       </div>
 
-      <div className="bg-amber-50 rounded-lg p-3 mb-4">
-        <div className="flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-          <div className="text-xs text-amber-800">
-            Required for iOS 14.5+ attribution tracking with opt-out users.
+      {step === 'intro' && (
+        <>
+          <div className="bg-amber-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-amber-800">
+                iOS 14.5+ 추적 거부 사용자의 어트리뷰션 측정에 필요합니다.
+              </div>
+            </div>
           </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={startConfiguring}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600"
+            >
+              Configure SKAN
+            </button>
+            <button
+              onClick={onSkip}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              Skip for now
+            </button>
+          </div>
+        </>
+      )}
+
+      {step === 'configuring' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">SKAN 설정 중...</div>
+          {configSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                configStep > idx ? 'bg-green-100' : configStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {configStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                configStep > idx ? 'text-green-600' : configStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {configStep === idx && idx < 3 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
-      <a
-        href="https://dashboard.airbridge.io/integrations/skan"
-        target="_blank"
-        rel="noopener noreferrer"
-        className={BUTTON_STYLES.primaryWithIconMb}
-      >
-        Open SKAN Integration <ExternalLink className="w-4 h-4" />
-      </a>
-
-      <div className="flex gap-2">
-        <button
-          onClick={onComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-        >
-          Done
-        </button>
-        <button
-          onClick={onSkip}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          Skip for now
-        </button>
-      </div>
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">SKAN 설정 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">Google Ads iOS 어트리뷰션이 활성화되었습니다.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -5309,6 +7035,30 @@ function AppleChannelIntegration({
   onHelp: (issue: string) => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'connecting' | 'done'>('intro');
+  const [connectStep, setConnectStep] = useState(0);
+
+  const connectSteps = [
+    { label: 'Apple Search Ads API 연결 중...', icon: '🔐' },
+    { label: 'API 인증서 확인 중...', icon: '📜' },
+    { label: '캠페인 데이터 동기화 중...', icon: '📊' },
+    { label: '연결 완료!', icon: '✅' },
+  ];
+
+  const startOAuthSimulation = () => {
+    setStep('connecting');
+    setConnectStep(0);
+
+    setTimeout(() => setConnectStep(1), 800);
+    setTimeout(() => setConnectStep(2), 1600);
+    setTimeout(() => setConnectStep(3), 2400);
+    setTimeout(() => {
+      setConnectStep(4);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 3200);
+  };
+
   if (isCompleted) {
     return (
       <div className={CARD_STYLES.completed}>
@@ -5325,51 +7075,63 @@ function AppleChannelIntegration({
         <div className="text-sm font-medium text-gray-700">Apple Search Ads - Channel Integration</div>
       </div>
 
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className={LABEL_STYLES.field}>Setup Steps:</div>
-        <ol className="text-xs text-gray-600 space-y-2">
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">1.</span>
-            Open Airbridge Dashboard → Integrations → Ad Channels
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">2.</span>
-            Find Apple Search Ads and click [Connect]
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">3.</span>
-            Upload your Apple Search Ads API certificate
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">4.</span>
-            Enter your Org ID and select campaigns
-          </li>
-        </ol>
-      </div>
+      {step === 'intro' && (
+        <>
+          <div className="bg-blue-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-blue-800">
+                Apple Search Ads 계정과 연동하면 앱스토어 검색 광고 성과를 Airbridge에서 확인할 수 있습니다.
+              </div>
+            </div>
+          </div>
 
-      <a
-        href="https://dashboard.airbridge.io/integrations/channels"
-        target="_blank"
-        rel="noopener noreferrer"
-        className={BUTTON_STYLES.primaryWithIconMb}
-      >
-        Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
-      </a>
+          <button
+            onClick={startOAuthSimulation}
+            className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-black text-white hover:bg-gray-800 mb-3"
+          >
+            <span>🍎</span> Connect with Apple Search Ads
+          </button>
 
-      <div className="flex gap-2">
-        <button
-          onClick={onComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-        >
-          Done
-        </button>
-        <button
-          onClick={() => onHelp('apple-api')}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          I need help
-        </button>
-      </div>
+          <button
+            onClick={() => onHelp('apple-api')}
+            className="w-full py-2 text-xs text-gray-500 hover:text-gray-700"
+          >
+            연동에 문제가 있나요?
+          </button>
+        </>
+      )}
+
+      {step === 'connecting' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">Apple Search Ads 연동 중...</div>
+          {connectSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                connectStep > idx ? 'bg-green-100' : connectStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {connectStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                connectStep > idx ? 'text-green-600' : connectStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {connectStep === idx && idx < 3 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">Apple Search Ads 연동 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">광고 계정이 성공적으로 연결되었습니다.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -5384,6 +7146,28 @@ function AppleCostIntegration({
   onSkip: () => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'enabling' | 'done'>('intro');
+  const [enableStep, setEnableStep] = useState(0);
+
+  const enableSteps = [
+    { label: 'Cost Integration 활성화 중...', icon: '💰' },
+    { label: 'Apple Search Ads 비용 데이터 연결 중...', icon: '📊' },
+    { label: '설정 완료!', icon: '✅' },
+  ];
+
+  const startEnabling = () => {
+    setStep('enabling');
+    setEnableStep(0);
+
+    setTimeout(() => setEnableStep(1), 600);
+    setTimeout(() => setEnableStep(2), 1200);
+    setTimeout(() => {
+      setEnableStep(3);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 1800);
+  };
+
   if (isCompleted) {
     return (
       <div className={CARD_STYLES.completed}>
@@ -5401,38 +7185,64 @@ function AppleCostIntegration({
         <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-800 rounded">Recommended</span>
       </div>
 
-      <div className="bg-blue-50 rounded-lg p-3 mb-4">
-        <div className="flex items-start gap-2">
-          <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-          <div className="text-xs text-blue-800">
-            View your Apple Search Ads spend in Airbridge for comprehensive ROI analysis.
+      {step === 'intro' && (
+        <>
+          <div className="bg-blue-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-blue-800">
+                Apple Search Ads 비용 데이터를 Airbridge에서 확인하고 ROI를 분석할 수 있습니다.
+              </div>
+            </div>
           </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={startEnabling}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600"
+            >
+              Enable Cost Integration
+            </button>
+            <button
+              onClick={onSkip}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              Skip for now
+            </button>
+          </div>
+        </>
+      )}
+
+      {step === 'enabling' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">Cost Integration 설정 중...</div>
+          {enableSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                enableStep > idx ? 'bg-green-100' : enableStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {enableStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                enableStep > idx ? 'text-green-600' : enableStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {enableStep === idx && idx < 2 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
-      <a
-        href="https://dashboard.airbridge.io/integrations/cost"
-        target="_blank"
-        rel="noopener noreferrer"
-        className={BUTTON_STYLES.primaryWithIconMb}
-      >
-        Open Cost Integration <ExternalLink className="w-4 h-4" />
-      </a>
-
-      <div className="flex gap-2">
-        <button
-          onClick={onComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-        >
-          Done
-        </button>
-        <button
-          onClick={onSkip}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          Skip for now
-        </button>
-      </div>
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">Cost Integration 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">Apple Search Ads 비용 데이터가 연동되었습니다.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -5447,6 +7257,30 @@ function TikTokChannelIntegration({
   onHelp: (issue: string) => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'connecting' | 'done'>('intro');
+  const [connectStep, setConnectStep] = useState(0);
+
+  const connectSteps = [
+    { label: 'TikTok 로그인 창 열기...', icon: '🔐' },
+    { label: 'TikTok 계정 인증 중...', icon: '👤' },
+    { label: '광고 계정 연결 중...', icon: '📊' },
+    { label: '연결 완료!', icon: '✅' },
+  ];
+
+  const startOAuthSimulation = () => {
+    setStep('connecting');
+    setConnectStep(0);
+
+    setTimeout(() => setConnectStep(1), 800);
+    setTimeout(() => setConnectStep(2), 1600);
+    setTimeout(() => setConnectStep(3), 2400);
+    setTimeout(() => {
+      setConnectStep(4);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 3200);
+  };
+
   if (isCompleted) {
     return (
       <div className={CARD_STYLES.completed}>
@@ -5463,64 +7297,67 @@ function TikTokChannelIntegration({
         <div className="text-sm font-medium text-gray-700">TikTok For Business - Channel Integration</div>
       </div>
 
-      <div className="bg-amber-50 rounded-lg p-3 mb-4">
-        <div className="flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-          <div className="text-xs text-amber-800">
-            <p className="font-medium mb-1">Important Notes:</p>
-            <ul className="space-y-1">
-              <li>• Pangle performance requires "Sub-Publisher" GroupBy in reports</li>
-              <li>• EPC (Extended Privacy Control) may cause under-counting</li>
-            </ul>
+      {step === 'intro' && (
+        <>
+          <div className="bg-amber-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-amber-800">
+                <p className="font-medium mb-1">참고 사항:</p>
+                <ul className="space-y-1">
+                  <li>• Pangle 성과는 리포트에서 "Sub-Publisher" GroupBy 필요</li>
+                  <li>• EPC 활성화 시 데이터 누락 가능</li>
+                </ul>
+              </div>
+            </div>
           </div>
+
+          <button
+            onClick={startOAuthSimulation}
+            className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-black text-white hover:bg-gray-800 mb-3"
+          >
+            <span>🎵</span> Connect with TikTok
+          </button>
+
+          <button
+            onClick={() => onHelp('tiktok-permission')}
+            className="w-full py-2 text-xs text-gray-500 hover:text-gray-700"
+          >
+            연동에 문제가 있나요?
+          </button>
+        </>
+      )}
+
+      {step === 'connecting' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">TikTok 계정 연동 중...</div>
+          {connectSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                connectStep > idx ? 'bg-green-100' : connectStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {connectStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                connectStep > idx ? 'text-green-600' : connectStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {connectStep === idx && idx < 3 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className={LABEL_STYLES.field}>Setup Steps:</div>
-        <ol className="text-xs text-gray-600 space-y-2">
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">1.</span>
-            Open Airbridge Dashboard → Integrations → Ad Channels
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">2.</span>
-            Find TikTok For Business and click [Connect]
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">3.</span>
-            Login with your TikTok For Business account
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">4.</span>
-            Select your ad account
-          </li>
-        </ol>
-      </div>
-
-      <a
-        href="https://dashboard.airbridge.io/integrations/channels"
-        target="_blank"
-        rel="noopener noreferrer"
-        className={BUTTON_STYLES.primaryWithIconMb}
-      >
-        Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
-      </a>
-
-      <div className="flex gap-2">
-        <button
-          onClick={onComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-        >
-          Done
-        </button>
-        <button
-          onClick={() => onHelp('tiktok-permission')}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          I need help
-        </button>
-      </div>
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">TikTok 연동 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">광고 계정이 성공적으로 연결되었습니다.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -5535,6 +7372,28 @@ function TikTokCostIntegration({
   onSkip: () => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'enabling' | 'done'>('intro');
+  const [enableStep, setEnableStep] = useState(0);
+
+  const enableSteps = [
+    { label: 'Cost Integration 활성화 중...', icon: '💰' },
+    { label: 'TikTok 비용 데이터 연결 중...', icon: '📊' },
+    { label: '설정 완료!', icon: '✅' },
+  ];
+
+  const startEnabling = () => {
+    setStep('enabling');
+    setEnableStep(0);
+
+    setTimeout(() => setEnableStep(1), 600);
+    setTimeout(() => setEnableStep(2), 1200);
+    setTimeout(() => {
+      setEnableStep(3);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 1800);
+  };
+
   if (isCompleted) {
     return (
       <div className={CARD_STYLES.completed}>
@@ -5552,38 +7411,64 @@ function TikTokCostIntegration({
         <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-800 rounded">Recommended</span>
       </div>
 
-      <div className="bg-blue-50 rounded-lg p-3 mb-4">
-        <div className="flex items-start gap-2">
-          <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-          <div className="text-xs text-blue-800">
-            View your TikTok ad spend in Airbridge to analyze campaign ROI.
+      {step === 'intro' && (
+        <>
+          <div className="bg-blue-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-blue-800">
+                TikTok 광고 비용 데이터를 Airbridge에서 확인하고 캠페인 ROI를 분석할 수 있습니다.
+              </div>
+            </div>
           </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={startEnabling}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600"
+            >
+              Enable Cost Integration
+            </button>
+            <button
+              onClick={onSkip}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              Skip for now
+            </button>
+          </div>
+        </>
+      )}
+
+      {step === 'enabling' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">Cost Integration 설정 중...</div>
+          {enableSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                enableStep > idx ? 'bg-green-100' : enableStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {enableStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                enableStep > idx ? 'text-green-600' : enableStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {enableStep === idx && idx < 2 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
-      <a
-        href="https://dashboard.airbridge.io/integrations/cost"
-        target="_blank"
-        rel="noopener noreferrer"
-        className={BUTTON_STYLES.primaryWithIconMb}
-      >
-        Open Cost Integration <ExternalLink className="w-4 h-4" />
-      </a>
-
-      <div className="flex gap-2">
-        <button
-          onClick={onComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-        >
-          Done
-        </button>
-        <button
-          onClick={onSkip}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          Skip for now
-        </button>
-      </div>
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">Cost Integration 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">TikTok 비용 데이터가 연동되었습니다.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -5598,6 +7483,30 @@ function TikTokSkanIntegration({
   onSkip: () => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'configuring' | 'done'>('intro');
+  const [configStep, setConfigStep] = useState(0);
+
+  const configSteps = [
+    { label: 'SKAN 설정 확인 중...', icon: '📋' },
+    { label: 'Conversion Value 설정 중...', icon: '🔢' },
+    { label: 'TikTok Postback 연결 중...', icon: '🔗' },
+    { label: '설정 완료!', icon: '✅' },
+  ];
+
+  const startConfiguring = () => {
+    setStep('configuring');
+    setConfigStep(0);
+
+    setTimeout(() => setConfigStep(1), 600);
+    setTimeout(() => setConfigStep(2), 1200);
+    setTimeout(() => setConfigStep(3), 1800);
+    setTimeout(() => {
+      setConfigStep(4);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 2400);
+  };
+
   if (isCompleted) {
     return (
       <div className={CARD_STYLES.completed}>
@@ -5615,38 +7524,64 @@ function TikTokSkanIntegration({
         <span className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded">iOS Required</span>
       </div>
 
-      <div className="bg-amber-50 rounded-lg p-3 mb-4">
-        <div className="flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-          <div className="text-xs text-amber-800">
-            Required for iOS 14.5+ attribution with TikTok campaigns.
+      {step === 'intro' && (
+        <>
+          <div className="bg-amber-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-amber-800">
+                TikTok 캠페인의 iOS 14.5+ 어트리뷰션에 필요합니다.
+              </div>
+            </div>
           </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={startConfiguring}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600"
+            >
+              Configure SKAN
+            </button>
+            <button
+              onClick={onSkip}
+              className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              Skip for now
+            </button>
+          </div>
+        </>
+      )}
+
+      {step === 'configuring' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">SKAN 설정 중...</div>
+          {configSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                configStep > idx ? 'bg-green-100' : configStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {configStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                configStep > idx ? 'text-green-600' : configStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {configStep === idx && idx < 3 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
-      <a
-        href="https://dashboard.airbridge.io/integrations/skan"
-        target="_blank"
-        rel="noopener noreferrer"
-        className={BUTTON_STYLES.primaryWithIconMb}
-      >
-        Open SKAN Integration <ExternalLink className="w-4 h-4" />
-      </a>
-
-      <div className="flex gap-2">
-        <button
-          onClick={onComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-        >
-          Done
-        </button>
-        <button
-          onClick={onSkip}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          Skip for now
-        </button>
-      </div>
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">SKAN 설정 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">TikTok iOS 어트리뷰션이 활성화되었습니다.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -6177,7 +8112,11 @@ function EventTaxonomySummary({
 }
 
 // Dev Completion Summary Component
-function DevCompletionSummary({ appName }: { appName: string }) {
+function DevCompletionSummary({ appName, onViewTestEvents, onAddProductionApp }: {
+  appName: string;
+  onViewTestEvents?: () => void;
+  onAddProductionApp?: () => void;
+}) {
   return (
     <div className={CARD_STYLES.base}>
       <div className="flex items-center gap-2 text-lg font-semibold mb-4 text-emerald-600">
@@ -6208,10 +8147,16 @@ function DevCompletionSummary({ appName }: { appName: string }) {
       <div className="mt-4 pt-4 border-t border-gray-100">
         <div className={LABEL_STYLES.title}>What's Next?</div>
         <div className="flex gap-2">
-          <button className="flex-1 py-2 px-3 text-sm rounded-lg transition-colors bg-blue-500 text-white hover:bg-blue-600">
+          <button
+            onClick={onViewTestEvents}
+            className="flex-1 py-2 px-3 text-sm rounded-lg transition-colors bg-blue-500 text-white hover:bg-blue-600"
+          >
             View Test Events
           </button>
-          <button className="flex-1 py-2 px-3 text-sm rounded-lg transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+          <button
+            onClick={onAddProductionApp}
+            className="flex-1 py-2 px-3 text-sm rounded-lg transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
+          >
             Add Production App
           </button>
         </div>
@@ -6732,17 +8677,40 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     }));
     addUserMessage(appName);
 
+    // Show platform selection for Dev mode (needed for SDK/Deeplink setup)
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: `✨ Great name! **"${appName}"**\n\n📱 Which platforms will you be testing?` },
+        { type: 'platform-multi-select' },
+      ]);
+    }, 300);
+  };
+
+  // Dev platform select handler (after app name)
+  const handleDevPlatformSelect = (platforms: string[]) => {
+    setSetupState(prev => ({ ...prev, platforms }));
+    const platformLabels = platforms.map(p => p === 'ios' ? 'iOS' : p === 'android' ? 'Android' : 'Web').join(', ');
+    addUserMessage(platformLabels);
+
     // Show timezone/currency confirmation (IP-based recommendation)
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: `✨ Your app **"${appName}"** is almost ready!\n\n🌍 Let me confirm your regional settings:` },
+        { type: 'text', text: `✅ Got it! You'll be testing on **${platformLabels}**.\n\n🌍 Let me confirm your regional settings:` },
         { type: 'timezone-currency-confirm', timezone: 'Asia/Seoul (KST, UTC+9)', currency: 'KRW (Korean Won)' },
       ]);
     }, 300);
   };
 
-  // Platform multi-select handler (Production)
+  // Platform multi-select handler (handles both Dev and Production)
   const handlePlatformMultiSelect = (platforms: string[]) => {
+    // Check if we're in Dev mode
+    if (setupState.environment === 'dev') {
+      // Dev mode: go directly to timezone/currency after platform selection
+      handleDevPlatformSelect(platforms);
+      return;
+    }
+
+    // Production mode: continue with platform registration flow
     setSetupState(prev => ({ ...prev, platforms, currentPlatformIndex: 0, platformInfos: [] }));
     const platformLabels = platforms.map(p => p === 'ios' ? 'iOS' : p === 'android' ? 'Android' : 'Web').join(', ');
     addUserMessage(platformLabels);
@@ -6923,10 +8891,23 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     const newAppId = Date.now().toString();
     // Capture app name now to avoid closure issues with setTimeout
     const appName = setupState.appInfo.appName;
+
+    // Generate tokens first so they can be stored in the app
+    const generateToken = () => {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    };
+
+    const tokens: AppTokens = {
+      appSdkToken: generateToken(),
+      webSdkToken: generateToken(),
+      apiToken: generateToken(),
+    };
+
     const newApp: RegisteredApp = {
       id: newAppId,
       appInfo: setupState.appInfo,
-      platforms: setupState.environment === 'dev' ? ['dev'] : setupState.platforms,
+      platforms: setupState.platforms, // Use actual platforms for both Dev and Production
       environment: setupState.environment as 'dev' | 'production',
       steps: setupState.environment === 'dev' ? createDevAppSteps(setupState.platforms) : createAppSteps(setupState.platforms),
       currentPhase: 1, // Stay in Phase 1 until token display is confirmed
@@ -6934,6 +8915,7 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
       channels: [],
       isExpanded: true,
       messages: [...messages], // Save current messages to the app
+      tokens, // Store generated tokens for SDK setup
     };
 
     setRegisteredApps(prev => [
@@ -6943,18 +8925,6 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     setCurrentAppId(newAppId);
     setIsAddingApp(false);
     setCurrentPhase(1);
-
-    // Generate mock tokens
-    const generateToken = () => {
-      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-      return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    };
-
-    const tokens = {
-      appSdkToken: generateToken(),
-      webSdkToken: generateToken(),
-      apiToken: generateToken(),
-    };
 
     // Use addBotMessageToApp with captured appId to avoid closure issues
     setTimeout(() => {
@@ -7043,7 +9013,7 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: `✅ Great! I've found your app **"${app.name}"**.\n\n📝 Now, please register your app on the Airbridge dashboard:\n\n1️⃣ Click the button below to open the dashboard\n2️⃣ Click **[Add Your App]**\n3️⃣ The app information has been pre-filled for you` },
+        { type: 'text', text: `✅ 앱을 찾았습니다: **"${app.name}"**\n\n📝 Airbridge에 앱을 등록합니다...` },
         {
           type: 'dashboard-action',
           appName: app.name,
@@ -7060,7 +9030,7 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '👍 No problem!\n\nYou can **manually enter** your app information.\n\nPlease fill in the details below:' },
+        { type: 'text', text: '👍 직접 앱 정보를 입력해주세요.' },
         { type: 'app-info-form' },
       ]);
     }, 300);
@@ -7073,7 +9043,7 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '✨ Perfect!\n\n📝 Now, please register your app on the Airbridge dashboard:\n\n1️⃣ Click the button below to open the dashboard\n2️⃣ Click **[Add Your App]**\n3️⃣ Enter the information below\n\nLet me know when you\'re done!' },
+        { type: 'text', text: '✨ 완벽해요!\n\n📝 Airbridge에 앱을 등록합니다...' },
         {
           type: 'dashboard-action',
           appName: info.appName,
@@ -7440,6 +9410,10 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     if (!app || !currentAppId) return;
 
     const categoryLabels: Record<string, string> = {
+      'web-sdk': 'Web SDK',
+      'ios-sdk': 'iOS SDK',
+      'android-sdk': 'Android SDK',
+      'sdk': 'SDK',
       'deeplink': 'Deep Link',
       'event-taxonomy': 'Event Taxonomy',
       'integration': 'Integration',
@@ -7493,12 +9467,25 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     addUserMessage('Web SDK installation complete');
     updateAppStepStatus(app.id, 'web-sdk-install', 'completed');
 
-    // Move to SDK initialization
+    // Check if there are mobile platforms to set up
+    const hasMobilePlatforms = app.platforms.includes('ios') || app.platforms.includes('android');
+
     setTimeout(() => {
-      addBotMessage([
-        { type: 'text', text: '✅ **Web SDK installed!**\n\nNow let\'s continue with the SDK initialization for your other platforms.' },
-      ]);
-      updateAppStepStatus(app.id, 'sdk-init', 'in_progress');
+      if (hasMobilePlatforms) {
+        addBotMessage([
+          { type: 'text', text: '✅ **Web SDK installed!**\n\nNow let\'s set up the SDK for your mobile platforms.\n\nSelect your development framework:' },
+          { type: 'framework-select' },
+        ]);
+        updateAppStepStatus(app.id, 'sdk-init', 'in_progress');
+      } else {
+        // Web only - proceed to deeplink
+        addBotMessage([
+          { type: 'text', text: '✅ **Web SDK installed!**\n\n🔗 Now let\'s set up **deep links** to direct users from ads to specific pages in your app.\n\nWould you like to set it up now?' },
+          { type: 'deeplink-choice' },
+        ]);
+        updateAppStepStatus(app.id, 'sdk-init', 'completed');
+        updateAppStepStatus(app.id, 'deeplink', 'in_progress');
+      }
     }, 300);
   };
 
@@ -7559,11 +9546,25 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     addUserMessage('User identity setup complete');
     updateAppStepStatus(app.id, 'web-sdk-install', 'completed');
 
+    // Check if there are mobile platforms to set up
+    const hasMobilePlatforms = app.platforms.includes('ios') || app.platforms.includes('android');
+
     setTimeout(() => {
-      addBotMessage([
-        { type: 'text', text: '✅ **Web SDK Installation Complete!**\n\nNow let\'s proceed with SDK setup for other platforms.' },
-      ]);
-      updateAppStepStatus(app.id, 'sdk-init', 'in_progress');
+      if (hasMobilePlatforms) {
+        addBotMessage([
+          { type: 'text', text: '✅ **Web SDK Installation Complete!**\n\nNow let\'s set up the SDK for your mobile platforms.\n\nSelect your development framework:' },
+          { type: 'framework-select' },
+        ]);
+        updateAppStepStatus(app.id, 'sdk-init', 'in_progress');
+      } else {
+        // Web only - proceed to deeplink
+        addBotMessage([
+          { type: 'text', text: '✅ **Web SDK Installation Complete!**\n\n🔗 Now let\'s set up **deep links** to direct users from ads to specific pages in your app.\n\nWould you like to set it up now?' },
+          { type: 'deeplink-choice' },
+        ]);
+        updateAppStepStatus(app.id, 'sdk-init', 'completed');
+        updateAppStepStatus(app.id, 'deeplink', 'in_progress');
+      }
     }, 300);
   };
 
@@ -7575,22 +9576,163 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     addUserMessage('Skipped user identity setup');
     updateAppStepStatus(app.id, 'web-sdk-install', 'completed');
 
+    // Check if there are mobile platforms to set up
+    const hasMobilePlatforms = app.platforms.includes('ios') || app.platforms.includes('android');
+
+    setTimeout(() => {
+      if (hasMobilePlatforms) {
+        addBotMessage([
+          { type: 'text', text: '✅ **Web SDK Installation Complete!**\n\nNow let\'s set up the SDK for your mobile platforms.\n\nSelect your development framework:' },
+          { type: 'framework-select' },
+        ]);
+        updateAppStepStatus(app.id, 'sdk-init', 'in_progress');
+      } else {
+        // Web only - proceed to deeplink
+        addBotMessage([
+          { type: 'text', text: '✅ **Web SDK Installation Complete!**\n\n🔗 Now let\'s set up **deep links** to direct users from ads to specific pages in your app.\n\nWould you like to set it up now?' },
+          { type: 'deeplink-choice' },
+        ]);
+        updateAppStepStatus(app.id, 'sdk-init', 'completed');
+        updateAppStepStatus(app.id, 'deeplink', 'in_progress');
+      }
+    }, 300);
+  };
+
+  // ===== iOS SDK Handlers (Native Only) =====
+
+  // iOS SDK Install Complete handler
+  const handleIosSdkInstallComplete = (method: 'cocoapods' | 'spm') => {
+    const app = currentApp;
+    if (!app) return;
+
+    const methodLabel = method === 'cocoapods' ? 'CocoaPods' : 'Swift Package Manager';
+    addUserMessage(`${methodLabel}로 iOS SDK 설치 완료`);
+    updateAppStepStatus(app.id, 'ios-sdk-install', 'completed');
+    updateAppStepStatus(app.id, 'ios-sdk-init', 'in_progress');
+
+    const appName = app.appInfo.appName.toLowerCase().replace(/\s/g, '');
+    const appToken = app.tokens.appSdkToken;
+
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '✅ **Web SDK Installation Complete!**\n\nNow let\'s proceed with SDK setup for other platforms.' },
+        { type: 'text', text: `✅ iOS SDK 설치 완료!\n\n이제 SDK를 초기화해보겠습니다.` },
+        { type: 'ios-sdk-init', appName, appToken },
       ]);
-      updateAppStepStatus(app.id, 'sdk-init', 'in_progress');
+    }, 300);
+  };
+
+  // iOS SDK Init Complete handler
+  const handleIosSdkInitComplete = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('iOS SDK 초기화 완료');
+    updateAppStepStatus(app.id, 'ios-sdk-init', 'completed');
+    updateAppStepStatus(app.id, 'ios-deeplink-setup', 'in_progress');
+
+    const appName = app.appInfo.appName.toLowerCase().replace(/\s/g, '');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: `✅ iOS SDK 초기화 완료!\n\n이제 딥링크를 설정해보겠습니다.` },
+        { type: 'ios-deeplink-setup', appName, bundleId: app.appInfo.bundleId },
+      ]);
+    }, 300);
+  };
+
+  // iOS Deep Link Setup Complete handler
+  const handleIosDeeplinkSetupComplete = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('iOS 딥링크 설정 완료');
+    updateAppStepStatus(app.id, 'ios-deeplink-setup', 'completed');
+
+    // Check if Android SDK needs to be set up
+    if (app.platforms.includes('android') && app.framework === 'android-native') {
+      // Need to set up Android too
+      updateAppStepStatus(app.id, 'android-sdk-install', 'in_progress');
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: `✅ iOS SDK 설정 완료!\n\n이제 Android SDK를 설정해보겠습니다.` },
+          { type: 'android-sdk-install' },
+        ]);
+      }, 300);
+    } else {
+      // iOS only or both platforms with same native framework - proceed to SDK test
+      updateAppStepStatus(app.id, 'sdk-test', 'in_progress');
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: `🎉 **iOS SDK 설정 완료!**\n\n이제 SDK 연동을 테스트해보겠습니다.` },
+          { type: 'sdk-test' },
+        ]);
+      }, 300);
+    }
+  };
+
+  // ===== Android SDK Handlers (Native Only) =====
+
+  // Android SDK Install Complete handler
+  const handleAndroidSdkInstallComplete = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('Android SDK 설치 완료');
+    updateAppStepStatus(app.id, 'android-sdk-install', 'completed');
+    updateAppStepStatus(app.id, 'android-sdk-init', 'in_progress');
+
+    const appName = app.appInfo.appName.toLowerCase().replace(/\s/g, '');
+    const appToken = app.tokens.appSdkToken;
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: `✅ Android SDK 설치 완료!\n\n이제 SDK를 초기화해보겠습니다.` },
+        { type: 'android-sdk-init', appName, appToken },
+      ]);
+    }, 300);
+  };
+
+  // Android SDK Init Complete handler
+  const handleAndroidSdkInitComplete = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('Android SDK 초기화 완료');
+    updateAppStepStatus(app.id, 'android-sdk-init', 'completed');
+    updateAppStepStatus(app.id, 'android-deeplink-setup', 'in_progress');
+
+    const appName = app.appInfo.appName.toLowerCase().replace(/\s/g, '');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: `✅ Android SDK 초기화 완료!\n\n이제 딥링크를 설정해보겠습니다.` },
+        { type: 'android-deeplink-setup', appName, packageName: app.appInfo.packageName },
+      ]);
+    }, 300);
+  };
+
+  // Android Deep Link Setup Complete handler
+  const handleAndroidDeeplinkSetupComplete = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('Android 딥링크 설정 완료');
+    updateAppStepStatus(app.id, 'android-deeplink-setup', 'completed');
+
+    // Proceed to SDK test
+    updateAppStepStatus(app.id, 'sdk-test', 'in_progress');
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: `🎉 **Android SDK 설정 완료!**\n\n이제 SDK 연동을 테스트해보겠습니다.` },
+        { type: 'sdk-test' },
+      ]);
     }, 300);
   };
 
   // Framework select handler
   const handleFrameworkSelect = (framework: string) => {
     setSetupState(prev => ({ ...prev, framework }));
-    if (currentAppId) {
-      setRegisteredApps(prev => prev.map(app =>
-        app.id === currentAppId ? { ...app, framework } : app
-      ));
-    }
+
     const frameworkLabels: Record<string, string> = {
       'react-native': 'React Native',
       'flutter': 'Flutter',
@@ -7602,50 +9744,121 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     addUserMessage(frameworkLabels[framework] || framework);
 
     if (currentAppId) {
-      updateAppStepStatus(currentAppId, 'sdk-install', 'completed');
-
-      // Check if web platform is selected - if so, go to web-sdk-install first
       const app = registeredApps.find(a => a.id === currentAppId);
-      if (app?.platforms.includes('web')) {
+      const platforms = app?.platforms || [];
+
+      // Regenerate steps based on framework selection
+      const newSteps = app?.environment === 'dev'
+        ? createDevAppSteps(platforms, framework)
+        : createAppSteps(platforms, framework);
+
+      setRegisteredApps(prev => prev.map(a =>
+        a.id === currentAppId ? { ...a, framework, steps: newSteps } : a
+      ));
+
+      // Native framework: start with platform-specific SDK installation (priority over web)
+      const isNativeFramework = framework === 'ios-native' || framework === 'android-native';
+
+      if (isNativeFramework) {
+        if (framework === 'ios-native') {
+          updateAppStepStatus(currentAppId, 'ios-sdk-install', 'in_progress');
+          setTimeout(() => {
+            addBotMessage([
+              { type: 'text', text: `🍎 **iOS SDK 설치**\n\n먼저 iOS SDK를 설치하겠습니다.` },
+              { type: 'ios-sdk-install' },
+            ]);
+          }, 300);
+        } else if (framework === 'android-native') {
+          updateAppStepStatus(currentAppId, 'android-sdk-install', 'in_progress');
+          setTimeout(() => {
+            addBotMessage([
+              { type: 'text', text: `🤖 **Android SDK 설치**\n\n먼저 Android SDK를 설치하겠습니다.` },
+              { type: 'android-sdk-install' },
+            ]);
+          }, 300);
+        }
+        return;
+      }
+
+      // Web-only platform: go to web-sdk-install
+      // (For cross-platform frameworks with web, Web SDK will be handled separately)
+      const hasOnlyWeb = platforms.length === 1 && platforms.includes('web');
+      if (hasOnlyWeb) {
         updateAppStepStatus(currentAppId, 'web-sdk-install', 'in_progress');
-        const generateWebToken = () => {
-          const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-          return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-        };
-        const webAppName = app.appInfo.appName.toLowerCase().replace(/\s/g, '');
-        const webToken = generateWebToken();
+        const webAppName = app?.appInfo.appName.toLowerCase().replace(/\s/g, '') || 'myapp';
+        const webToken = app?.tokens.webSdkToken || 'web-token';
         setTimeout(() => {
           addBotMessage([
-            { type: 'text', text: `🌐 **Web SDK Installation** - **${app.appInfo.appName}**\n\nLet's install the Web SDK. First, please select an installation method.` },
+            { type: 'text', text: `🌐 **Web SDK 설치** - **${app?.appInfo.appName}**\n\nWeb SDK를 설치하겠습니다. 설치 방법을 선택해주세요.` },
             { type: 'web-sdk-method-select', appName: webAppName, webToken },
           ]);
         }, 300);
         return;
       }
 
+      // Cross-platform framework: use unified SDK flow
+      updateAppStepStatus(currentAppId, 'sdk-install', 'completed');
       updateAppStepStatus(currentAppId, 'sdk-init', 'in_progress');
     }
 
+    // Get current app tokens
+    const appTokenValue = currentApp?.tokens.appSdkToken || 'YOUR_APP_TOKEN';
+    const appNameValue = currentApp?.appInfo.appName?.toLowerCase().replace(/\s/g, '') || setupState.appInfo?.appName?.toLowerCase().replace(/\s/g, '') || 'myapp';
+
+    // Cross-platform frameworks: Show SDK install code + sdk-install-confirm
     if (framework === 'react-native') {
       setTimeout(() => {
         addBotMessage([
-          { type: 'text', text: '⚛️ You\'re using **React Native**!\n\n📦 Here are the SDK installation commands.\nPlease run them in your terminal:' },
-          { type: 'code-block', title: 'Step 1: Install package', code: 'npm install airbridge-react-native-sdk', language: 'bash' },
-          { type: 'code-block', title: 'Step 2: iOS setup', code: 'cd ios && pod install', language: 'bash' },
+          { type: 'text', text: '⚛️ **React Native SDK 설치**\n\n📦 터미널에서 아래 명령어를 실행해 주세요:' },
+          { type: 'code-block', title: 'Step 1: 패키지 설치', code: 'npm install airbridge-react-native-sdk', language: 'bash' },
+          { type: 'code-block', title: 'Step 2: iOS 추가 설정', code: 'cd ios && pod install', language: 'bash' },
+          { type: 'sdk-install-confirm' },
         ]);
       }, 300);
-
+    } else if (framework === 'flutter') {
       setTimeout(() => {
         addBotMessage([
-          { type: 'text', text: '👍 Great progress!\n\n⚙️ Now let\'s **initialize the SDK**.\n\nAdd the code below to your app entry point (App.js or index.js).\n💡 I\'ve already filled in the App Name and App Token for you!' },
-          { type: 'sdk-init-code', appName: setupState.appInfo?.appName?.toLowerCase().replace(/\s/g, '') || 'myapp', appToken: 'abc123token' },
+          { type: 'text', text: '💙 **Flutter SDK 설치**\n\n📦 아래 내용을 `pubspec.yaml`에 추가하고 설치해 주세요:' },
+          { type: 'code-block', title: 'pubspec.yaml', code: `dependencies:
+  airbridge_flutter_sdk: ^3.0.0`, language: 'yaml' },
+          { type: 'code-block', title: '설치', code: 'flutter pub get', language: 'bash' },
+          { type: 'sdk-install-confirm' },
         ]);
-      }, 1500);
+      }, 300);
+    } else if (framework === 'unity') {
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: '🎮 **Unity SDK 설치**\n\n📦 아래 방법 중 하나로 SDK를 설치해 주세요:\n\n1. Unity Package Manager에서 최신 Airbridge Unity SDK 다운로드\n2. 또는 `.unitypackage` 파일 임포트' },
+          { type: 'sdk-install-confirm' },
+        ]);
+      }, 300);
+    } else if (framework === 'expo') {
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: '📱 **Expo SDK 설치**\n\n📦 아래 명령어를 실행해 주세요:' },
+          { type: 'code-block', title: '패키지 설치', code: 'npx expo install airbridge-react-native-sdk', language: 'bash' },
+          { type: 'code-block', title: 'app.json 설정', code: `{
+  "expo": {
+    "plugins": [
+      [
+        "airbridge-react-native-sdk",
+        {
+          "appName": "${appNameValue}",
+          "appToken": "${appTokenValue}"
+        }
+      ]
+    ]
+  }
+}`, language: 'json' },
+          { type: 'code-block', title: '앱 재빌드', code: 'npx expo prebuild --clean && npx expo run:ios', language: 'bash' },
+          { type: 'sdk-install-confirm' },
+        ]);
+      }, 300);
     } else {
       setTimeout(() => {
         addBotMessage([
-          { type: 'text', text: `📦 Please check the **${frameworkLabels[framework]}** SDK installation guide:` },
-          { type: 'sdk-init-code', appName: setupState.appInfo?.appName?.toLowerCase().replace(/\s/g, '') || 'myapp', appToken: 'abc123token' },
+          { type: 'text', text: `📦 **${frameworkLabels[framework] || framework}** SDK 설치 가이드를 확인해 주세요.` },
+          { type: 'sdk-install-confirm' },
         ]);
       }, 300);
     }
@@ -7653,28 +9866,204 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
   // SDK init confirm handler
   const handleSDKInitConfirm = (status: string) => {
-    addUserMessage(status === 'completed' ? 'Done!' : 'Need help with App Token');
+    addUserMessage('Done!');
 
-    if (status === 'completed') {
+    if (currentAppId) {
+      updateAppStepStatus(currentAppId, 'sdk-init', 'completed');
+      updateAppStepStatus(currentAppId, 'deeplink', 'in_progress');
+    }
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '🏁 Almost there!\n\n🔗 **Deep link setup** is needed.\n\nWith deep links, you can direct users from ad clicks to specific screens in your app.\n\nWould you like to set it up?' },
+        { type: 'deeplink-choice' },
+      ]);
+    }, 300);
+  };
+
+  // New Guide-aligned handlers for SDK Install Flow
+
+  // SDK Install Confirm handler (Guide 2-2)
+  const handleNewSdkInstallConfirm = (status: 'done' | 'error') => {
+    if (status === 'done') {
+      addUserMessage('설치 완료!');
+
+      if (currentAppId) {
+        updateAppStepStatus(currentAppId, 'sdk-install', 'completed');
+        updateAppStepStatus(currentAppId, 'sdk-init', 'in_progress');
+      }
+
+      const appTokenValue = currentApp?.tokens.appSdkToken || 'YOUR_APP_TOKEN';
+      const appNameValue = currentApp?.appInfo.appName?.toLowerCase().replace(/\s/g, '') || 'myapp';
+      const framework = setupState.framework;
+
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: '👍 잘 진행되고 있어요!\n\n⚙️ 이제 SDK를 **초기화**하겠습니다.\n\n아래 코드를 앱 진입점에 추가해 주세요.\nApp Name과 App Token은 이미 채워놨어요!' },
+          { type: 'sdk-init-code', appName: appNameValue, appToken: appTokenValue },
+          { type: 'sdk-init-confirm' },
+        ]);
+      }, 300);
+    } else {
+      addUserMessage('에러가 발생했어요');
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: '🔧 에러가 발생했군요.\n\n아래 상황을 선택해 주세요:' },
+          { type: 'single-select', options: [
+            { label: '앱이 크래시나요', value: 'crash' },
+            { label: '빌드 에러가 발생해요', value: 'build-error' },
+            { label: '다시 시도할게요', value: 'retry' },
+          ]},
+        ]);
+      }, 300);
+    }
+  };
+
+  // SDK Init Confirm handler (Guide 2-3)
+  const handleNewSdkInitConfirm = (status: 'done' | 'token-help') => {
+    if (status === 'done') {
+      addUserMessage('추가 완료!');
+
       if (currentAppId) {
         updateAppStepStatus(currentAppId, 'sdk-init', 'completed');
-        updateAppStepStatus(currentAppId, 'deeplink', 'in_progress');
+      }
+
+      // Check if it's web-only (no deeplink needed)
+      const platforms = currentApp?.platforms || setupState.platforms || [];
+      const hasOnlyWeb = platforms.length === 1 && platforms.includes('web');
+
+      if (hasOnlyWeb) {
+        // Skip deeplink for web-only, go directly to verification
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: '🎉 SDK 설정이 완료되었어요!\n\n이제 제대로 동작하는지 확인해볼게요.\n앱을 실행하고, Real-time Logs에서 이벤트를 확인해 주세요.' },
+            { type: 'sdk-verification' },
+          ]);
+        }, 300);
+      } else {
+        // Show deeplink setup choice
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: '🏁 거의 다 왔어요!\n\n딥링크 설정이 필요해요.\n딥링크를 사용하면 광고 클릭 시 앱 내 특정 화면으로 바로 이동할 수 있어요.' },
+            { type: 'deeplink-setup-choice' },
+          ]);
+        }, 300);
+      }
+    } else {
+      addUserMessage('App Token을 모르겠어요');
+      setTimeout(() => {
+        const appTokenValue = currentApp?.tokens.appSdkToken || 'YOUR_APP_TOKEN';
+        addBotMessage([
+          { type: 'text', text: `💡 App Token은 앱 등록 시 생성된 토큰이에요.\n\n**당신의 App Token:**\n\`${appTokenValue}\`\n\n위 토큰을 SDK 초기화 코드에 입력해 주세요.` },
+        ]);
+      }, 300);
+    }
+  };
+
+  // Deeplink Setup Choice handler (Guide 2-4)
+  const handleDeeplinkSetupChoice = (choice: 'now' | 'later') => {
+    addUserMessage(choice === 'now' ? '지금 설정할게요' : '나중에 설정할게요');
+
+    if (choice === 'later') {
+      // Skip deeplink, go to verification
+      if (currentAppId) {
+        updateAppStepStatus(currentAppId, 'deeplink', 'completed');
+        updateAppStepStatus(currentAppId, 'sdk-verify', 'in_progress');
       }
 
       setTimeout(() => {
         addBotMessage([
-          { type: 'text', text: '🏁 Almost there!\n\n🔗 **Deep link setup** is needed.\n\nWith deep links, you can direct users from ad clicks to specific screens in your app.\n\nWould you like to set it up?' },
-          { type: 'deeplink-choice' },
+          { type: 'text', text: '✅ 딥링크 설정은 나중에 할게요.\n\n🧪 이제 SDK 통합이 제대로 작동하는지 **확인**해볼게요.\n앱을 실행하고, Real-time Logs에서 이벤트를 확인해 주세요.' },
+          { type: 'sdk-verification' },
         ]);
       }, 300);
     } else {
+      // Start deeplink setup - same as existing handleDeeplinkChoice 'now' logic
+      if (currentAppId) {
+        updateAppStepStatus(currentAppId, 'deeplink', 'in_progress');
+      }
+
+      const platforms = currentApp?.platforms || setupState.platforms || [];
+      const hasIos = platforms.includes('ios');
+      const hasAndroid = platforms.includes('android');
+
+      setDeeplinkState({ completedPlatforms: [] });
+
+      setTimeout(() => {
+        if (hasIos) {
+          addBotMessage([
+            { type: 'text', text: '🔗 **딥링크 설정을 시작할게요!**\n\n먼저 iOS 딥링크에 필요한 정보를 입력해 주세요.' },
+            { type: 'deeplink-ios-input', bundleId: currentApp?.appInfo.bundleId || setupState.appInfo?.bundleId },
+          ]);
+        } else if (hasAndroid) {
+          addBotMessage([
+            { type: 'text', text: '🔗 **딥링크 설정을 시작할게요!**\n\nAndroid 딥링크에 필요한 정보를 입력해 주세요.' },
+            { type: 'deeplink-android-input', packageName: currentApp?.appInfo.packageName || setupState.appInfo?.packageName },
+          ]);
+        }
+      }, 300);
+    }
+  };
+
+  // SDK Verification Result handler (Guide 2-5)
+  const handleNewSdkVerificationResult = (result: 'success' | 'fail' | 'unsure') => {
+    if (result === 'success') {
+      addUserMessage('이벤트가 보여요!');
+
+      const currentAppData = registeredApps.find(app => app.id === currentAppId);
+      const isDevMode = currentAppData?.environment === 'dev';
+
+      if (isDevMode) {
+        // Dev mode: Show completion
+        if (currentAppId) {
+          updateAppStepStatus(currentAppId, 'sdk-verify', 'completed');
+          setRegisteredApps(prev => prev.map(app =>
+            app.id === currentAppId ? { ...app, currentPhase: 3 } : app
+          ));
+        }
+
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: '🎉 **Development 설정 완료!**' },
+            { type: 'dev-completion-summary', appName: setupState.appInfo?.appName || currentApp?.appInfo.appName || 'Your App' },
+          ]);
+        }, 300);
+      } else {
+        // Production mode: Continue to channel integration
+        if (currentAppId) {
+          updateAppStepStatus(currentAppId, 'sdk-verify', 'completed');
+          updateAppStepStatus(currentAppId, 'channel-connect', 'in_progress');
+          setRegisteredApps(prev => prev.map(app =>
+            app.id === currentAppId ? { ...app, currentPhase: 3 } : app
+          ));
+        }
+        setCurrentPhase(3);
+
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: '🎉 SDK 설정 완료!\n\n📊 이제 **광고 채널 연동**을 진행할게요.\n\n어떤 광고 플랫폼을 연결하시겠어요?\n(복수 선택 가능)' },
+            { type: 'channel-select' },
+          ]);
+        }, 300);
+      }
+    } else if (result === 'fail') {
+      addUserMessage('이벤트가 안 보여요');
       setTimeout(() => {
         addBotMessage([
-          { type: 'text', text: '🔍 You can find **App Token** in:\n\n**Airbridge Dashboard → Settings → Tokens**\n\nWould you like to open the dashboard to check?' },
+          { type: 'text', text: '🤔 이벤트가 안 보이시는군요.\n\n몇 가지 확인해볼게요:\n\n1️⃣ 앱이 **Debug 모드**로 실행 중인가요?\n2️⃣ **네트워크 연결**은 정상인가요?\n3️⃣ **App Token**이 올바른가요?\n\n아래에서 상황을 선택해 주세요:' },
           { type: 'single-select', options: [
-            { label: 'Found it!', value: 'found' },
-            { label: 'Still can\'t find it', value: 'still-lost' },
+            { label: '앱이 크래시나요', value: 'crash' },
+            { label: '앱은 되는데 이벤트만 안 보여요', value: 'no-event' },
+            { label: '다시 확인해볼게요', value: 'retry' },
           ]},
+        ]);
+      }, 300);
+    } else {
+      addUserMessage('잘 모르겠어요');
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: '🔍 Real-time Logs에서 확인하는 방법을 알려드릴게요.\n\n1. 앱을 실행한 후 **10분 정도** 기다려주세요\n2. Real-time Logs에서 **Install** 또는 **Open** 이벤트를 찾아주세요\n3. 이벤트가 보이면 성공이에요!\n\n다시 확인해보시겠어요?' },
+          { type: 'sdk-verification' },
         ]);
       }, 300);
     }
@@ -7742,7 +10131,7 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '📋 iOS 정보가 저장되었습니다!\n\n이제 Airbridge 대시보드에서 설정을 완료해 주세요.' },
+        { type: 'text', text: '📋 iOS 딥링크 정보를 등록합니다...' },
         { type: 'deeplink-dashboard-guide', platform: 'ios', data: { uriScheme: data.uriScheme, appId: data.appId } },
       ]);
     }, 300);
@@ -7755,7 +10144,7 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '📋 Android 정보가 저장되었습니다!\n\n이제 Airbridge 대시보드에서 설정을 완료해 주세요.' },
+        { type: 'text', text: '📋 Android 딥링크 정보를 등록합니다...' },
         { type: 'deeplink-dashboard-guide', platform: 'android', data: { uriScheme: data.uriScheme, packageName: data.packageName, sha256Fingerprints: data.sha256Fingerprints } },
       ]);
     }, 300);
@@ -7763,7 +10152,7 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
   // Deeplink Dashboard complete handler
   const handleDeeplinkDashboardComplete = (platform: 'ios' | 'android') => {
-    addUserMessage(`${platform === 'ios' ? 'iOS' : 'Android'} dashboard setup complete`);
+    addUserMessage(`${platform === 'ios' ? 'iOS' : 'Android'} 딥링크 설정 완료`);
 
     const appName = currentApp?.appInfo.appName.toLowerCase().replace(/\s/g, '') || 'myapp';
     const framework = currentApp?.framework || setupState.framework || 'Native';
@@ -7825,7 +10214,7 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '🧪 Starting deep link test.\n\nClick the Test button in the dashboard and test each scenario.' },
+        { type: 'text', text: '🧪 딥링크 테스트를 시작합니다.\n\n아래 시나리오별로 테스트를 진행해주세요.' },
         { type: 'deeplink-test-scenarios', appName },
       ]);
     }, 300);
@@ -7879,7 +10268,7 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     }, 300);
   };
 
-  // Token display continue handler - proceeds to SDK setup
+  // Token display continue handler - proceeds to SDK setup (directly to framework select)
   const handleTokenDisplayContinue = () => {
     setCurrentPhase(2);
     if (currentAppId) {
@@ -7891,8 +10280,8 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '📱 **SDK Installation**\n\nThe SDK needs to be installed by a developer. Who will handle this?' },
-        { type: 'sdk-install-choice' },
+        { type: 'text', text: '🛠️ **SDK 설치**\n\n이제 SDK를 설치하겠습니다.\n앱 개발에 사용하신 프레임워크를 선택해 주세요.' },
+        { type: 'framework-select' },
       ]);
     }, 300);
   };
@@ -8183,6 +10572,10 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
       };
       addBotMessage([
         { type: 'text', text: helpMessages[issue] || 'Please contact support for assistance with this issue.' },
+        { type: 'single-select', options: [
+          { label: 'Try Again', value: `retry_${channel}` },
+          { label: 'Skip this channel', value: `skip_channel_${channel}` },
+        ]},
       ]);
     }, 300);
   };
@@ -8419,6 +10812,18 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     window.open(`/app/${appSlug}`, '_blank');
   };
 
+  // Dev Completion handlers
+  const handleDevViewTestEvents = () => {
+    const app = currentApp;
+    const appSlug = app?.appInfo.appName?.toLowerCase().replace(/\s/g, '') || 'myapp';
+    window.open(`/app/${appSlug}/logs`, '_blank');
+  };
+
+  const handleDevAddProductionApp = () => {
+    addUserMessage('Add Production App');
+    handleAddAnotherApp();
+  };
+
   // Single select handler
   const handleSingleSelect = (value: string) => {
     addUserMessage(value);
@@ -8432,11 +10837,85 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
         ]);
       }, 300);
     } else if (value === 'found') {
+      // Show sdk-init-code with actual tokens
+      const appTokenValue = currentApp?.tokens.appSdkToken || 'YOUR_APP_TOKEN';
+      const appNameValue = currentApp?.appInfo.appName?.toLowerCase().replace(/\s/g, '') || 'myapp';
       setTimeout(() => {
         addBotMessage([
           { type: 'text', text: '✅ Great! Now add the **App Token** to your code and try again:' },
-          { type: 'sdk-init-code', appName: setupState.appInfo?.appName?.toLowerCase().replace(/\s/g, '') || 'myapp', appToken: 'YOUR_APP_TOKEN' },
+          { type: 'sdk-init-code', appName: appNameValue, appToken: appTokenValue },
         ]);
+      }, 300);
+    } else if (value === 'skip_apple') {
+      // Skip Apple Search Ads and continue with other channels
+      setTimeout(() => {
+        const nextIndex = currentChannelIndex + 1;
+        setCurrentChannelIndex(nextIndex);
+        if (nextIndex < selectedChannels.length) {
+          const nextChannel = selectedChannels[nextIndex];
+          const hasIOS = setupState.platforms.includes('ios');
+          const initialSteps: ChannelStep[] = [
+            { id: 'channel', label: 'Channel Integration', status: 'in_progress', required: true },
+            { id: 'cost', label: 'Cost Integration', status: 'pending', required: false },
+            { id: 'skan', label: 'SKAN Integration', status: 'pending', required: hasIOS },
+          ];
+          setChannelSteps(prev => ({ ...prev, [nextChannel]: initialSteps }));
+          startChannelIntegration(nextChannel, hasIOS, initialSteps);
+        } else {
+          addBotMessage([
+            { type: 'text', text: '**Channel integration complete!** Now let\'s create a tracking link.' },
+            { type: 'tracking-link-form', channel: selectedChannels[0] || 'organic' },
+          ]);
+          if (currentAppId) {
+            updateAppStepStatus(currentAppId, 'tracking-link', 'in_progress');
+          }
+        }
+      }, 300);
+    } else if (value === 'upgrade_apple') {
+      // Return to Apple Advanced integration
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: 'Great! Once you\'ve upgraded to Apple Search Ads Advanced, let\'s set it up:' },
+          { type: 'apple-channel-integration' },
+        ]);
+      }, 300);
+    } else if (value.startsWith('retry_')) {
+      // Retry channel integration
+      const channel = value.replace('retry_', '');
+      const hasIOS = setupState.platforms.includes('ios');
+      const currentSteps = channelSteps[channel] || [
+        { id: 'channel', label: 'Channel Integration', status: 'in_progress', required: true },
+        { id: 'cost', label: 'Cost Integration', status: 'pending', required: false },
+        { id: 'skan', label: 'SKAN Integration', status: 'pending', required: hasIOS },
+      ];
+      setTimeout(() => {
+        startChannelIntegration(channel, hasIOS, currentSteps);
+      }, 300);
+    } else if (value.startsWith('skip_channel_')) {
+      // Skip channel and proceed to next
+      const channel = value.replace('skip_channel_', '');
+      const nextIndex = currentChannelIndex + 1;
+      setCurrentChannelIndex(nextIndex);
+      setTimeout(() => {
+        if (nextIndex < selectedChannels.length) {
+          const nextChannel = selectedChannels[nextIndex];
+          const hasIOS = setupState.platforms.includes('ios');
+          const initialSteps: ChannelStep[] = [
+            { id: 'channel', label: 'Channel Integration', status: 'in_progress', required: true },
+            { id: 'cost', label: 'Cost Integration', status: 'pending', required: false },
+            { id: 'skan', label: 'SKAN Integration', status: 'pending', required: hasIOS },
+          ];
+          setChannelSteps(prev => ({ ...prev, [nextChannel]: initialSteps }));
+          startChannelIntegration(nextChannel, hasIOS, initialSteps);
+        } else {
+          addBotMessage([
+            { type: 'text', text: '**Channel integration complete!** Now let\'s create a tracking link.' },
+            { type: 'tracking-link-form', channel: selectedChannels[0] || 'organic' },
+          ]);
+          if (currentAppId) {
+            updateAppStepStatus(currentAppId, 'tracking-link', 'in_progress');
+          }
+        }
       }, 300);
     }
   };
@@ -8586,7 +11065,7 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
         setTimeout(() => {
           addBotMessage([
             { type: 'text', text: `⚙️ **SDK Initialization** for **${app.appInfo.appName}**\n\nAdd the initialization code to your app entry point:` },
-            { type: 'sdk-init-code', appName: app.appInfo.appName.toLowerCase().replace(/\s/g, ''), appToken: 'abc123token' },
+            { type: 'sdk-init-code', appName: app.appInfo.appName.toLowerCase().replace(/\s/g, ''), appToken: app.tokens.appSdkToken },
           ]);
         }, 300);
         break;
@@ -8889,6 +11368,64 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
           />
         );
 
+      // iOS SDK Components (Native Only)
+      case 'ios-sdk-install':
+        return (
+          <IosSdkInstall
+            onComplete={handleIosSdkInstallComplete}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'ios-sdk-init':
+        return (
+          <IosSdkInit
+            appName={content.appName}
+            appToken={content.appToken}
+            onComplete={handleIosSdkInitComplete}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'ios-deeplink-setup':
+        return (
+          <IosDeeplinkSetup
+            appName={content.appName}
+            bundleId={content.bundleId}
+            onComplete={handleIosDeeplinkSetupComplete}
+            isCompleted={isCompleted}
+          />
+        );
+
+      // Android SDK Components (Native Only)
+      case 'android-sdk-install':
+        return (
+          <AndroidSdkInstall
+            onComplete={handleAndroidSdkInstallComplete}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'android-sdk-init':
+        return (
+          <AndroidSdkInit
+            appName={content.appName}
+            appToken={content.appToken}
+            onComplete={handleAndroidSdkInitComplete}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'android-deeplink-setup':
+        return (
+          <AndroidDeeplinkSetup
+            appName={content.appName}
+            packageName={content.packageName}
+            onComplete={handleAndroidDeeplinkSetupComplete}
+            isCompleted={isCompleted}
+          />
+        );
+
       case 'sdk-guide-share':
         return (
           <SdkGuideShare
@@ -8909,6 +11446,19 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
       case 'sdk-init-code':
         return <SDKInitCode appName={content.appName} appToken={content.appToken} onConfirm={handleSDKInitConfirm} isCompleted={isCompleted} />;
+
+      // New Guide-aligned SDK Install Flow render cases
+      case 'sdk-install-confirm':
+        return <SdkInstallConfirm onConfirm={handleNewSdkInstallConfirm} isCompleted={isCompleted} />;
+
+      case 'sdk-init-confirm':
+        return <SdkInitConfirm onConfirm={handleNewSdkInitConfirm} isCompleted={isCompleted} />;
+
+      case 'deeplink-setup-choice':
+        return <DeeplinkSetupChoice onSelect={handleDeeplinkSetupChoice} isCompleted={isCompleted} />;
+
+      case 'sdk-verification':
+        return <SdkVerification onResult={handleNewSdkVerificationResult} isCompleted={isCompleted} />;
 
       case 'deeplink-choice':
         return <DeeplinkChoice onSelect={handleDeeplinkChoice} isCompleted={isCompleted} />;
@@ -9173,7 +11723,13 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
         return <TokenDisplay tokens={content.tokens} onContinue={handleTokenDisplayContinue} isCompleted={isCompleted} />;
 
       case 'dev-completion-summary':
-        return <DevCompletionSummary appName={content.appName} />;
+        return (
+          <DevCompletionSummary
+            appName={content.appName}
+            onViewTestEvents={handleDevViewTestEvents}
+            onAddProductionApp={handleDevAddProductionApp}
+          />
+        );
 
       // SDK Test
       case 'sdk-test':
@@ -9200,7 +11756,16 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
         return <CategoryNavigation onSelect={handleCategoryNavigation} isCompleted={isCompleted} />;
 
       case 'onboarding-complete':
-        return <OnboardingComplete appName={currentApp?.appInfo.appName || 'App'} onViewDashboard={handleViewDashboard} />;
+        return (
+          <OnboardingComplete
+            appName={currentApp?.appInfo.appName || 'App'}
+            onViewDashboard={handleViewDashboard}
+            onAddAnotherApp={() => {
+              addUserMessage('Add Another App');
+              handleAddAnotherApp();
+            }}
+          />
+        );
 
       default:
         return null;
@@ -9407,11 +11972,14 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
                       >
                         <div className="px-3 pb-3 border-t border-gray-100 pt-2">
                           {/* Group steps by category */}
-                          {(['sdk', 'deeplink', 'event-taxonomy', 'integration'] as const).map((category) => {
+                          {(['web-sdk', 'ios-sdk', 'android-sdk', 'sdk', 'deeplink', 'event-taxonomy', 'integration'] as const).map((category) => {
                             const categorySteps = app.steps.filter(s => s.category === category);
                             if (categorySteps.length === 0) return null;
 
-                            const categoryLabels = {
+                            const categoryLabels: Record<string, string> = {
+                              'web-sdk': 'Web SDK',
+                              'ios-sdk': 'iOS SDK',
+                              'android-sdk': 'Android SDK',
                               'sdk': 'SDK',
                               'deeplink': 'Deep Link',
                               'event-taxonomy': 'Event Taxonomy',

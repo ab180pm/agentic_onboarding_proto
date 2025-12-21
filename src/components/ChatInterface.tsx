@@ -436,7 +436,7 @@ airbridge.init({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4 shadow-sm">
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4 shadow-sm w-full max-w-full">
       {/* Auth Info */}
       <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
         <div className="text-xs text-gray-500 mb-2">Authentication Info (Auto-configured)</div>
@@ -3162,125 +3162,120 @@ function AppInfoForm({ onSubmit, platforms, isCompleted = false }: { onSubmit: (
   );
 }
 
-// Dashboard Action Component
+// App Registration Component (Auto-registration in Chat UI)
 function DashboardAction({
   appName, bundleId, packageName, onConfirm, isCompleted = false
 }: {
   appName: string; bundleId: string; packageName: string; onConfirm: (status: string) => void; isCompleted?: boolean
 }) {
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [checking, setChecking] = useState(true);
-  const [detected, setDetected] = useState(false);
+  const [registrationStep, setRegistrationStep] = useState(0);
 
-  // Simulate auto-detection of app registration
+  // Auto-registration simulation
   useEffect(() => {
     if (isCompleted) return;
-    const checkInterval = setInterval(() => {
-      // In real implementation, this would call an API to check registration status
-      // For demo, we simulate detection after 5 seconds
-    }, 2000);
 
-    const detectionTimer = setTimeout(() => {
-      setChecking(false);
-      setDetected(true);
-      clearInterval(checkInterval);
-      // Auto-proceed after detection
-      setTimeout(() => {
-        onConfirm('completed');
-      }, 1500);
-    }, 5000);
+    const steps = [
+      { delay: 800, step: 1 },   // Validating app info
+      { delay: 1200, step: 2 },  // Creating app
+      { delay: 800, step: 3 },   // Generating tokens
+      { delay: 600, step: 4 },   // Complete
+    ];
 
-    return () => {
-      clearInterval(checkInterval);
-      clearTimeout(detectionTimer);
-    };
+    let timeouts: NodeJS.Timeout[] = [];
+    let totalDelay = 0;
+
+    steps.forEach(({ delay, step }) => {
+      totalDelay += delay;
+      const timeout = setTimeout(() => {
+        setRegistrationStep(step);
+        if (step === 4) {
+          setTimeout(() => onConfirm('completed'), 800);
+        }
+      }, totalDelay);
+      timeouts.push(timeout);
+    });
+
+    return () => timeouts.forEach(t => clearTimeout(t));
   }, [onConfirm, isCompleted]);
 
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">Dashboard Action</div>
-        <div className="text-xs text-gray-400">Action completed</div>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">앱 등록 완료</span>
+        </div>
       </div>
     );
   }
 
-  const copyToClipboard = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  const CopyButton = ({ text, field }: { text: string; field: string }) => (
-    <button
-      onClick={() => copyToClipboard(text, field)}
-      className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-    >
-      {copiedField === field ? (
-        <Check className="w-4 h-4 text-green-500" />
-      ) : (
-        <Copy className="w-4 h-4 text-gray-400" />
-      )}
-    </button>
-  );
+  const registrationSteps = [
+    { label: '앱 정보 검증 중...', icon: '🔍' },
+    { label: '앱 생성 중...', icon: '📱' },
+    { label: '토큰 생성 중...', icon: '🔑' },
+    { label: '등록 완료!', icon: '✅' },
+  ];
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <a
-        href="https://dashboard.airbridge.io"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2 w-full py-4 rounded-lg font-medium transition-colors mb-4 bg-blue-500 text-white hover:bg-blue-600"
-      >
-        <ExternalLink className="w-4 h-4" />
-        Open Airbridge Dashboard
-      </a>
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 min-w-[280px] max-w-full w-full">
+      <div className="text-sm font-medium text-gray-900 mb-4">앱 등록</div>
 
-      <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-        <div className="text-sm font-medium text-gray-700 mb-2">Information to Copy</div>
-
+      {/* App Info Summary */}
+      <div className="bg-gray-50 rounded-lg p-3 space-y-2 mb-4">
         <div className="flex items-center justify-between py-2 px-3 bg-white rounded-lg">
           <div>
             <span className="text-xs text-gray-500">App Name</span>
             <div className="font-medium">{appName || '-'}</div>
           </div>
-          {appName && <CopyButton text={appName} field="appName" />}
+          <CheckCircle2 className="w-4 h-4 text-green-500" />
         </div>
 
         {bundleId && (
           <div className="flex items-center justify-between py-2 px-3 bg-white rounded-lg">
             <div>
-              <span className="text-xs text-gray-500">Bundle ID</span>
+              <span className="text-xs text-gray-500">Bundle ID (iOS)</span>
               <div className="font-mono text-sm">{bundleId}</div>
             </div>
-            <CopyButton text={bundleId} field="bundleId" />
+            <CheckCircle2 className="w-4 h-4 text-green-500" />
           </div>
         )}
 
         {packageName && (
           <div className="flex items-center justify-between py-2 px-3 bg-white rounded-lg">
             <div>
-              <span className="text-xs text-gray-500">Package Name</span>
+              <span className="text-xs text-gray-500">Package Name (Android)</span>
               <div className="font-mono text-sm">{packageName}</div>
             </div>
-            <CopyButton text={packageName} field="packageName" />
+            <CheckCircle2 className="w-4 h-4 text-green-500" />
           </div>
         )}
       </div>
 
-      <div className="mt-4 pt-4 border-t border-gray-100">
-        {checking && !detected && (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Waiting for app registration...</span>
-          </div>
-        )}
-        {detected && (
-          <div className="flex items-center gap-2 text-sm text-emerald-500">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>App registration detected! Proceeding to next step...</span>
-          </div>
-        )}
+      {/* Registration Progress */}
+      <div className="pt-4 border-t border-gray-100">
+        <div className="space-y-2">
+          {registrationSteps.map((step, index) => (
+            <div
+              key={index}
+              className={`flex items-center gap-2 text-sm transition-all ${
+                registrationStep > index
+                  ? 'text-green-600'
+                  : registrationStep === index
+                  ? 'text-blue-600'
+                  : 'text-gray-300'
+              }`}
+            >
+              {registrationStep > index ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : registrationStep === index ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <div className="w-4 h-4 rounded-full border border-gray-300" />
+              )}
+              <span>{step.icon} {step.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -3724,7 +3719,7 @@ function DeeplinkAndroidInput({
   );
 }
 
-// Deep Link Dashboard Guide Component
+// Deep Link Auto-Configuration Component (Chat UI에서 자동 등록)
 function DeeplinkDashboardGuide({
   platform,
   data,
@@ -3738,45 +3733,63 @@ function DeeplinkDashboardGuide({
   onComplete: () => void;
   isCompleted?: boolean;
 }) {
-  const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [configStep, setConfigStep] = useState(0);
 
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopySuccess(id);
-    setTimeout(() => setCopySuccess(null), 2000);
-  };
+  // Auto-configuration simulation
+  useEffect(() => {
+    if (isCompleted) return;
+
+    const steps = [
+      { delay: 600, step: 1 },   // Validating deep link info
+      { delay: 800, step: 2 },   // Registering URI Scheme
+      { delay: 600, step: 3 },   // Configuring App Links/Universal Links
+      { delay: 500, step: 4 },   // Complete
+    ];
+
+    let timeouts: NodeJS.Timeout[] = [];
+    let totalDelay = 0;
+
+    steps.forEach(({ delay, step }) => {
+      totalDelay += delay;
+      const timeout = setTimeout(() => {
+        setConfigStep(step);
+        if (step === 4) {
+          setTimeout(() => onComplete(), 600);
+        }
+      }, totalDelay);
+      timeouts.push(timeout);
+    });
+
+    return () => timeouts.forEach(t => clearTimeout(t));
+  }, [onComplete, isCompleted]);
 
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">Dashboard Setup Guide</div>
-        <div className="text-xs text-gray-400">Setup Complete</div>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">
+            {platform === 'ios' ? 'iOS' : 'Android'} 딥링크 설정 완료
+          </span>
+        </div>
       </div>
     );
   }
 
+  const configSteps = [
+    { label: '딥링크 정보 검증 중...', icon: '🔍' },
+    { label: 'URI Scheme 등록 중...', icon: '🔗' },
+    { label: platform === 'ios' ? 'Universal Links 설정 중...' : 'App Links 설정 중...', icon: '⚙️' },
+    { label: '설정 완료!', icon: '✅' },
+  ];
+
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 min-w-[280px] max-w-full w-full">
       <div className="text-sm font-medium text-gray-900 mb-4">
-        {platform === 'ios' ? '🍎' : '🤖'} {platform === 'ios' ? 'iOS' : 'Android'} Dashboard Setup
+        {platform === 'ios' ? '🍎' : '🤖'} {platform === 'ios' ? 'iOS' : 'Android'} 딥링크 자동 설정
       </div>
 
-      {/* Dashboard Link */}
-      <a
-        href={`https://dashboard.airbridge.io/app/${appName}/tracking-link/deeplinks`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2 w-full py-2.5 mb-4 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
-      >
-        <ExternalLink className="w-4 h-4" />
-        Open Airbridge Dashboard
-      </a>
-
-      <div className="text-xs text-gray-500 mb-4">
-        Navigate to [Tracking Link] → [Deep Links] and enter the following information:
-      </div>
-
-      {/* Values to Enter */}
+      {/* Configuration Summary */}
       <div className="space-y-3 mb-4">
         {/* URI Scheme */}
         <div className="p-3 bg-gray-50 rounded-lg">
@@ -3784,16 +3797,11 @@ function DeeplinkDashboardGuide({
             <span className="text-xs font-medium text-gray-700">
               {platform === 'ios' ? 'iOS' : 'Android'} URI Scheme
             </span>
-            <button
-              onClick={() => handleCopy(data.uriScheme, 'uriScheme')}
-              className="p-1 hover:bg-gray-200 rounded transition-colors"
-            >
-              {copySuccess === 'uriScheme' ? (
-                <Check className="w-3.5 h-3.5 text-green-600" />
-              ) : (
-                <Copy className="w-3.5 h-3.5 text-gray-500" />
-              )}
-            </button>
+            {configStep >= 2 ? (
+              <CheckCircle2 className="w-4 h-4 text-green-500" />
+            ) : (
+              <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+            )}
           </div>
           <code className="text-sm text-gray-900">{data.uriScheme}</code>
         </div>
@@ -3803,16 +3811,13 @@ function DeeplinkDashboardGuide({
           <div className="p-3 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-gray-700">iOS App ID</span>
-              <button
-                onClick={() => handleCopy(data.appId!, 'appId')}
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
-              >
-                {copySuccess === 'appId' ? (
-                  <Check className="w-3.5 h-3.5 text-green-600" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5 text-gray-500" />
-                )}
-              </button>
+              {configStep >= 3 ? (
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+              ) : configStep >= 1 ? (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+              ) : (
+                <div className="w-4 h-4 rounded-full border border-gray-300" />
+              )}
             </div>
             <code className="text-sm text-gray-900">{data.appId}</code>
           </div>
@@ -3823,31 +3828,47 @@ function DeeplinkDashboardGuide({
           <div className="p-3 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-gray-700">SHA256 Fingerprints</span>
-              <button
-                onClick={() => handleCopy(data.sha256Fingerprints!.join(',\n'), 'fingerprints')}
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
-              >
-                {copySuccess === 'fingerprints' ? (
-                  <Check className="w-3.5 h-3.5 text-green-600" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5 text-gray-500" />
-                )}
-              </button>
+              {configStep >= 3 ? (
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+              ) : configStep >= 1 ? (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+              ) : (
+                <div className="w-4 h-4 rounded-full border border-gray-300" />
+              )}
             </div>
             <code className="text-xs text-gray-900 break-all">
-              {data.sha256Fingerprints.join(',\n')}
+              {data.sha256Fingerprints.join(', ')}
             </code>
           </div>
         )}
       </div>
 
-      {/* Completion Button */}
-      <button
-        onClick={onComplete}
-        className="w-full py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors"
-      >
-        Dashboard Setup Complete
-      </button>
+      {/* Configuration Progress */}
+      <div className="pt-4 border-t border-gray-100">
+        <div className="space-y-2">
+          {configSteps.map((step, index) => (
+            <div
+              key={index}
+              className={`flex items-center gap-2 text-sm transition-all ${
+                configStep > index
+                  ? 'text-green-600'
+                  : configStep === index
+                  ? 'text-blue-600'
+                  : 'text-gray-300'
+              }`}
+            >
+              {configStep > index ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : configStep === index ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <div className="w-4 h-4 rounded-full border border-gray-300" />
+              )}
+              <span>{step.icon} {step.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -4230,16 +4251,16 @@ function DeeplinkTestScenarios({
     <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
       <div className="text-sm font-medium text-gray-900 mb-4">🧪 Deep Link Test</div>
 
-      {/* Dashboard Test Link */}
-      <a
-        href={`https://dashboard.airbridge.io/app/${appName}/tracking-link/deeplinks`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2 w-full py-2.5 mb-4 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
-      >
-        <ExternalLink className="w-4 h-4" />
-        Click Test Button in Dashboard
-      </a>
+      {/* Test Link Info */}
+      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+        <div className="text-xs font-medium text-blue-800 mb-2">📱 테스트 링크</div>
+        <code className="text-xs text-blue-700 break-all block bg-white p-2 rounded">
+          https://{appName}.abr.ge/test
+        </code>
+        <p className="text-xs text-blue-600 mt-2">
+          위 링크를 디바이스에서 클릭하여 각 시나리오를 테스트하세요.
+        </p>
+      </div>
 
       {/* Test Scenarios */}
       <div className="space-y-3 mb-4">
@@ -4685,7 +4706,29 @@ function MetaChannelIntegration({
   isCompleted?: boolean;
 }) {
   const [metaAppId, setMetaAppId] = useState('');
-  const [step, setStep] = useState<'input' | 'connect' | 'done'>('input');
+  const [step, setStep] = useState<'input' | 'connect' | 'connecting' | 'done'>('input');
+  const [connectStep, setConnectStep] = useState(0);
+
+  const connectSteps = [
+    { label: 'Meta 로그인 창 열기...', icon: '🔐' },
+    { label: 'Facebook 계정 인증 중...', icon: '👤' },
+    { label: '광고 계정 연결 중...', icon: '📊' },
+    { label: '권한 설정 완료!', icon: '✅' },
+  ];
+
+  const startOAuthSimulation = () => {
+    setStep('connecting');
+    setConnectStep(0);
+
+    setTimeout(() => setConnectStep(1), 800);
+    setTimeout(() => setConnectStep(2), 1600);
+    setTimeout(() => setConnectStep(3), 2400);
+    setTimeout(() => {
+      setConnectStep(4);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 3200);
+  };
 
   if (isCompleted) {
     return (
@@ -4736,52 +4779,60 @@ function MetaChannelIntegration({
 
       {step === 'connect' && (
         <>
-          <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <div className="text-sm font-medium text-gray-700 mb-2">Step 2: Connect with Facebook</div>
-            <ol className="text-xs text-gray-600 space-y-2">
-              <li className="flex items-start gap-2">
-                <span className="text-blue-500 font-medium">1.</span>
-                Open Airbridge Dashboard and navigate to Integrations → Ad Channels
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-500 font-medium">2.</span>
-                Find Meta Ads and click [Connect] button
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-500 font-medium">3.</span>
-                Login with your Facebook account
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-500 font-medium">4.</span>
-                Select your ad account and grant permissions
-              </li>
-            </ol>
+          <div className="bg-blue-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-blue-800">
+                Meta 계정과 연동하면 광고 성과 데이터를 Airbridge에서 확인할 수 있습니다.
+              </div>
+            </div>
           </div>
 
-          <a
-            href="https://dashboard.airbridge.io/integrations/channels"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
+          <button
+            onClick={startOAuthSimulation}
+            className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-[#1877F2] text-white hover:bg-[#166FE5] mb-3"
           >
-            Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
-          </a>
+            <span>f</span> Connect with Meta
+          </button>
 
-          <div className="flex gap-2">
-            <button
-              onClick={onComplete}
-              className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-            >
-              Done
-            </button>
-            <button
-              onClick={() => onHelp('meta-permission')}
-              className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-            >
-              I need help
-            </button>
-          </div>
+          <button
+            onClick={() => onHelp('meta-permission')}
+            className="w-full py-2 text-xs text-gray-500 hover:text-gray-700"
+          >
+            연동에 문제가 있나요?
+          </button>
         </>
+      )}
+
+      {step === 'connecting' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">Meta 계정 연동 중...</div>
+          {connectSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                connectStep > idx ? 'bg-green-100' : connectStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {connectStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                connectStep > idx ? 'text-green-600' : connectStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {connectStep === idx && idx < 3 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">Meta 연동 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">광고 계정이 성공적으로 연결되었습니다.</div>
+        </div>
       )}
     </div>
   );
@@ -4961,6 +5012,30 @@ function GoogleChannelIntegration({
   onHelp: (issue: string) => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'connecting' | 'done'>('intro');
+  const [connectStep, setConnectStep] = useState(0);
+
+  const connectSteps = [
+    { label: 'Google 로그인 창 열기...', icon: '🔐' },
+    { label: 'Google 계정 인증 중...', icon: '👤' },
+    { label: 'Google Ads 계정 연결 중...', icon: '📊' },
+    { label: '연결 완료!', icon: '✅' },
+  ];
+
+  const startOAuthSimulation = () => {
+    setStep('connecting');
+    setConnectStep(0);
+
+    setTimeout(() => setConnectStep(1), 800);
+    setTimeout(() => setConnectStep(2), 1600);
+    setTimeout(() => setConnectStep(3), 2400);
+    setTimeout(() => {
+      setConnectStep(4);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 3200);
+  };
+
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
@@ -4977,56 +5052,74 @@ function GoogleChannelIntegration({
         <div className="text-sm font-medium text-gray-700">Google Ads - Channel Integration</div>
       </div>
 
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">Setup Steps:</div>
-        <ol className="text-xs text-gray-600 space-y-2">
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">1.</span>
-            Open Airbridge Dashboard → Integrations → Ad Channels
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">2.</span>
-            Find Google Ads and click [Connect]
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">3.</span>
-            Sign in with your Google account
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">4.</span>
-            Select your Google Ads account
-          </li>
-        </ol>
-      </div>
+      {step === 'intro' && (
+        <>
+          <div className="bg-blue-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-blue-800">
+                Google Ads 계정과 연동하면 광고 캠페인 성과를 Airbridge에서 확인할 수 있습니다.
+              </div>
+            </div>
+          </div>
 
-      <a
-        href="https://dashboard.airbridge.io/integrations/channels"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
-      >
-        Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
-      </a>
+          <button
+            onClick={startOAuthSimulation}
+            className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50 mb-3"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Connect with Google
+          </button>
 
-      <div className="flex gap-2">
-        <button
-          onClick={onComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-        >
-          Done
-        </button>
-        <button
-          onClick={() => onHelp('google-permission')}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          I need help
-        </button>
-      </div>
+          <button
+            onClick={() => onHelp('google-permission')}
+            className="w-full py-2 text-xs text-gray-500 hover:text-gray-700"
+          >
+            연동에 문제가 있나요?
+          </button>
+        </>
+      )}
+
+      {step === 'connecting' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">Google 계정 연동 중...</div>
+          {connectSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                connectStep > idx ? 'bg-green-100' : connectStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {connectStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                connectStep > idx ? 'text-green-600' : connectStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {connectStep === idx && idx < 3 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">Google Ads 연동 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">광고 계정이 성공적으로 연결되었습니다.</div>
+        </div>
+      )}
     </div>
   );
 }
 
-// Google Cost Integration Component
+// Google Cost Integration Component - Auto-progress version
 function GoogleCostIntegration({
   onComplete,
   onSkip,
@@ -5036,6 +5129,27 @@ function GoogleCostIntegration({
   onSkip: () => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'enabling' | 'done'>('intro');
+  const [enableStep, setEnableStep] = useState(0);
+
+  const enableSteps = [
+    { label: 'Cost Integration 활성화 중...', icon: '💰' },
+    { label: 'Google Ads 비용 데이터 연결 중...', icon: '📊' },
+    { label: '설정 완료!', icon: '✅' },
+  ];
+
+  const startEnabling = () => {
+    setStep('enabling');
+    setEnableStep(0);
+
+    setTimeout(() => setEnableStep(1), 600);
+    setTimeout(() => setEnableStep(2), 1200);
+    setTimeout(() => {
+      setEnableStep(3);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 1800);
+  };
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
@@ -5242,6 +5356,30 @@ function AppleChannelIntegration({
   onHelp: (issue: string) => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'connecting' | 'done'>('intro');
+  const [connectStep, setConnectStep] = useState(0);
+
+  const connectSteps = [
+    { label: 'Apple Search Ads API 연결 중...', icon: '🔐' },
+    { label: 'API 인증서 확인 중...', icon: '📜' },
+    { label: '캠페인 데이터 동기화 중...', icon: '📊' },
+    { label: '연결 완료!', icon: '✅' },
+  ];
+
+  const startOAuthSimulation = () => {
+    setStep('connecting');
+    setConnectStep(0);
+
+    setTimeout(() => setConnectStep(1), 800);
+    setTimeout(() => setConnectStep(2), 1600);
+    setTimeout(() => setConnectStep(3), 2400);
+    setTimeout(() => {
+      setConnectStep(4);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 3200);
+  };
+
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
@@ -5258,51 +5396,63 @@ function AppleChannelIntegration({
         <div className="text-sm font-medium text-gray-700">Apple Search Ads - Channel Integration</div>
       </div>
 
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">Setup Steps:</div>
-        <ol className="text-xs text-gray-600 space-y-2">
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">1.</span>
-            Open Airbridge Dashboard → Integrations → Ad Channels
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">2.</span>
-            Find Apple Search Ads and click [Connect]
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">3.</span>
-            Upload your Apple Search Ads API certificate
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">4.</span>
-            Enter your Org ID and select campaigns
-          </li>
-        </ol>
-      </div>
+      {step === 'intro' && (
+        <>
+          <div className="bg-blue-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-blue-800">
+                Apple Search Ads 계정과 연동하면 앱스토어 검색 광고 성과를 Airbridge에서 확인할 수 있습니다.
+              </div>
+            </div>
+          </div>
 
-      <a
-        href="https://dashboard.airbridge.io/integrations/channels"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
-      >
-        Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
-      </a>
+          <button
+            onClick={startOAuthSimulation}
+            className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-black text-white hover:bg-gray-800 mb-3"
+          >
+            <span>🍎</span> Connect with Apple Search Ads
+          </button>
 
-      <div className="flex gap-2">
-        <button
-          onClick={onComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-        >
-          Done
-        </button>
-        <button
-          onClick={() => onHelp('apple-api')}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          I need help
-        </button>
-      </div>
+          <button
+            onClick={() => onHelp('apple-api')}
+            className="w-full py-2 text-xs text-gray-500 hover:text-gray-700"
+          >
+            연동에 문제가 있나요?
+          </button>
+        </>
+      )}
+
+      {step === 'connecting' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">Apple Search Ads 연동 중...</div>
+          {connectSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                connectStep > idx ? 'bg-green-100' : connectStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {connectStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                connectStep > idx ? 'text-green-600' : connectStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {connectStep === idx && idx < 3 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">Apple Search Ads 연동 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">광고 계정이 성공적으로 연결되었습니다.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -5380,6 +5530,30 @@ function TikTokChannelIntegration({
   onHelp: (issue: string) => void;
   isCompleted?: boolean;
 }) {
+  const [step, setStep] = useState<'intro' | 'connecting' | 'done'>('intro');
+  const [connectStep, setConnectStep] = useState(0);
+
+  const connectSteps = [
+    { label: 'TikTok 로그인 창 열기...', icon: '🔐' },
+    { label: 'TikTok 계정 인증 중...', icon: '👤' },
+    { label: '광고 계정 연결 중...', icon: '📊' },
+    { label: '연결 완료!', icon: '✅' },
+  ];
+
+  const startOAuthSimulation = () => {
+    setStep('connecting');
+    setConnectStep(0);
+
+    setTimeout(() => setConnectStep(1), 800);
+    setTimeout(() => setConnectStep(2), 1600);
+    setTimeout(() => setConnectStep(3), 2400);
+    setTimeout(() => {
+      setConnectStep(4);
+      setStep('done');
+      setTimeout(() => onComplete(), 500);
+    }, 3200);
+  };
+
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
@@ -5396,64 +5570,67 @@ function TikTokChannelIntegration({
         <div className="text-sm font-medium text-gray-700">TikTok For Business - Channel Integration</div>
       </div>
 
-      <div className="bg-amber-50 rounded-lg p-3 mb-4">
-        <div className="flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-          <div className="text-xs text-amber-800">
-            <p className="font-medium mb-1">Important Notes:</p>
-            <ul className="space-y-1">
-              <li>• Pangle performance requires "Sub-Publisher" GroupBy in reports</li>
-              <li>• EPC (Extended Privacy Control) may cause under-counting</li>
-            </ul>
+      {step === 'intro' && (
+        <>
+          <div className="bg-amber-50 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-amber-800">
+                <p className="font-medium mb-1">참고 사항:</p>
+                <ul className="space-y-1">
+                  <li>• Pangle 성과는 리포트에서 "Sub-Publisher" GroupBy 필요</li>
+                  <li>• EPC 활성화 시 데이터 누락 가능</li>
+                </ul>
+              </div>
+            </div>
           </div>
+
+          <button
+            onClick={startOAuthSimulation}
+            className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-black text-white hover:bg-gray-800 mb-3"
+          >
+            <span>🎵</span> Connect with TikTok
+          </button>
+
+          <button
+            onClick={() => onHelp('tiktok-permission')}
+            className="w-full py-2 text-xs text-gray-500 hover:text-gray-700"
+          >
+            연동에 문제가 있나요?
+          </button>
+        </>
+      )}
+
+      {step === 'connecting' && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-700 mb-3">TikTok 계정 연동 중...</div>
+          {connectSteps.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                connectStep > idx ? 'bg-green-100' : connectStep === idx ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
+                {connectStep > idx ? '✓' : s.icon}
+              </div>
+              <span className={`text-sm ${
+                connectStep > idx ? 'text-green-600' : connectStep === idx ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {s.label}
+              </span>
+              {connectStep === idx && idx < 3 && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin ml-auto" />
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">Setup Steps:</div>
-        <ol className="text-xs text-gray-600 space-y-2">
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">1.</span>
-            Open Airbridge Dashboard → Integrations → Ad Channels
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">2.</span>
-            Find TikTok For Business and click [Connect]
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">3.</span>
-            Login with your TikTok For Business account
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 font-medium">4.</span>
-            Select your ad account
-          </li>
-        </ol>
-      </div>
-
-      <a
-        href="https://dashboard.airbridge.io/integrations/channels"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 mb-3"
-      >
-        Open Airbridge Dashboard <ExternalLink className="w-4 h-4" />
-      </a>
-
-      <div className="flex gap-2">
-        <button
-          onClick={onComplete}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors bg-green-500 text-white hover:bg-green-600"
-        >
-          Done
-        </button>
-        <button
-          onClick={() => onHelp('tiktok-permission')}
-          className="flex-1 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          I need help
-        </button>
-      </div>
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+          <div className="text-sm font-medium text-gray-700">TikTok 연동 완료!</div>
+          <div className="text-xs text-gray-500 mt-1">광고 계정이 성공적으로 연결되었습니다.</div>
+        </div>
+      )}
     </div>
   );
 }
