@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, CheckCircle2, Circle, Sparkles, Copy, Check, ExternalLink,
-  Smartphone, Code, Tv, AlertCircle, ChevronRight, ChevronDown, ChevronLeft, Loader2, Plus, Lightbulb,
-  Maximize2, MessageCircle, X, Share2, MessageSquare
+  Smartphone, Code, Tv, AlertCircle, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Loader2, Plus, Lightbulb,
+  Maximize2, MessageCircle, X, Share2, MessageSquare, Users, UserPlus, LayoutDashboard, Link, Bell, Globe, Mail, Monitor, Package
 } from 'lucide-react';
 import { AirbridgeBackground } from './AirbridgeBackground';
 
@@ -52,6 +52,9 @@ type MessageContent =
   | { type: 'framework-select' }
   | { type: 'code-block'; title: string; code: string; language: string }
   | { type: 'sdk-init-code'; appName: string; appToken: string }
+  | { type: 'react-native-sdk-install'; appName: string; appToken: string }
+  | { type: 'react-native-sdk-config' }
+  | { type: 'ios-att-prompt-config'; appName: string; appToken: string }
   | { type: 'deeplink-choice' }
   // Deep Link Setup (multi-step flow)
   | { type: 'deeplink-platform-info'; platforms: string[] }
@@ -90,6 +93,11 @@ type MessageContent =
   | { type: 'token-display'; tokens: { appSdkToken: string; webSdkToken: string; apiToken: string } }
   | { type: 'dev-completion-summary'; appName: string }
   | { type: 'sdk-install-choice' }
+  | { type: 'role-capability-check' }
+  | { type: 'marketer-next-steps'; appName: string }
+  | { type: 'sdk-requires-developer'; appName: string }
+  | { type: 'sdk-type-choice' }
+  | { type: 'developer-email-invite'; appName: string }
   | { type: 'sdk-guide-share'; appName: string; platforms: string[]; framework?: string }
   // GitHub Automation types
   | { type: 'sdk-install-method-select' }
@@ -122,7 +130,29 @@ type MessageContent =
   | { type: 'data-verify' }
   | { type: 'data-verify-result'; metrics: DataVerifyMetrics }
   | { type: 'onboarding-complete' }
-  | { type: 'category-navigation' };
+  | { type: 'category-navigation' }
+  // Plan Selection (Growth/Deep Link)
+  | { type: 'plan-select' }
+  | { type: 'plan-feature-comparison'; currentPlan: 'growth' | 'deeplink' }
+  // Role-based flow
+  | { type: 'role-select' }
+  | { type: 'role-based-guide'; role: 'marketer' | 'developer'; context: string }
+  // Mode explanation
+  | { type: 'mode-explainer'; mode: 'dev' | 'production' }
+  // App registration validation
+  | { type: 'app-name-validation'; name: string; isValid: boolean; errors: string[] }
+  | { type: 'registration-checklist'; items: RegistrationCheckItem[] }
+  | { type: 'immutable-warning'; field: 'mode' | 'appName' | 'timezone' | 'currency' }
+  // Onboarding phase guide
+  | { type: 'phase-overview'; currentPhase: number; totalPhases: number }
+  | { type: 'phase-detail'; phase: PhaseInfo }
+  // Validation and testing
+  | { type: 'validation-checklist'; category: 'sdk' | 'deeplink' | 'event' | 'attribution'; items: ValidationItem[] }
+  | { type: 'realtime-log-guide' }
+  | { type: 'test-scenario-guide'; scenarios: TestScenario[] }
+  // Error handling
+  | { type: 'error-recovery'; errorType: string; message: string; suggestions: string[] }
+  | { type: 'setup-warning'; warningType: 'info' | 'warning' | 'error'; title: string; message: string };
 
 type Message = {
   id: string;
@@ -229,6 +259,56 @@ type DeeplinkTestScenario = {
   status: 'pending' | 'testing' | 'passed' | 'failed';
 };
 
+// Registration Check Item Types
+type RegistrationCheckItem = {
+  id: string;
+  label: string;
+  description: string;
+  isValid: boolean;
+  isImmutable: boolean;
+  value?: string;
+};
+
+// Phase Info Types
+type PhaseInfo = {
+  id: number;
+  title: string;
+  description: string;
+  steps: string[];
+  estimatedDuration?: string;
+  requiredFor: 'growth' | 'deeplink' | 'both';
+};
+
+// Validation Item Types
+type ValidationItem = {
+  id: string;
+  label: string;
+  description: string;
+  status: 'pending' | 'checking' | 'passed' | 'failed';
+  errorMessage?: string;
+  helpLink?: string;
+};
+
+// Test Scenario Types
+type TestScenario = {
+  id: string;
+  name: string;
+  description: string;
+  steps: string[];
+  expectedResult: string;
+  status: 'pending' | 'testing' | 'passed' | 'failed';
+};
+
+// Plan Feature Types
+type PlanFeature = {
+  id: string;
+  name: string;
+  description: string;
+  growthPlan: boolean;
+  deeplinkPlan: boolean;
+  category: 'attribution' | 'deeplink' | 'analytics' | 'integration';
+};
+
 // Deeplink Dashboard Data Types
 type DeeplinkDashboardData = {
   uriScheme: string;
@@ -256,6 +336,13 @@ type AppInfo = {
   currency?: string;
 };
 
+// App Tokens type
+type AppTokens = {
+  appSdkToken: string;
+  webSdkToken: string;
+  apiToken: string;
+};
+
 // Registered app with its own setup progress
 type RegisteredApp = {
   id: string;
@@ -268,6 +355,7 @@ type RegisteredApp = {
   channels: string[];
   isExpanded: boolean;
   messages: Message[]; // App-specific chat history
+  tokens?: AppTokens; // SDK tokens generated at registration
 };
 
 // Production mode steps - full onboarding flow
@@ -555,8 +643,8 @@ function WebSdkInitOptions({ appName, webToken, onComplete, onSkip, isCompleted 
 }) {
   const [options, setOptions] = useState({
     autoStartTrackingEnabled: true,
-    utmParsing: false,
-    userHash: true,
+    utmParsing: true, // Recommended: Most web customers enable this
+    userHash: false, // Not recommended: Avoid collecting email/phone
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -610,9 +698,9 @@ ${optionEntries}
             className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
         </label>
-        <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+        <label className="flex items-center justify-between p-3 bg-blue-50 border border-blue-100 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
           <div>
-            <div className="text-sm font-medium text-gray-900">UTM Parsing</div>
+            <div className="text-sm font-medium text-gray-900">UTM Parsing <span className="text-xs text-blue-600 font-normal">(Recommended)</span></div>
             <div className="text-xs text-gray-500">Auto-extract UTM parameters from URL</div>
           </div>
           <input
@@ -622,10 +710,10 @@ ${optionEntries}
             className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
         </label>
-        <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+        <label className="flex items-center justify-between p-3 bg-amber-50 border border-amber-100 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors">
           <div>
-            <div className="text-sm font-medium text-gray-900">User Data Hashing</div>
-            <div className="text-xs text-gray-500">SHA-256 hash email and phone number</div>
+            <div className="text-sm font-medium text-gray-900">User Data Hashing <span className="text-xs text-amber-600 font-normal">(Not Recommended)</span></div>
+            <div className="text-xs text-amber-700">Airbridge advises against collecting email/phone data</div>
           </div>
           <input
             type="checkbox"
@@ -924,13 +1012,10 @@ function GitHubConnect({ onConnect, onSkip, isCompleted = false }: {
 
   const handleConnect = () => {
     setConnectState('connecting');
-    // Simulate OAuth popup opening
     setTimeout(() => {
       setConnectState('authorizing');
-      // Simulate authorization completing
       setTimeout(() => {
         setConnectState('connected');
-        // Trigger the parent callback after showing success
         setTimeout(() => {
           onConnect();
         }, 1000);
@@ -950,7 +1035,7 @@ function GitHubConnect({ onConnect, onSkip, isCompleted = false }: {
           </div>
           <div>
             <div className="text-sm font-medium text-gray-700">GitHub Connected</div>
-            <div className="text-xs text-gray-500">@airbridge-user</div>
+            <div className="text-xs text-gray-500">Repository access authorized</div>
           </div>
           <CheckCircle2 className="w-5 h-5 text-green-600 ml-auto" />
         </div>
@@ -961,72 +1046,93 @@ function GitHubConnect({ onConnect, onSkip, isCompleted = false }: {
   // Connecting state - showing OAuth flow
   if (connectState !== 'idle') {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
-        <div className="flex items-center gap-3 mb-6">
+      <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+        <div className="flex items-center gap-4 mb-6">
           <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center"
+            className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
             style={{ backgroundColor: '#171717' }}
           >
-            <GitHubIcon className="w-7 h-7" fill="#ffffff" />
+            <GitHubIcon className="w-8 h-8" fill="#ffffff" />
           </div>
           <div>
-            <div className="font-medium text-gray-900">Connecting to GitHub</div>
-            <div className="text-sm text-gray-500">Please complete authorization in the popup window</div>
+            <div className="font-semibold text-gray-900">Connecting to GitHub</div>
+            <div className="text-sm text-gray-500">Complete authorization in the popup window</div>
           </div>
         </div>
 
         {/* Connection Steps */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+        <div className="space-y-2">
+          <div className={`flex items-center gap-3 p-3.5 rounded-xl transition-all ${
+            connectState === 'connecting' ? 'bg-blue-50 border border-blue-200' : 'bg-green-50 border border-green-200'
+          }`}>
             {connectState === 'connecting' ? (
-              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+              </div>
             ) : (
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+              </div>
             )}
             <div className="flex-1">
-              <div className="text-sm font-medium text-gray-700">Opening GitHub authorization</div>
+              <div className="text-sm font-medium text-gray-800">Opening GitHub OAuth</div>
               <div className="text-xs text-gray-500">Redirecting to github.com...</div>
             </div>
           </div>
 
-          <div className={`flex items-center gap-3 p-3 rounded-lg ${connectState === 'connecting' ? 'bg-gray-50 opacity-50' : 'bg-gray-50'}`}>
+          <div className={`flex items-center gap-3 p-3.5 rounded-xl transition-all ${
+            connectState === 'connecting' ? 'bg-gray-50 border border-gray-100 opacity-50' :
+            connectState === 'authorizing' ? 'bg-blue-50 border border-blue-200' : 'bg-green-50 border border-green-200'
+          }`}>
             {connectState === 'connecting' ? (
-              <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
+              <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                <div className="w-2 h-2 rounded-full bg-gray-300" />
+              </div>
             ) : connectState === 'authorizing' ? (
-              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+              </div>
             ) : (
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+              </div>
             )}
             <div className="flex-1">
-              <div className="text-sm font-medium text-gray-700">Waiting for authorization</div>
-              <div className="text-xs text-gray-500">Grant Airbridge access to your repositories</div>
+              <div className="text-sm font-medium text-gray-800">Waiting for Authorization</div>
+              <div className="text-xs text-gray-500">Grant Airbridge read/write access to repositories</div>
             </div>
           </div>
 
-          <div className={`flex items-center gap-3 p-3 rounded-lg ${connectState !== 'connected' ? 'bg-gray-50 opacity-50' : 'bg-green-50 border border-green-200'}`}>
+          <div className={`flex items-center gap-3 p-3.5 rounded-xl transition-all ${
+            connectState !== 'connected' ? 'bg-gray-50 border border-gray-100 opacity-50' : 'bg-green-50 border border-green-200'
+          }`}>
             {connectState === 'connected' ? (
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+              </div>
             ) : (
-              <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
+              <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                <div className="w-2 h-2 rounded-full bg-gray-300" />
+              </div>
             )}
             <div className="flex-1">
               <div className={`text-sm font-medium ${connectState === 'connected' ? 'text-green-700' : 'text-gray-700'}`}>
-                {connectState === 'connected' ? 'Successfully connected!' : 'Connection complete'}
+                {connectState === 'connected' ? 'Connected Successfully!' : 'Connection Complete'}
               </div>
               <div className={`text-xs ${connectState === 'connected' ? 'text-green-600' : 'text-gray-500'}`}>
-                {connectState === 'connected' ? 'Fetching your repositories...' : 'Ready to select repository'}
+                {connectState === 'connected' ? 'Loading your repositories...' : 'Ready to select repository'}
               </div>
             </div>
           </div>
         </div>
 
         {connectState !== 'connected' && (
-          <div className="mt-4 text-center">
+          <div className="mt-5 pt-4 border-t border-gray-100 text-center">
             <button
               onClick={() => setConnectState('idle')}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
-              Cancel
+              Cancel connection
             </button>
           </div>
         )}
@@ -1035,34 +1141,40 @@ function GitHubConnect({ onConnect, onSkip, isCompleted = false }: {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
-      <div className="flex items-center gap-3 mb-4">
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="flex items-center gap-4 mb-5">
         <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center"
+          className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
           style={{ backgroundColor: '#171717' }}
         >
-          <GitHubIcon className="w-7 h-7" fill="#ffffff" />
+          <GitHubIcon className="w-8 h-8" fill="#ffffff" />
         </div>
         <div>
-          <div className="font-medium text-gray-900">Connect GitHub</div>
-          <div className="text-sm text-gray-500">Authorize Airbridge to access your repository</div>
+          <div className="font-semibold text-gray-900">Connect to GitHub</div>
+          <div className="text-sm text-gray-500">Authorize Airbridge to automate SDK integration</div>
         </div>
       </div>
 
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">What we'll be able to do:</div>
-        <ul className="space-y-2 text-sm text-gray-600">
-          <li className="flex items-start gap-2">
-            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-            <span>Read repository contents to analyze your project structure</span>
+      <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-xl p-4 mb-5 border border-gray-100">
+        <div className="text-sm font-medium text-gray-700 mb-3">Airbridge will be able to:</div>
+        <ul className="space-y-2.5">
+          <li className="flex items-start gap-2.5 text-sm text-gray-600">
+            <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <CheckCircle2 className="w-3 h-3 text-green-600" />
+            </div>
+            <span>Analyze your project structure and detect SDK requirements</span>
           </li>
-          <li className="flex items-start gap-2">
-            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-            <span>Create branches and pull requests for SDK integration</span>
+          <li className="flex items-start gap-2.5 text-sm text-gray-600">
+            <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <CheckCircle2 className="w-3 h-3 text-green-600" />
+            </div>
+            <span>Create feature branches and pull requests for SDK setup</span>
           </li>
-          <li className="flex items-start gap-2">
-            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-            <span>Add comments to PRs with setup instructions</span>
+          <li className="flex items-start gap-2.5 text-sm text-gray-600">
+            <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <CheckCircle2 className="w-3 h-3 text-green-600" />
+            </div>
+            <span>Add inline comments and documentation to your code</span>
           </li>
         </ul>
       </div>
@@ -1070,7 +1182,7 @@ function GitHubConnect({ onConnect, onSkip, isCompleted = false }: {
       <div className="flex gap-3">
         <button
           onClick={handleConnect}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg hover:opacity-90 transition-opacity font-medium"
+          className="flex-1 flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-xl hover:opacity-90 transition-all font-medium shadow-sm"
           style={{ backgroundColor: '#171717', color: '#ffffff' }}
         >
           <GitHubIcon className="w-5 h-5" fill="#ffffff" />
@@ -1078,10 +1190,19 @@ function GitHubConnect({ onConnect, onSkip, isCompleted = false }: {
         </button>
         <button
           onClick={onSkip}
-          className="px-4 py-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          className="px-5 py-3.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-medium"
         >
           Skip
         </button>
+      </div>
+
+      <div className="mt-4 pt-3 border-t border-gray-100">
+        <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+          </svg>
+          <span>Your code is never stored. We only create PRs in your repository.</span>
+        </div>
       </div>
     </div>
   );
@@ -1098,8 +1219,14 @@ function GitHubRepoSelect({ repos, onSelect, isCompleted = false }: {
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">Repository Selection</div>
-        <div className="text-xs text-gray-400">Repository selected</div>
+        <div className="flex items-center gap-3">
+          <GitHubIcon className="w-5 h-5 text-gray-500" />
+          <div>
+            <div className="text-sm font-medium text-gray-500">Repository Selected</div>
+            <div className="text-xs text-gray-400">Ready for SDK integration</div>
+          </div>
+          <CheckCircle2 className="w-5 h-5 text-green-600 ml-auto" />
+        </div>
       </div>
     );
   }
@@ -1110,38 +1237,72 @@ function GitHubRepoSelect({ repos, onSelect, isCompleted = false }: {
   );
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">Select your repository</div>
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+          <GitHubIcon className="w-5 h-5 text-gray-700" />
+        </div>
+        <div>
+          <div className="font-semibold text-gray-900">Select Repository</div>
+          <div className="text-sm text-gray-500">Choose where to integrate Airbridge SDK</div>
+        </div>
+      </div>
 
       {/* Search */}
-      <div className="mb-3">
-        <input
-          type="text"
-          placeholder="Search repositories..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 transition-colors text-sm"
-        />
+      <div className="mb-4">
+        <div className="relative">
+          <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search repositories..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm"
+          />
+        </div>
       </div>
 
       {/* Repo List */}
-      <div className="max-h-64 overflow-y-auto space-y-2">
-        {filteredRepos.map((repo) => (
-          <button
-            key={repo.id}
-            onClick={() => onSelect(repo)}
-            className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
-          >
-            <GitHubIcon className="w-5 h-5 text-gray-700 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-gray-900 truncate">{repo.name}</div>
-              <div className="text-xs text-gray-500 truncate">{repo.fullName}</div>
-            </div>
-            {repo.isPrivate && (
-              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Private</span>
-            )}
-          </button>
-        ))}
+      <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+        {filteredRepos.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <div className="text-sm">No repositories found</div>
+            <div className="text-xs text-gray-400 mt-1">Try a different search term</div>
+          </div>
+        ) : (
+          filteredRepos.map((repo) => (
+            <button
+              key={repo.id}
+              onClick={() => onSelect(repo)}
+              className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-gray-200 hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left group"
+            >
+              <div className="w-9 h-9 rounded-lg bg-gray-50 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                <GitHubIcon className="w-5 h-5 text-gray-600 group-hover:text-blue-600 transition-colors" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-gray-900 truncate">{repo.name}</div>
+                <div className="text-xs text-gray-500 truncate">{repo.fullName}</div>
+              </div>
+              {repo.isPrivate && (
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-md flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                  Private
+                </span>
+              )}
+              <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
+            </button>
+          ))
+        )}
+      </div>
+
+      <div className="mt-4 pt-3 border-t border-gray-100">
+        <div className="text-xs text-gray-400 text-center">
+          Showing {filteredRepos.length} of {repos.length} repositories
+        </div>
       </div>
     </div>
   );
@@ -1157,15 +1318,21 @@ function GitHubPermissions({ onGranted, isCompleted = false }: {
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">Permissions</div>
-        <div className="text-xs text-gray-400">Permissions granted</div>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+          </div>
+          <div>
+            <div className="text-sm font-medium text-gray-500">Write Access Granted</div>
+            <div className="text-xs text-gray-400">Ready to create pull requests</div>
+          </div>
+        </div>
       </div>
     );
   }
 
   const handleGrant = () => {
     setIsGranting(true);
-    // Simulate permission granting
     setTimeout(() => {
       setIsGranting(false);
       onGranted();
@@ -1173,27 +1340,53 @@ function GitHubPermissions({ onGranted, isCompleted = false }: {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
-      <div className="flex items-center gap-2 mb-4">
-        <AlertCircle className="w-5 h-5 text-amber-500" />
-        <div className="font-medium text-gray-900">Additional Permissions Required</div>
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+          <AlertCircle className="w-5 h-5 text-amber-600" />
+        </div>
+        <div>
+          <div className="font-semibold text-gray-900">Additional Permissions Required</div>
+          <div className="text-sm text-gray-500">Write access needed to create PRs</div>
+        </div>
       </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-        <div className="text-sm text-amber-800">
-          To create pull requests, we need write access to your repository. This permission is only used for:
+      <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-200 rounded-xl p-4 mb-5">
+        <div className="text-sm font-medium text-amber-800 mb-3">
+          To automate SDK integration, Airbridge needs write access for:
         </div>
-        <ul className="mt-2 space-y-1 text-sm text-amber-700">
-          <li>• Creating feature branches for SDK integration</li>
-          <li>• Opening pull requests with SDK code changes</li>
-          <li>• Adding review comments and documentation</li>
+        <ul className="space-y-2">
+          <li className="flex items-start gap-2.5 text-sm text-amber-700">
+            <div className="w-5 h-5 rounded-full bg-amber-200/50 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg className="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <span>Creating feature branches (e.g., <code className="bg-amber-100 px-1 rounded text-xs">airbridge/sdk-setup</code>)</span>
+          </li>
+          <li className="flex items-start gap-2.5 text-sm text-amber-700">
+            <div className="w-5 h-5 rounded-full bg-amber-200/50 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg className="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <span>Opening pull requests with SDK integration code</span>
+          </li>
+          <li className="flex items-start gap-2.5 text-sm text-amber-700">
+            <div className="w-5 h-5 rounded-full bg-amber-200/50 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg className="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+              </svg>
+            </div>
+            <span>Adding inline comments and setup documentation</span>
+          </li>
         </ul>
       </div>
 
       <button
         onClick={handleGrant}
         disabled={isGranting}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-2.5 px-4 py-3.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-medium disabled:opacity-50 shadow-sm"
       >
         {isGranting ? (
           <>
@@ -1202,11 +1395,19 @@ function GitHubPermissions({ onGranted, isCompleted = false }: {
           </>
         ) : (
           <>
-            <CheckCircle2 className="w-5 h-5" />
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
             <span>Grant Write Access</span>
           </>
         )}
       </button>
+
+      <div className="mt-4 text-center">
+        <div className="text-xs text-gray-400">
+          You can revoke access anytime from GitHub Settings
+        </div>
+      </div>
     </div>
   );
 }
@@ -1222,71 +1423,110 @@ function GitHubPRConfirm({ step, onConfirm, onSkip, isCompleted = false }: {
     'sdk-install': {
       title: 'SDK Installation',
       description: 'Install Airbridge SDK packages and configure dependencies',
+      icon: '📦',
+      color: 'blue',
+      branch: 'airbridge/sdk-install',
       changes: [
-        'Add Airbridge SDK to package.json / Podfile / build.gradle',
-        'Configure build settings for your platform',
-        'Set up required native modules'
+        { file: 'package.json', action: 'Add airbridge-sdk dependency' },
+        { file: 'ios/Podfile', action: 'Add AirbridgeSDK pod' },
+        { file: 'android/build.gradle', action: 'Add Airbridge repository' }
       ]
     },
     'sdk-init': {
       title: 'SDK Initialization',
       description: 'Add SDK initialization code to your app entry point',
+      icon: '🚀',
+      color: 'purple',
+      branch: 'airbridge/sdk-init',
       changes: [
-        'Import Airbridge SDK in your main app file',
-        'Initialize SDK with your app token',
-        'Configure SDK options (logging, etc.)'
+        { file: 'App.tsx', action: 'Import and initialize Airbridge SDK' },
+        { file: 'index.js', action: 'Configure SDK with app token' },
+        { file: 'config/', action: 'Add Airbridge configuration file' }
       ]
     },
     'deeplink': {
       title: 'Deep Link Setup',
       description: 'Configure deep linking for attribution tracking',
+      icon: '🔗',
+      color: 'green',
+      branch: 'airbridge/deeplink-setup',
       changes: [
-        'Add URL scheme configuration',
-        'Set up Universal Links / App Links',
-        'Add deep link handling code'
+        { file: 'Info.plist', action: 'Add URL scheme and Associated Domains' },
+        { file: 'AndroidManifest.xml', action: 'Add intent filters for App Links' },
+        { file: 'App.tsx', action: 'Add deep link handler callback' }
       ]
     },
     'event-tracking': {
       title: 'Event Tracking Setup',
       description: 'Implement event tracking based on your taxonomy',
+      icon: '📊',
+      color: 'orange',
+      branch: 'airbridge/event-tracking',
       changes: [
-        'Add event tracking code for selected events',
-        'Configure event properties and attributes',
-        'Set up automatic event collection'
+        { file: 'analytics/', action: 'Create event tracking utilities' },
+        { file: 'screens/', action: 'Add trackEvent calls to key screens' },
+        { file: 'hooks/', action: 'Create useAirbridgeEvent hook' }
       ]
     }
   };
 
   const info = stepInfo[step];
+  const colorClasses = {
+    blue: 'bg-blue-100 text-blue-600',
+    purple: 'bg-purple-100 text-purple-600',
+    green: 'bg-green-100 text-green-600',
+    orange: 'bg-orange-100 text-orange-600'
+  };
 
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">{info.title} PR</div>
-        <div className="text-xs text-gray-400">PR created</div>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+          </div>
+          <div>
+            <div className="text-sm font-medium text-gray-500">{info.title} PR</div>
+            <div className="text-xs text-gray-400">Pull request created</div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-100">
-          <GitHubIcon className="w-5 h-5 text-blue-600" />
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${colorClasses[info.color as keyof typeof colorClasses]}`}>
+          <span className="text-lg">{info.icon}</span>
         </div>
-        <div>
-          <div className="font-medium text-gray-900">{info.title} PR</div>
+        <div className="flex-1">
+          <div className="font-semibold text-gray-900">{info.title}</div>
           <div className="text-sm text-gray-500">{info.description}</div>
         </div>
       </div>
 
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">Changes to be made:</div>
-        <ul className="space-y-2">
+      {/* Branch info */}
+      <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-gray-50 rounded-lg">
+        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+        </svg>
+        <span className="text-xs text-gray-500">Branch:</span>
+        <code className="text-xs font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{info.branch}</code>
+      </div>
+
+      <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-xl p-4 mb-5 border border-gray-100">
+        <div className="text-sm font-medium text-gray-700 mb-3">Files to be modified:</div>
+        <ul className="space-y-2.5">
           {info.changes.map((change, index) => (
-            <li key={index} className="flex items-start gap-2 text-sm text-gray-600">
-              <Code className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-              <span>{change}</span>
+            <li key={index} className="flex items-start gap-2.5 text-sm">
+              <div className="w-5 h-5 rounded bg-gray-200/50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Code className="w-3 h-3 text-gray-500" />
+              </div>
+              <div className="flex-1">
+                <code className="text-xs font-mono text-gray-700 bg-white px-1.5 py-0.5 rounded border border-gray-200">{change.file}</code>
+                <div className="text-xs text-gray-500 mt-0.5">{change.action}</div>
+              </div>
             </li>
           ))}
         </ul>
@@ -1295,16 +1535,16 @@ function GitHubPRConfirm({ step, onConfirm, onSkip, isCompleted = false }: {
       <div className="flex gap-3">
         <button
           onClick={onConfirm}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-medium shadow-sm"
         >
-          <Plus className="w-5 h-5" />
-          <span>Create PR</span>
+          <GitHubIcon className="w-5 h-5" fill="#ffffff" />
+          <span>Create Pull Request</span>
         </button>
         <button
           onClick={onSkip}
-          className="px-4 py-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          className="px-5 py-3.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-medium"
         >
-          Skip this step
+          Skip
         </button>
       </div>
     </div>
@@ -1312,43 +1552,93 @@ function GitHubPRConfirm({ step, onConfirm, onSkip, isCompleted = false }: {
 }
 
 // GitHub PR Waiting Component
-function GitHubPRWaiting({ prUrl, step, isCompleted = false }: {
+function GitHubPRWaiting({ step, isCompleted = false }: {
   prUrl?: string;
   step: string;
   isCompleted?: boolean;
 }) {
+  const [progress, setProgress] = useState(0);
+  const [currentAction, setCurrentAction] = useState('Analyzing codebase...');
+
+  useEffect(() => {
+    if (isCompleted) return;
+
+    const actions = [
+      'Analyzing codebase structure...',
+      'Detecting project configuration...',
+      'Generating SDK integration code...',
+      'Creating feature branch...',
+      'Preparing pull request...'
+    ];
+
+    let actionIndex = 0;
+    const actionInterval = setInterval(() => {
+      actionIndex = (actionIndex + 1) % actions.length;
+      setCurrentAction(actions[actionIndex]);
+    }, 2000);
+
+    const progressInterval = setInterval(() => {
+      setProgress(prev => Math.min(prev + Math.random() * 15, 95));
+    }, 500);
+
+    return () => {
+      clearInterval(actionInterval);
+      clearInterval(progressInterval);
+    };
+  }, [isCompleted]);
+
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">Creating PR</div>
-        <div className="text-xs text-gray-400">Completed</div>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+          </div>
+          <div>
+            <div className="text-sm font-medium text-gray-500">Pull Request Created</div>
+            <div className="text-xs text-gray-400">Ready for review</div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
-      <div className="flex items-center gap-4">
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="flex items-center gap-4 mb-5">
         <div className="relative">
-          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+            <Loader2 className="w-7 h-7 text-blue-600 animate-spin" />
           </div>
-          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-sm">
-            <GitHubIcon className="w-3 h-3 text-gray-700" />
+          <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-md border border-gray-100">
+            <GitHubIcon className="w-3.5 h-3.5 text-gray-700" />
           </div>
         </div>
         <div className="flex-1">
-          <div className="font-medium text-gray-900">Creating Pull Request...</div>
-          <div className="text-sm text-gray-500 mt-1">
-            Analyzing your codebase and generating changes for {step}
-          </div>
+          <div className="font-semibold text-gray-900">Creating Pull Request</div>
+          <div className="text-sm text-gray-500 mt-0.5">{step.replace('-', ' ').replace(/^\w/, c => c.toUpperCase())} integration</div>
         </div>
       </div>
 
-      <div className="mt-4 bg-gray-50 rounded-lg p-3">
-        <div className="flex items-center gap-2 text-sm text-gray-600">
+      {/* Progress bar */}
+      <div className="mb-4">
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Current action */}
+      <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-xl p-4 border border-gray-100">
+        <div className="flex items-center gap-3">
           <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-          <span>This usually takes 30-60 seconds</span>
+          <span className="text-sm text-gray-600">{currentAction}</span>
+        </div>
+        <div className="mt-3 pt-3 border-t border-gray-200/50 flex items-center justify-between text-xs text-gray-400">
+          <span>Estimated time: 30-60 seconds</span>
+          <span>{Math.round(progress)}%</span>
         </div>
       </div>
     </div>
@@ -1356,7 +1646,7 @@ function GitHubPRWaiting({ prUrl, step, isCompleted = false }: {
 }
 
 // GitHub PR Complete Component
-function GitHubPRComplete({ prUrl, prNumber, step, onReview, isCompleted = false }: {
+function GitHubPRComplete({ prUrl, prNumber, onReview, isCompleted = false }: {
   prUrl: string;
   prNumber: number;
   step: string;
@@ -1366,41 +1656,69 @@ function GitHubPRComplete({ prUrl, prNumber, step, onReview, isCompleted = false
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">PR #{prNumber}</div>
-        <div className="text-xs text-gray-400">Created successfully</div>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+          </div>
+          <div>
+            <div className="text-sm font-medium text-gray-500">PR #{prNumber}</div>
+            <div className="text-xs text-gray-400">Created successfully</div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-          <CheckCircle2 className="w-6 h-6 text-green-600" />
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      {/* Success header */}
+      <div className="flex items-center gap-4 mb-5">
+        <div className="relative">
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+            <CheckCircle2 className="w-7 h-7 text-green-600" />
+          </div>
+          <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-md border border-gray-100">
+            <GitHubIcon className="w-3.5 h-3.5 text-gray-700" />
+          </div>
         </div>
-        <div>
-          <div className="font-medium text-gray-900">Pull Request Created!</div>
-          <div className="text-sm text-gray-500">PR #{prNumber} is ready for review</div>
+        <div className="flex-1">
+          <div className="font-semibold text-gray-900">Pull Request Created!</div>
+          <div className="text-sm text-green-600 mt-0.5">PR #{prNumber} is ready for review</div>
         </div>
       </div>
 
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="flex items-center gap-2 text-sm">
-          <GitHubIcon className="w-4 h-4 text-gray-600" />
-          <a
-            href={prUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline font-mono text-xs truncate"
+      {/* PR Link */}
+      <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-xl p-4 mb-5 border border-gray-100">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
+            <GitHubIcon className="w-4 h-4 text-gray-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs text-gray-500 mb-0.5">Pull Request URL</div>
+            <a
+              href={prUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-700 hover:underline font-mono text-xs truncate block"
+            >
+              {prUrl}
+            </a>
+          </div>
+          <button
+            onClick={() => navigator.clipboard.writeText(prUrl)}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-white rounded-lg transition-colors"
+            title="Copy URL"
           >
-            {prUrl}
-          </a>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
         </div>
       </div>
 
       <button
         onClick={onReview}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+        className="w-full flex items-center justify-center gap-2.5 px-4 py-3.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-medium shadow-sm"
       >
         <ExternalLink className="w-5 h-5" />
         <span>Review Pull Request</span>
@@ -1410,7 +1728,7 @@ function GitHubPRComplete({ prUrl, prNumber, step, onReview, isCompleted = false
 }
 
 // GitHub PR Review Component
-function GitHubPRReview({ prUrl, prNumber, step, onMerged, onContinue, isCompleted = false }: {
+function GitHubPRReview({ prUrl, prNumber, onMerged, onContinue, isCompleted = false }: {
   prUrl: string;
   prNumber: number;
   step: string;
@@ -1421,52 +1739,313 @@ function GitHubPRReview({ prUrl, prNumber, step, onMerged, onContinue, isComplet
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">PR Review</div>
-        <div className="text-xs text-gray-400">Completed</div>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+          </div>
+          <div>
+            <div className="text-sm font-medium text-gray-500">PR #{prNumber} Review</div>
+            <div className="text-xs text-gray-400">Completed</div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
-      <div className="text-sm font-medium text-gray-700 mb-3">What would you like to do?</div>
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+          <GitHubIcon className="w-5 h-5 text-purple-600" />
+        </div>
+        <div>
+          <div className="font-semibold text-gray-900">Review PR #{prNumber}</div>
+          <div className="text-sm text-gray-500">Choose how to proceed</div>
+        </div>
+      </div>
 
       <div className="space-y-3">
         <a
           href={prUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all"
+          className="w-full flex items-center gap-3.5 p-4 rounded-xl border border-gray-200 hover:border-blue-500 hover:bg-blue-50/50 transition-all group"
         >
-          <ExternalLink className="w-5 h-5 text-gray-600" />
-          <div className="flex-1">
-            <div className="font-medium text-gray-900">View PR on GitHub</div>
-            <div className="text-sm text-gray-500">Review the changes in detail</div>
+          <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+            <ExternalLink className="w-5 h-5 text-gray-600 group-hover:text-blue-600 transition-colors" />
           </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">View on GitHub</div>
+            <div className="text-sm text-gray-500">Review code changes in detail</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors" />
         </a>
 
         <button
           onClick={onMerged}
-          className="w-full flex items-center gap-3 p-4 rounded-lg border border-green-200 bg-green-50 hover:border-green-500 hover:bg-green-100 transition-all text-left"
+          className="w-full flex items-center gap-3.5 p-4 rounded-xl border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50/50 hover:border-green-400 hover:from-green-100 hover:to-emerald-100/50 transition-all text-left group"
         >
-          <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <div className="w-10 h-10 rounded-lg bg-green-100 group-hover:bg-green-200 flex items-center justify-center transition-colors">
+            <CheckCircle2 className="w-5 h-5 text-green-600" />
+          </div>
           <div className="flex-1">
             <div className="font-medium text-gray-900">I've merged the PR</div>
-            <div className="text-sm text-gray-500">Continue to the next step</div>
+            <div className="text-sm text-green-600">Continue to the next automation step</div>
           </div>
         </button>
 
         <button
           onClick={onContinue}
-          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition-all text-left"
+          className="w-full flex items-center gap-3.5 p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all text-left group"
         >
-          <ChevronRight className="w-5 h-5 text-gray-400" />
+          <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition-colors">
+            <ChevronRight className="w-5 h-5 text-gray-500" />
+          </div>
           <div className="flex-1">
-            <div className="font-medium text-gray-900">Continue without merging</div>
-            <div className="text-sm text-gray-500">I'll merge later, proceed with next automation</div>
+            <div className="font-medium text-gray-900">Skip for now</div>
+            <div className="text-sm text-gray-500">Continue without merging, review later</div>
           </div>
         </button>
       </div>
+    </div>
+  );
+}
+
+// SDK Type Selection Modal Component - Asks whether to install App SDK or Web SDK first
+function SdkTypeSelectionModal({
+  onSelect,
+  onClose,
+  isOpen = true
+}: {
+  onSelect: (type: 'app' | 'web') => void;
+  onClose?: () => void;
+  isOpen?: boolean;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+
+      {/* Modal Content */}
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-in fade-in zoom-in duration-200">
+        {/* Modal Header */}
+        <div className="p-6 pb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xl font-semibold text-gray-900">Choose SDK to Install First</h3>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 p-1 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+          <p className="text-sm text-gray-500">You have both mobile app and web platforms. Which SDK would you like to install first?</p>
+        </div>
+
+        {/* Modal Body */}
+        <div className="px-6 pb-6 space-y-3">
+          <button
+            onClick={() => onSelect('app')}
+            className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left group"
+          >
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <Smartphone className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold text-gray-900 group-hover:text-blue-600">App SDK</div>
+              <div className="text-sm text-gray-500">iOS and Android mobile apps</div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500" />
+          </button>
+
+          <button
+            onClick={() => onSelect('web')}
+            className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left group"
+          >
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+              <Monitor className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold text-gray-900 group-hover:text-blue-600">Web SDK</div>
+              <div className="text-sm text-gray-500">Website and web applications</div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500" />
+          </button>
+        </div>
+
+        {/* Modal Footer */}
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+          <p className="text-xs text-gray-400 text-center">You can install the other SDK later in the onboarding process</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Web SDK Package Manager Install Component - Chat module for npm/yarn/pnpm installation
+function WebSdkPackageInstall({
+  appName,
+  webToken,
+  onComplete,
+  isCompleted = false
+}: {
+  appName: string;
+  webToken: string;
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  const [packageManager, setPackageManager] = useState<'npm' | 'yarn' | 'pnpm'>('npm');
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const copyToClipboard = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const packageInstallCommands = {
+    npm: 'npm install airbridge-web-sdk-loader',
+    yarn: 'yarn add airbridge-web-sdk-loader',
+    pnpm: 'pnpm add airbridge-web-sdk-loader',
+  };
+
+  const packageUsageCode = `import Airbridge from 'airbridge-web-sdk-loader';
+
+Airbridge.init({
+  app: '${appName}',
+  webToken: '${webToken}',
+});`;
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Package Manager SDK installation completed</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4 shadow-sm w-full max-w-full">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+          <Package className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">Package Manager Installation</div>
+          <div className="text-sm text-gray-500">Install via npm, yarn, or pnpm</div>
+        </div>
+      </div>
+
+      {/* Auth Info */}
+      <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+        <div className="text-xs text-gray-500 mb-2">Your configuration (auto-filled)</div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="text-xs text-gray-400">App Name</div>
+            <div className="text-sm font-mono text-gray-900">{appName}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-400">Web Token</div>
+            <div className="text-sm font-mono text-gray-900 truncate">{webToken.slice(0, 20)}...</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Step 1: Install Package */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-bold">1</div>
+          <span className="text-sm font-medium text-gray-700">Install Package</span>
+        </div>
+
+        {/* Package Manager Tabs */}
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg mb-3">
+          {(['npm', 'yarn', 'pnpm'] as const).map((pm) => (
+            <button
+              key={pm}
+              onClick={() => setPackageManager(pm)}
+              className={`flex-1 py-1.5 px-3 rounded text-xs font-medium transition-all ${
+                packageManager === pm
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              {pm}
+            </button>
+          ))}
+        </div>
+
+        {/* Install Command */}
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-sm font-mono">
+            <code>{packageInstallCommands[packageManager]}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(packageInstallCommands[packageManager], 'install')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'install' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Step 2: Initialize SDK */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-bold">2</div>
+          <span className="text-sm font-medium text-gray-700">Initialize SDK</span>
+        </div>
+
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-sm font-mono overflow-x-auto">
+            <code>{packageUsageCode}</code>
+          </pre>
+          <button
+            onClick={() => copyToClipboard(packageUsageCode, 'usage')}
+            className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            {copiedCode === 'usage' ? (
+              <Check className="w-3 h-3 text-green-400" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Documentation Link */}
+      <div className="mb-4 flex items-center gap-2 text-xs text-gray-500">
+        <ExternalLink className="w-3 h-3" />
+        <a
+          href="https://developers.airbridge.io/docs/web-sdk"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-blue-600 transition-colors"
+        >
+          View full documentation
+        </a>
+      </div>
+
+      {/* Complete Button */}
+      <button
+        onClick={onComplete}
+        className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+      >
+        Installation Code Applied
+        <ChevronRight className="w-4 h-4" />
+      </button>
     </div>
   );
 }
@@ -1509,6 +2088,385 @@ function SdkInstallChoice({ onSelect, isCompleted = false }: { onSelect: (choice
             <div className="font-medium text-gray-900">Send guide to developer</div>
             <div className="text-sm text-gray-500">I'm a marketer and need to share the setup guide with my dev team</div>
           </div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Role Capability Check Component - Asks if user can install SDK themselves
+function RoleCapabilityCheck({ onSelect, isCompleted = false }: { onSelect: (canInstall: boolean) => void; isCompleted?: boolean }) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Setup Role</div>
+        <div className="text-xs text-gray-400">Role confirmed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="text-sm font-medium text-gray-700 mb-2">What's your role in this setup?</div>
+      <p className="text-xs text-gray-500 mb-4">This helps us guide you through the right steps.</p>
+      <div className="space-y-2">
+        <button
+          onClick={() => onSelect(true)}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-100">
+            <Code className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">I'm a developer - I'll install the SDK myself</div>
+            <div className="text-sm text-gray-500">I have codebase access and can integrate the SDK</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+        <button
+          onClick={() => onSelect(false)}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-purple-100">
+            <Users className="w-5 h-5 text-purple-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">I'm not a developer - someone else will handle SDK</div>
+            <div className="text-sm text-gray-500">I'm a marketer, PM, or analyst - technical setup will be done by others</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Marketer Next Steps Component - Shows options for non-developers
+function MarketerNextSteps({ appName, onSelect, isCompleted = false }: {
+  appName: string;
+  onSelect: (choice: 'invite-developer' | 'create-tracking-link' | 'explore-dashboard') => void;
+  isCompleted?: boolean
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Next Steps</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="text-sm font-medium text-gray-700 mb-3">What would you like to do next?</div>
+      <div className="space-y-2">
+        <button
+          onClick={() => onSelect('invite-developer')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-purple-100">
+            <UserPlus className="w-5 h-5 text-purple-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">Invite a developer</div>
+            <div className="text-sm text-gray-500">Share SDK setup guide with your dev team</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+        <button
+          onClick={() => onSelect('create-tracking-link')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-blue-500 bg-blue-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-500 text-white">
+            <Link className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-900">Create a tracking link</span>
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Recommended</span>
+            </div>
+            <div className="text-sm text-gray-500">Start building campaign links right now</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-blue-400" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// SDK Requires Developer Component - Shows options when SDK installation is needed
+function SdkRequiresDeveloper({ appName, onSelect, isCompleted = false }: {
+  appName: string;
+  onSelect: (choice: 'create-tracking-link' | 'explore-dashboard' | 'invite-developer' | 'self-install') => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">SDK Installation</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="flex items-start gap-3 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+        <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <div className="font-medium text-amber-800">SDK Installation Requires a Developer</div>
+          <div className="text-sm text-amber-700 mt-1">
+            A developer with codebase access is needed to integrate the Airbridge SDK.
+          </div>
+        </div>
+      </div>
+
+      <div className="text-sm font-medium text-gray-700 mb-3">In the meantime, what would you like to do?</div>
+      <div className="space-y-2">
+        <button
+          onClick={() => onSelect('create-tracking-link')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-blue-500 bg-blue-50 transition-all text-left hover:bg-blue-100"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-500 text-white">
+            <Link className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-900">Create a tracking link</span>
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Recommended</span>
+            </div>
+            <div className="text-sm text-gray-500">Start building campaign links right now</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-blue-400" />
+        </button>
+
+        <button
+          onClick={() => onSelect('explore-dashboard')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-indigo-100">
+            <LayoutDashboard className="w-5 h-5 text-indigo-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">Explore the dashboard</div>
+            <div className="text-sm text-gray-500">See what Airbridge can do with sample data</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+
+        <button
+          onClick={() => onSelect('invite-developer')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-purple-100">
+            <Mail className="w-5 h-5 text-purple-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">Invite developer(s)</div>
+            <div className="text-sm text-gray-500">Send SDK setup invitation via email</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+
+        <div className="pt-2 mt-2 border-t border-gray-100">
+          <button
+            onClick={() => onSelect('self-install')}
+            className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all text-left"
+          >
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-green-100">
+              <Code className="w-5 h-5 text-green-600" />
+            </div>
+            <div className="flex-1">
+              <div className="font-medium text-gray-900">I can do it myself</div>
+              <div className="text-sm text-gray-500">I have access to the codebase and can install the SDK</div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// SDK Type Choice Component - Choose between App SDK and Web SDK
+function SdkTypeChoice({ onSelect, isCompleted = false }: {
+  onSelect: (type: 'app' | 'web') => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">SDK Type Selection</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="text-sm font-medium text-gray-700 mb-3">Which SDK would you like to install?</div>
+      <div className="space-y-2">
+        <button
+          onClick={() => onSelect('app')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600">
+            <Smartphone className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">App SDK</div>
+            <div className="text-sm text-gray-500">iOS and Android native app integration</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+
+        <button
+          onClick={() => onSelect('web')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-600">
+            <Globe className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">Web SDK</div>
+            <div className="text-sm text-gray-500">Website JavaScript integration</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Developer Email Invite Component - Input multiple developer emails
+function DeveloperEmailInvite({ appName, onSend, onBack, isCompleted = false }: {
+  appName: string;
+  onSend: (emails: string[]) => void;
+  onBack: () => void;
+  isCompleted?: boolean;
+}) {
+  const [emails, setEmails] = useState<string[]>(['']);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  if (isCompleted || sent) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <Check className="w-4 h-4 text-green-600" />
+          <span className="text-sm font-medium text-gray-700">Invitations sent</span>
+        </div>
+        <div className="text-xs text-gray-400 mt-1">
+          {emails.filter(e => e.trim()).length} developer(s) invited
+        </div>
+      </div>
+    );
+  }
+
+  const addEmail = () => {
+    setEmails([...emails, '']);
+  };
+
+  const removeEmail = (index: number) => {
+    if (emails.length > 1) {
+      setEmails(emails.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateEmail = (index: number, value: string) => {
+    const newEmails = [...emails];
+    newEmails[index] = value;
+    setEmails(newEmails);
+  };
+
+  const isValidEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const validEmails = emails.filter(e => isValidEmail(e.trim()));
+  const canSend = validEmails.length > 0;
+
+  const handleSend = () => {
+    if (!canSend) return;
+    setSending(true);
+    // Simulate sending
+    setTimeout(() => {
+      setSending(false);
+      setSent(true);
+      onSend(validEmails);
+    }, 1000);
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
+      <div className="text-sm font-medium text-gray-700 mb-3">Invite Developer(s) to Set Up SDK</div>
+      <p className="text-xs text-gray-500 mb-4">
+        We'll send them an email with SDK setup instructions and access to the <strong>{appName}</strong> dashboard.
+      </p>
+
+      <div className="space-y-2 mb-4">
+        {emails.map((email, index) => (
+          <div key={index} className="flex gap-2">
+            <div className="flex-1 relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => updateEmail(index, e.target.value)}
+                placeholder="developer@company.com"
+                className={`w-full pl-10 pr-4 py-3 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  email && !isValidEmail(email) ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                }`}
+              />
+            </div>
+            {emails.length > 1 && (
+              <button
+                onClick={() => removeEmail(index)}
+                className="p-3 text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={addEmail}
+        className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 mb-4"
+      >
+        <Plus className="w-4 h-4" />
+        Add another developer
+      </button>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onBack}
+          className="px-4 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          Back
+        </button>
+        <button
+          onClick={handleSend}
+          disabled={!canSend || sending}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-colors ${
+            canSend && !sending
+              ? 'bg-blue-500 text-white hover:bg-blue-600'
+              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          {sending ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Sending...
+            </>
+          ) : (
+            <>
+              <Send className="w-4 h-4" />
+              Send Invitation{validEmails.length > 1 ? 's' : ''}
+              {validEmails.length > 0 && ` (${validEmails.length})`}
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -1654,32 +2612,109 @@ function CategoryNavigation({ onSelect, isCompleted = false }: {
   );
 }
 
-// SDK Test Component
+// Mock event data for realtime log
+interface EventLogEntry {
+  id: string;
+  os: 'iOS' | 'Android';
+  eventCategory: string;
+  channel: string;
+  adid: string;
+  sdkVersion: string;
+  action: string;
+  label: string;
+  datetime: Date;
+}
+
+const generateMockEvents = (): EventLogEntry[] => {
+  const eventCategories = ['Install', 'Open', 'Sign-in', 'Sign-up', 'Home Screen', 'Product View', 'Add To Cart', 'Order Complete', 'Search Results'];
+  const channels = ['naver.searchad', 'kakao', 'google.adwords', 'apple.searchads', 'facebook.business'];
+  const adids = [
+    '217320c2-804e-4ee2-9aa5-dafec68563b9',
+    '03a38783-da1a-4780-b6fc-26bef1f6c86f',
+    '7a6a7887-14ea-4508-a232-e6f76132fa9f',
+    'b78f9071-14d4-4c81-9e7c-f6516145d6e7',
+    '6cf1a858-7171-4143-8639-63c07fc4bb72'
+  ];
+
+  const events: EventLogEntry[] = [];
+  const now = new Date();
+
+  for (let i = 0; i < 10; i++) {
+    const os = Math.random() > 0.5 ? 'iOS' : 'Android';
+    events.push({
+      id: `event-${i}`,
+      os,
+      eventCategory: eventCategories[Math.floor(Math.random() * eventCategories.length)],
+      channel: channels[Math.floor(Math.random() * channels.length)],
+      adid: adids[Math.floor(Math.random() * adids.length)],
+      sdkVersion: os === 'iOS' ? 'M_I_v1.9.7' : 'M_A_v1.7.1',
+      action: '',
+      label: '',
+      datetime: new Date(now.getTime() - i * 60000 * Math.random() * 5)
+    });
+  }
+
+  return events.sort((a, b) => b.datetime.getTime() - a.datetime.getTime());
+};
+
+// SDK Test Component with Realtime Event Log
 function SdkTest({ onRunTest, isCompleted = false }: {
   onRunTest: () => void;
   isCompleted?: boolean;
 }) {
-  const [testState, setTestState] = useState<'idle' | 'testing' | 'complete'>('idle');
-  const [testResults, setTestResults] = useState({
-    install: false,
-    init: false,
-    events: false
-  });
+  const [isStreaming, setIsStreaming] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [events, setEvents] = useState<EventLogEntry[]>([]);
+  const [hasNewEvents, setHasNewEvents] = useState(false);
 
-  const handleRunTest = () => {
-    setTestState('testing');
-    // Simulate test progression
-    setTimeout(() => {
-      setTestResults(prev => ({ ...prev, install: true }));
-      setTimeout(() => {
-        setTestResults(prev => ({ ...prev, init: true }));
-        setTimeout(() => {
-          setTestResults(prev => ({ ...prev, events: true }));
-          setTestState('complete');
-          setTimeout(() => onRunTest(), 1000);
-        }, 800);
-      }, 800);
-    }, 800);
+  useEffect(() => {
+    // Initialize with mock events
+    setEvents(generateMockEvents());
+  }, []);
+
+  useEffect(() => {
+    if (!isStreaming) return;
+
+    // Add new events periodically
+    const interval = setInterval(() => {
+      const eventCategories = ['Open', 'Sign-in', 'Product View', 'Add To Cart', 'Home Screen'];
+      const channels = ['naver.searchad', 'kakao', 'google.adwords'];
+      const os = Math.random() > 0.5 ? 'iOS' : 'Android';
+
+      const newEvent: EventLogEntry = {
+        id: `event-${Date.now()}`,
+        os,
+        eventCategory: eventCategories[Math.floor(Math.random() * eventCategories.length)],
+        channel: channels[Math.floor(Math.random() * channels.length)],
+        adid: `${Math.random().toString(36).substring(2, 10)}-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 14)}`,
+        sdkVersion: os === 'iOS' ? 'M_I_v1.9.7' : 'M_A_v1.7.1',
+        action: '',
+        label: '',
+        datetime: new Date()
+      };
+
+      setEvents(prev => [newEvent, ...prev.slice(0, 19)]);
+      setHasNewEvents(true);
+      setTimeout(() => setHasNewEvents(false), 500);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [isStreaming]);
+
+  const filteredEvents = events.filter(event =>
+    !searchQuery ||
+    event.os.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    event.eventCategory.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    event.channel.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    event.adid.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace('.', '');
   };
 
   if (isCompleted) {
@@ -1687,110 +2722,149 @@ function SdkTest({ onRunTest, isCompleted = false }: {
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-600" />
-          <span className="text-sm font-medium text-gray-700">SDK Test Passed</span>
+          <span className="text-sm font-medium text-gray-700">SDK Integration Test Complete</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-          <Code className="w-5 h-5 text-blue-600" />
-        </div>
-        <div>
-          <div className="font-medium text-gray-900">SDK Integration Test</div>
-          <div className="text-sm text-gray-500">Verify your SDK is properly integrated</div>
+    <div className="bg-white border border-gray-200 rounded-xl mt-4 w-full max-w-full overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900">App Event Real-time Logs</h2>
+          <a
+            href="https://help.airbridge.io/ko/guides/tracking-events-with-real-time-logs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <div className="w-4 h-4 bg-blue-600 rounded flex items-center justify-center">
+              <span className="text-white text-[8px] font-bold">A</span>
+            </div>
+            <span className="text-xs text-gray-700">My Device ID by Airbridge</span>
+          </a>
         </div>
       </div>
 
-      {testState === 'idle' && (
-        <>
-          <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <div className="text-sm font-medium text-gray-700 mb-2">This test will verify:</div>
-            <ul className="space-y-2 text-sm text-gray-600">
-              <li className="flex items-center gap-2">
-                <Circle className="w-4 h-4 text-gray-400" />
-                <span>SDK package is installed correctly</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Circle className="w-4 h-4 text-gray-400" />
-                <span>SDK initialization is successful</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Circle className="w-4 h-4 text-gray-400" />
-                <span>Events are being sent to Airbridge</span>
-              </li>
-            </ul>
+      {/* Toolbar */}
+      <div className="px-5 py-3 border-b border-gray-100 space-y-3">
+        <div className="flex items-center gap-3">
+          {/* Play/Pause Toggle */}
+          <div className="flex bg-gray-100 rounded-lg p-0.5">
+            <button
+              onClick={() => setIsStreaming(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                isStreaming ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              Real-time Logs
+            </button>
+            <button
+              onClick={() => setIsStreaming(false)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                !isStreaming ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+              </svg>
+              Stop
+            </button>
           </div>
 
-          <button
-            onClick={handleRunTest}
-            className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-          >
-            Run SDK Test
-          </button>
-        </>
-      )}
-
-      {testState !== 'idle' && (
-        <div className="space-y-3">
-          <div className={`flex items-center gap-3 p-3 rounded-lg ${testResults.install ? 'bg-green-50' : 'bg-gray-50'}`}>
-            {!testResults.install && testState === 'testing' ? (
-              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-            ) : testResults.install ? (
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
-            ) : (
-              <Circle className="w-5 h-5 text-gray-400" />
-            )}
-            <div className="flex-1">
-              <div className="text-sm font-medium text-gray-700">SDK Installation</div>
-              <div className="text-xs text-gray-500">Checking package installation...</div>
-            </div>
-            {testResults.install && <span className="text-xs text-green-600 font-medium">Passed</span>}
+          {/* Search */}
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search real-time logs"
+              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </div>
+        </div>
 
-          <div className={`flex items-center gap-3 p-3 rounded-lg ${testResults.init ? 'bg-green-50' : testResults.install ? 'bg-gray-50' : 'bg-gray-50 opacity-50'}`}>
-            {testResults.install && !testResults.init && testState === 'testing' ? (
-              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-            ) : testResults.init ? (
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
-            ) : (
-              <Circle className="w-5 h-5 text-gray-400" />
-            )}
-            <div className="flex-1">
-              <div className="text-sm font-medium text-gray-700">SDK Initialization</div>
-              <div className="text-xs text-gray-500">Verifying SDK startup...</div>
-            </div>
-            {testResults.init && <span className="text-xs text-green-600 font-medium">Passed</span>}
-          </div>
+        <p className="text-xs text-gray-500">
+          Some data may be available after a delay due to processing time.
+          <br />Searchable parameters: OS, Event Category, Channel, ADID, SDK Version
+        </p>
+      </div>
 
-          <div className={`flex items-center gap-3 p-3 rounded-lg ${testResults.events ? 'bg-green-50' : testResults.init ? 'bg-gray-50' : 'bg-gray-50 opacity-50'}`}>
-            {testResults.init && !testResults.events && testState === 'testing' ? (
-              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-            ) : testResults.events ? (
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
-            ) : (
-              <Circle className="w-5 h-5 text-gray-400" />
-            )}
-            <div className="flex-1">
-              <div className="text-sm font-medium text-gray-700">Event Tracking</div>
-              <div className="text-xs text-gray-500">Checking event transmission...</div>
-            </div>
-            {testResults.events && <span className="text-xs text-green-600 font-medium">Passed</span>}
-          </div>
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">OS</th>
+              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">Event Category</th>
+              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">Channel</th>
+              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">ADID</th>
+              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">SDK Version</th>
+              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">Datetime</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredEvents.map((event, index) => (
+              <tr
+                key={event.id}
+                className={`border-b border-gray-100 transition-colors ${
+                  index === 0 && hasNewEvents ? 'bg-blue-50' : index % 2 === 0 ? 'bg-gray-50/50' : 'bg-white'
+                }`}
+              >
+                <td className="px-3 py-2.5 text-gray-700">{event.os}</td>
+                <td className="px-3 py-2.5 text-gray-700">{event.eventCategory}</td>
+                <td className="px-3 py-2.5 text-gray-700">{event.channel}</td>
+                <td className="px-3 py-2.5 text-gray-700 font-mono text-[10px]">{event.adid}</td>
+                <td className="px-3 py-2.5 text-gray-700">{event.sdkVersion}</td>
+                <td className="px-3 py-2.5 whitespace-nowrap">
+                  <span className="text-gray-700">{formatDate(event.datetime)}</span>
+                  <span className="text-gray-400 ml-1">{formatTime(event.datetime)}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-          {testState === 'complete' && (
-            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center gap-2 text-green-700 font-medium">
-                <CheckCircle2 className="w-5 h-5" />
-                All tests passed! Your SDK is properly integrated.
-              </div>
-            </div>
+      {/* Status Bar */}
+      <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {isStreaming ? (
+            <>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              <span className="text-xs text-green-600 font-medium">Receiving live data</span>
+            </>
+          ) : (
+            <>
+              <span className="h-2 w-2 rounded-full bg-gray-400"></span>
+              <span className="text-xs text-gray-500">Stopped</span>
+            </>
           )}
         </div>
-      )}
+        <span className="text-xs text-gray-500">{filteredEvents.length} events</span>
+      </div>
+
+      {/* Complete Button */}
+      <div className="px-5 py-4 border-t border-gray-200">
+        <button
+          onClick={onRunTest}
+          className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+        >
+          Complete Event Verification
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -2456,6 +3530,1479 @@ function EnvironmentSelect({ onSelect, isCompleted = false }: { onSelect: (env: 
   );
 }
 
+// Plan Selector Component (Growth Plan vs Deep Link Plan)
+function PlanSelector({ onSelect, isCompleted = false }: {
+  onSelect: (plan: 'growth' | 'deeplink') => void;
+  isCompleted?: boolean
+}) {
+  const [hoveredPlan, setHoveredPlan] = useState<'growth' | 'deeplink' | null>(null);
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Plan selected</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="text-sm font-medium text-gray-700 mb-2">Select Your Plan</div>
+      <div className="text-xs text-gray-500 mb-4">Choose the plan that best fits your needs</div>
+
+      <div className="space-y-3">
+        {/* Growth Plan */}
+        <button
+          onClick={() => onSelect('growth')}
+          onMouseEnter={() => setHoveredPlan('growth')}
+          onMouseLeave={() => setHoveredPlan(null)}
+          className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-blue-200 bg-blue-50 hover:border-blue-500 hover:bg-blue-100 transition-all text-left"
+        >
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-blue-600 flex-shrink-0">
+            <Sparkles className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-semibold text-gray-900">Growth Plan</span>
+              <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">Full MMP</span>
+            </div>
+            <div className="text-sm text-gray-600 mb-3">Complete mobile measurement solution with attribution and analytics</div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Attribution & Analytics</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Deep Linking</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Ad Channel Integration</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>SKAN & SKAdNetwork</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Reports & Raw Data Export</span>
+              </div>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-blue-400 flex-shrink-0 mt-1" />
+        </button>
+
+        {/* Deep Link Plan */}
+        <button
+          onClick={() => onSelect('deeplink')}
+          onMouseEnter={() => setHoveredPlan('deeplink')}
+          onMouseLeave={() => setHoveredPlan(null)}
+          className="w-full flex items-start gap-4 p-4 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all text-left"
+        >
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-green-100 flex-shrink-0">
+            <Share2 className="w-6 h-6 text-green-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-semibold text-gray-900">Deep Link Plan</span>
+              <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">Deep Link Only</span>
+            </div>
+            <div className="text-sm text-gray-600 mb-3">Deep linking functionality for seamless user experience</div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-xs text-green-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Deep Linking</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-green-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Deferred Deep Links</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-green-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Tracking Links</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <Circle className="w-3.5 h-3.5" />
+                <span className="line-through">Attribution (Not included)</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <Circle className="w-3.5 h-3.5" />
+                <span className="line-through">Ad Channel Integration (Not included)</span>
+              </div>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 mt-1" />
+        </button>
+      </div>
+
+      {/* Plan comparison link */}
+      <div className="mt-4 text-center">
+        <a href="#" className="text-xs text-blue-600 hover:underline flex items-center justify-center gap-1">
+          <ExternalLink className="w-3 h-3" />
+          Compare plans in detail
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// Plan Feature Comparison Component
+function PlanFeatureComparison({ currentPlan, onUpgrade, isCompleted = false }: {
+  currentPlan: 'growth' | 'deeplink';
+  onUpgrade?: () => void;
+  isCompleted?: boolean;
+}) {
+  const features: PlanFeature[] = [
+    { id: 'attribution', name: 'Attribution', description: 'Track install sources', growthPlan: true, deeplinkPlan: false, category: 'attribution' },
+    { id: 'deeplink', name: 'Deep Linking', description: 'Seamless app opening', growthPlan: true, deeplinkPlan: true, category: 'deeplink' },
+    { id: 'deferred', name: 'Deferred Deep Links', description: 'Deep link after install', growthPlan: true, deeplinkPlan: true, category: 'deeplink' },
+    { id: 'actuals', name: 'Actuals Report', description: 'Performance metrics', growthPlan: true, deeplinkPlan: false, category: 'analytics' },
+    { id: 'cohort', name: 'Cohort Analysis', description: 'User behavior over time', growthPlan: true, deeplinkPlan: false, category: 'analytics' },
+    { id: 'raw', name: 'Raw Data Export', description: 'Export raw event data', growthPlan: true, deeplinkPlan: false, category: 'analytics' },
+    { id: 'channel', name: 'Ad Channel Integration', description: 'Connect ad platforms', growthPlan: true, deeplinkPlan: false, category: 'integration' },
+    { id: 'postback', name: 'Postback Setup', description: 'Send data to channels', growthPlan: true, deeplinkPlan: false, category: 'integration' },
+    { id: 'skan', name: 'SKAdNetwork', description: 'iOS privacy attribution', growthPlan: true, deeplinkPlan: false, category: 'integration' },
+  ];
+
+  if (isCompleted) {
+    return null;
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="text-sm font-medium text-gray-700 mb-4">Plan Feature Comparison</div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left py-2 font-medium text-gray-600">Feature</th>
+              <th className="text-center py-2 font-medium text-blue-600">Growth Plan</th>
+              <th className="text-center py-2 font-medium text-green-600">Deep Link Plan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {features.map((feature) => (
+              <tr key={feature.id} className="border-b border-gray-100">
+                <td className="py-2">
+                  <div className="font-medium text-gray-900">{feature.name}</div>
+                  <div className="text-xs text-gray-500">{feature.description}</div>
+                </td>
+                <td className="py-2 text-center">
+                  {feature.growthPlan ? (
+                    <CheckCircle2 className="w-5 h-5 text-blue-600 mx-auto" />
+                  ) : (
+                    <Circle className="w-5 h-5 text-gray-300 mx-auto" />
+                  )}
+                </td>
+                <td className="py-2 text-center">
+                  {feature.deeplinkPlan ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-600 mx-auto" />
+                  ) : (
+                    <Circle className="w-5 h-5 text-gray-300 mx-auto" />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {currentPlan === 'deeplink' && onUpgrade && (
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Lightbulb className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="text-sm font-medium text-blue-900">Need attribution & analytics?</div>
+              <div className="text-xs text-blue-700 mt-1">Upgrade to Growth Plan to unlock full MMP capabilities</div>
+              <button
+                onClick={onUpgrade}
+                className="mt-2 px-4 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Upgrade to Growth Plan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Role Selector Component (Marketer vs Developer)
+function RoleSelector({ onSelect, isCompleted = false }: {
+  onSelect: (role: 'marketer' | 'developer') => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Role selected</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="text-sm font-medium text-gray-700 mb-2">What's your role?</div>
+      <div className="text-xs text-gray-500 mb-4">We'll customize the onboarding experience based on your role</div>
+
+      <div className="space-y-3">
+        {/* Marketer */}
+        <button
+          onClick={() => onSelect('marketer')}
+          className="w-full flex items-start gap-4 p-4 rounded-xl border border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all text-left"
+        >
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-purple-100 flex-shrink-0">
+            <MessageSquare className="w-6 h-6 text-purple-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-gray-900 mb-1">Marketer</div>
+            <div className="text-sm text-gray-600 mb-2">I focus on campaign performance and analytics</div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-xs text-purple-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Dashboard-focused guidance</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-purple-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Channel integration walkthrough</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-purple-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Shareable developer guide generated</span>
+              </div>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 mt-1" />
+        </button>
+
+        {/* Developer */}
+        <button
+          onClick={() => onSelect('developer')}
+          className="w-full flex items-start gap-4 p-4 rounded-xl border border-gray-200 hover:border-orange-500 hover:bg-orange-50 transition-all text-left"
+        >
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-orange-100 flex-shrink-0">
+            <Code className="w-6 h-6 text-orange-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-gray-900 mb-1">Developer</div>
+            <div className="text-sm text-gray-600 mb-2">I'll be implementing the SDK integration</div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-xs text-orange-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Technical SDK documentation</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-orange-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Code snippets & examples</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-orange-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Debug & testing tools</span>
+              </div>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 mt-1" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Role Based Guide Component
+function RoleBasedGuide({ role, context, onContinue, isCompleted = false }: {
+  role: 'marketer' | 'developer';
+  context: string;
+  onContinue: () => void;
+  isCompleted?: boolean;
+}) {
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const copyToClipboard = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Guide reviewed</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (role === 'marketer') {
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-purple-100">
+            <MessageSquare className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <div className="font-medium text-gray-900">Marketer Guide</div>
+            <div className="text-xs text-gray-500">{context}</div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Dashboard Actions */}
+          <div className="p-4 bg-purple-50 rounded-lg">
+            <div className="text-sm font-medium text-purple-900 mb-2">Dashboard Actions</div>
+            <div className="space-y-2 text-xs text-purple-700">
+              <div className="flex items-start gap-2">
+                <span className="bg-purple-200 text-purple-800 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">1</span>
+                <span>Go to Settings → App Settings in your dashboard</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="bg-purple-200 text-purple-800 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">2</span>
+                <span>Configure the required settings as shown below</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="bg-purple-200 text-purple-800 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">3</span>
+                <span>Share the SDK guide with your development team</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Share with Developer */}
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <div className="text-sm font-medium text-gray-700 mb-2">Share with Developer</div>
+            <p className="text-xs text-gray-600 mb-3">
+              Send this link to your development team for SDK integration instructions:
+            </p>
+            <div className="flex gap-2">
+              <code className="flex-1 text-xs bg-gray-900 text-gray-100 p-2 rounded overflow-x-auto">
+                https://help.airbridge.io/sdk-guide/...
+              </code>
+              <button
+                onClick={() => copyToClipboard('https://help.airbridge.io/sdk-guide/...')}
+                className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+              >
+                {copiedCode ? (
+                  <Check className="w-4 h-4 text-green-400" />
+                ) : (
+                  <Copy className="w-4 h-4 text-gray-300" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={onContinue}
+          className="w-full mt-4 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+        >
+          Continue to Channel Integration
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
+
+  // Developer guide
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-orange-100">
+          <Code className="w-5 h-5 text-orange-600" />
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">Developer Guide</div>
+          <div className="text-xs text-gray-500">{context}</div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {/* Technical Steps */}
+        <div className="p-4 bg-orange-50 rounded-lg">
+          <div className="text-sm font-medium text-orange-900 mb-2">Implementation Steps</div>
+          <div className="space-y-2 text-xs text-orange-700">
+            <div className="flex items-start gap-2">
+              <span className="bg-orange-200 text-orange-800 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">1</span>
+              <span>Install SDK package using your package manager</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="bg-orange-200 text-orange-800 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">2</span>
+              <span>Initialize SDK with your app token</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="bg-orange-200 text-orange-800 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">3</span>
+              <span>Configure deep linking handlers</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="bg-orange-200 text-orange-800 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">4</span>
+              <span>Implement event tracking</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Documentation Links */}
+        <div className="p-4 bg-gray-50 rounded-lg">
+          <div className="text-sm font-medium text-gray-700 mb-2">Documentation</div>
+          <div className="space-y-2">
+            <a href="#" className="flex items-center gap-2 text-xs text-blue-600 hover:underline">
+              <ExternalLink className="w-3 h-3" />
+              SDK Reference Documentation
+            </a>
+            <a href="#" className="flex items-center gap-2 text-xs text-blue-600 hover:underline">
+              <ExternalLink className="w-3 h-3" />
+              Deep Linking Guide
+            </a>
+            <a href="#" className="flex items-center gap-2 text-xs text-blue-600 hover:underline">
+              <ExternalLink className="w-3 h-3" />
+              Event Tracking API
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <button
+        onClick={onContinue}
+        className="w-full mt-4 py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
+      >
+        Start SDK Integration
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+// Mode Explainer Component
+function ModeExplainer({ mode, onContinue, isCompleted = false }: {
+  mode: 'dev' | 'production';
+  onContinue: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Mode explanation reviewed</span>
+        </div>
+      </div>
+    );
+  }
+
+  const isDev = mode === 'dev';
+
+  return (
+    <div className={`bg-white border rounded-xl p-5 mt-4 shadow-sm ${isDev ? 'border-green-200' : 'border-blue-200'}`}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDev ? 'bg-green-100' : 'bg-blue-100'}`}>
+          {isDev ? (
+            <Code className="w-6 h-6 text-green-600" />
+          ) : (
+            <Sparkles className="w-6 h-6 text-blue-600" />
+          )}
+        </div>
+        <div>
+          <div className="font-semibold text-gray-900">
+            {isDev ? 'Development Mode' : 'Production Mode'}
+          </div>
+          <div className="text-xs text-gray-500">
+            {isDev ? 'For testing & SDK verification' : 'For live app with real users'}
+          </div>
+        </div>
+      </div>
+
+      {isDev ? (
+        <div className="space-y-4">
+          {/* What you can do */}
+          <div className="p-4 bg-green-50 rounded-lg">
+            <div className="text-sm font-medium text-green-900 mb-3">What you can test</div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-green-700">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>SDK initialization & event tracking</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-green-700">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Deep link functionality (URI Scheme, Universal Links)</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-green-700">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Deferred deep link testing</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-green-700">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Real-time log monitoring</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Limitations */}
+          <div className="p-4 bg-amber-50 rounded-lg">
+            <div className="flex items-start gap-2 mb-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm font-medium text-amber-900">Development Mode Limitations</div>
+            </div>
+            <div className="space-y-2 ml-6">
+              <div className="flex items-center gap-2 text-xs text-amber-700">
+                <X className="w-3.5 h-3.5" />
+                <span>Ad channel integration not available</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-amber-700">
+                <X className="w-3.5 h-3.5" />
+                <span>Attribution verification not possible</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-amber-700">
+                <X className="w-3.5 h-3.5" />
+                <span>Cost data import disabled</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Real-time Log Tip */}
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="w-4 h-4 text-gray-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="text-sm font-medium text-gray-700">Use Real-time Logs</div>
+                <div className="text-xs text-gray-600 mt-1">
+                  Go to Raw Data → App Real-time Log to verify SDK events. Note: Events appear after ~10 minutes and only the last 24 hours are available.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Full capabilities */}
+          <div className="p-4 bg-blue-50 rounded-lg">
+            <div className="text-sm font-medium text-blue-900 mb-3">Full Capabilities</div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Real user data collection & attribution</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Ad channel integration (Meta, Google, TikTok, etc.)</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Cost data import & ROAS analysis</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Full reporting suite (Actuals, Trend, Cohort)</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-blue-700">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Raw data export & postback configuration</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Requirements */}
+          <div className="p-4 bg-amber-50 rounded-lg">
+            <div className="flex items-start gap-2 mb-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm font-medium text-amber-900">Requirements for Production</div>
+            </div>
+            <div className="space-y-2 ml-6">
+              <div className="flex items-center gap-2 text-xs text-amber-700">
+                <Circle className="w-3.5 h-3.5" />
+                <span>App must be published on App Store / Play Store</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-amber-700">
+                <Circle className="w-3.5 h-3.5" />
+                <span>Store URLs must be verified</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-amber-700">
+                <Circle className="w-3.5 h-3.5" />
+                <span>iOS: ATT prompt implementation required for IDFA</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <button
+        onClick={onContinue}
+        className={`w-full mt-4 py-3 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+          isDev ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+        }`}
+      >
+        I understand, continue
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+// App Name Validation Component
+function AppNameValidation({ name, onSubmit, isCompleted = false }: {
+  name?: string;
+  onSubmit: (name: string) => void;
+  isCompleted?: boolean;
+}) {
+  const [appName, setAppName] = useState(name || '');
+  const [touched, setTouched] = useState(false);
+
+  const validateAppName = (value: string): { isValid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+
+    if (!value) {
+      errors.push('App name is required');
+    } else {
+      if (!/^[a-z0-9]+$/.test(value)) {
+        errors.push('Only lowercase letters (a-z) and numbers (0-9) allowed');
+      }
+      if (value.length < 3) {
+        errors.push('Minimum 3 characters required');
+      }
+      if (value.length > 50) {
+        errors.push('Maximum 50 characters allowed');
+      }
+    }
+
+    return { isValid: errors.length === 0, errors };
+  };
+
+  const validation = validateAppName(appName);
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">App name validated</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="text-sm font-medium text-gray-700 mb-1">App Name</div>
+      <div className="text-xs text-gray-500 mb-4">This will be used as a unique identifier for your app</div>
+
+      {/* Immutable Warning */}
+      <div className="flex items-center gap-2 mb-4 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200">
+        <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-600" />
+        <span className="text-sm text-amber-800">App name cannot be changed after registration</span>
+      </div>
+
+      {/* Input */}
+      <div className="relative">
+        <input
+          type="text"
+          value={appName}
+          onChange={(e) => {
+            setAppName(e.target.value.toLowerCase());
+            setTouched(true);
+          }}
+          onBlur={() => setTouched(true)}
+          placeholder="myappname"
+          className={`w-full rounded-lg focus:outline-none border px-4 py-3 text-gray-900 ${
+            touched && !validation.isValid
+              ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+              : 'border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+          }`}
+        />
+        {touched && validation.isValid && (
+          <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
+        )}
+      </div>
+
+      {/* Validation Rules */}
+      <div className="mt-3 space-y-1">
+        <div className={`flex items-center gap-2 text-xs ${
+          /^[a-z0-9]*$/.test(appName) && appName.length > 0 ? 'text-green-600' : 'text-gray-500'
+        }`}>
+          {/^[a-z0-9]*$/.test(appName) && appName.length > 0 ? (
+            <CheckCircle2 className="w-3.5 h-3.5" />
+          ) : (
+            <Circle className="w-3.5 h-3.5" />
+          )}
+          <span>Lowercase letters and numbers only</span>
+        </div>
+        <div className={`flex items-center gap-2 text-xs ${
+          appName.length >= 3 ? 'text-green-600' : 'text-gray-500'
+        }`}>
+          {appName.length >= 3 ? (
+            <CheckCircle2 className="w-3.5 h-3.5" />
+          ) : (
+            <Circle className="w-3.5 h-3.5" />
+          )}
+          <span>At least 3 characters</span>
+        </div>
+      </div>
+
+      {/* Error Messages */}
+      {touched && !validation.isValid && (
+        <div className="mt-3 p-3 bg-red-50 rounded-lg">
+          {validation.errors.map((error, index) => (
+            <div key={index} className="flex items-center gap-2 text-xs text-red-600">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>{error}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Preview */}
+      {appName && validation.isValid && (
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+          <div className="text-xs text-gray-500 mb-1">Your tracking link will look like:</div>
+          <code className="text-sm text-blue-600">https://abr.ge/{appName}/...</code>
+        </div>
+      )}
+
+      <button
+        onClick={() => validation.isValid && onSubmit(appName)}
+        disabled={!validation.isValid}
+        className={`w-full mt-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+          validation.isValid
+            ? 'bg-blue-600 text-white hover:bg-blue-700'
+            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+        }`}
+      >
+        Confirm App Name
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+// Registration Checklist Component
+function RegistrationChecklist({ items, onConfirm, isCompleted = false }: {
+  items: RegistrationCheckItem[];
+  onConfirm: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Registration checklist confirmed</span>
+        </div>
+      </div>
+    );
+  }
+
+  const allValid = items.every(item => item.isValid);
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="text-sm font-medium text-gray-700 mb-1">Registration Checklist</div>
+      <div className="text-xs text-gray-500 mb-4">Please review before submitting</div>
+
+      <div className="space-y-3">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className={`p-4 rounded-lg border ${
+              item.isValid
+                ? 'bg-green-50 border-green-200'
+                : 'bg-red-50 border-red-200'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              {item.isValid ? (
+                <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-medium ${item.isValid ? 'text-green-900' : 'text-red-900'}`}>
+                    {item.label}
+                  </span>
+                  {item.isImmutable && (
+                    <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">
+                      Cannot change later
+                    </span>
+                  )}
+                </div>
+                <div className={`text-xs mt-0.5 ${item.isValid ? 'text-green-700' : 'text-red-700'}`}>
+                  {item.description}
+                </div>
+                {item.value && (
+                  <div className="mt-2 text-sm font-mono bg-white/50 px-2 py-1 rounded">
+                    {item.value}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={onConfirm}
+        disabled={!allValid}
+        className={`w-full mt-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+          allValid
+            ? 'bg-blue-600 text-white hover:bg-blue-700'
+            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+        }`}
+      >
+        {allValid ? 'Register App' : 'Fix issues to continue'}
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+// Immutable Warning Component
+function ImmutableWarning({ field, value, onAcknowledge, isCompleted = false }: {
+  field: 'mode' | 'appName' | 'timezone' | 'currency';
+  value: string;
+  onAcknowledge: () => void;
+  isCompleted?: boolean;
+}) {
+  const fieldLabels = {
+    mode: 'App Mode',
+    appName: 'App Name',
+    timezone: 'Timezone',
+    currency: 'Currency',
+  };
+
+  const fieldDescriptions = {
+    mode: 'The app mode (Development/Production) determines available features and cannot be changed.',
+    appName: 'The app name is used as a unique identifier and will appear in your tracking links.',
+    timezone: 'All reports and data will be displayed in this timezone.',
+    currency: 'All cost and revenue data will be converted to this currency.',
+  };
+
+  if (isCompleted) {
+    return null;
+  }
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mt-4">
+      <div className="flex items-start gap-3">
+        <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0" />
+        <div className="flex-1">
+          <div className="font-medium text-amber-900 mb-1">
+            {fieldLabels[field]} Cannot Be Changed
+          </div>
+          <div className="text-sm text-amber-800 mb-3">
+            {fieldDescriptions[field]}
+          </div>
+          <div className="p-3 bg-white/50 rounded-lg mb-3">
+            <div className="text-xs text-amber-600 mb-1">Selected value:</div>
+            <div className="font-medium text-amber-900">{value}</div>
+          </div>
+          <button
+            onClick={onAcknowledge}
+            className="w-full py-2.5 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 transition-colors"
+          >
+            I understand, continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Phase Overview Component
+function PhaseOverview({ currentPhase, totalPhases, phases, onPhaseClick, isCompleted = false }: {
+  currentPhase: number;
+  totalPhases: number;
+  phases: { id: number; title: string; status: 'pending' | 'in_progress' | 'completed' }[];
+  onPhaseClick?: (phaseId: number) => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return null;
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="text-sm font-medium text-gray-700 mb-4">Onboarding Progress</div>
+
+      <div className="relative">
+        {/* Progress Line */}
+        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
+
+        <div className="space-y-4">
+          {phases.map((phase, index) => (
+            <div
+              key={phase.id}
+              className={`relative flex items-start gap-4 ${onPhaseClick ? 'cursor-pointer' : ''}`}
+              onClick={() => onPhaseClick?.(phase.id)}
+            >
+              {/* Status Indicator */}
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${
+                phase.status === 'completed'
+                  ? 'bg-green-500 text-white'
+                  : phase.status === 'in_progress'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 text-gray-500'
+              }`}>
+                {phase.status === 'completed' ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  <span className="text-sm font-medium">{phase.id}</span>
+                )}
+              </div>
+
+              {/* Phase Info */}
+              <div className={`flex-1 pb-4 ${index === phases.length - 1 ? 'pb-0' : ''}`}>
+                <div className={`text-sm font-medium ${
+                  phase.status === 'in_progress' ? 'text-blue-600' :
+                  phase.status === 'completed' ? 'text-green-600' : 'text-gray-600'
+                }`}>
+                  {phase.title}
+                </div>
+                {phase.status === 'in_progress' && (
+                  <div className="text-xs text-blue-500 mt-0.5">Currently working on this</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Phase Detail Component
+function PhaseDetail({ phase, onStart, isCompleted = false }: {
+  phase: PhaseInfo;
+  onStart: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Phase {phase.id} completed</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-100">
+          <span className="text-lg font-bold text-blue-600">{phase.id}</span>
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">{phase.title}</div>
+          {phase.estimatedDuration && (
+            <div className="text-xs text-gray-500">{phase.estimatedDuration}</div>
+          )}
+        </div>
+        {phase.requiredFor !== 'both' && (
+          <span className={`ml-auto text-xs px-2 py-1 rounded ${
+            phase.requiredFor === 'growth'
+              ? 'bg-blue-100 text-blue-700'
+              : 'bg-green-100 text-green-700'
+          }`}>
+            {phase.requiredFor === 'growth' ? 'Growth Plan' : 'Deep Link Plan'}
+          </span>
+        )}
+      </div>
+
+      <p className="text-sm text-gray-600 mb-4">{phase.description}</p>
+
+      <div className="p-4 bg-gray-50 rounded-lg mb-4">
+        <div className="text-xs font-medium text-gray-700 mb-2">Steps in this phase:</div>
+        <div className="space-y-2">
+          {phase.steps.map((step, index) => (
+            <div key={index} className="flex items-center gap-2 text-xs text-gray-600">
+              <Circle className="w-3 h-3 text-gray-400" />
+              <span>{step}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button
+        onClick={onStart}
+        className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+      >
+        Start Phase {phase.id}
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+// Validation Checklist Component (for SDK, Deeplink, Event, Attribution)
+function ValidationChecklist({ category, items, onRunTest, onItemClick, isCompleted = false }: {
+  category: 'sdk' | 'deeplink' | 'event' | 'attribution';
+  items: ValidationItem[];
+  onRunTest: () => void;
+  onItemClick?: (itemId: string) => void;
+  isCompleted?: boolean;
+}) {
+  const categoryConfig = {
+    sdk: { title: 'SDK Verification', icon: Code, color: 'blue' },
+    deeplink: { title: 'Deep Link Verification', icon: Share2, color: 'green' },
+    event: { title: 'Event Tracking Verification', icon: Sparkles, color: 'purple' },
+    attribution: { title: 'Attribution Verification', icon: CheckCircle2, color: 'orange' },
+  };
+
+  const config = categoryConfig[category];
+  const Icon = config.icon;
+  const allPassed = items.every(item => item.status === 'passed');
+  const hasFailed = items.some(item => item.status === 'failed');
+  const isChecking = items.some(item => item.status === 'checking');
+
+  if (isCompleted && allPassed) {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-xl p-4 mt-4">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-green-700">{config.title} - All checks passed</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="flex items-center gap-3 mb-4">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-${config.color}-100`}>
+          <Icon className={`w-5 h-5 text-${config.color}-600`} />
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">{config.title}</div>
+          <div className="text-xs text-gray-500">
+            {allPassed ? 'All checks passed' : hasFailed ? 'Some checks failed' : 'Ready to verify'}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2 mb-4">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className={`p-3 rounded-lg border ${
+              item.status === 'passed' ? 'bg-green-50 border-green-200' :
+              item.status === 'failed' ? 'bg-red-50 border-red-200' :
+              item.status === 'checking' ? 'bg-blue-50 border-blue-200' :
+              'bg-gray-50 border-gray-200'
+            } ${onItemClick ? 'cursor-pointer hover:bg-opacity-75' : ''}`}
+            onClick={() => onItemClick?.(item.id)}
+          >
+            <div className="flex items-start gap-3">
+              {item.status === 'checking' ? (
+                <Loader2 className="w-5 h-5 text-blue-500 animate-spin flex-shrink-0" />
+              ) : item.status === 'passed' ? (
+                <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+              ) : item.status === 'failed' ? (
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+              ) : (
+                <Circle className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              )}
+              <div className="flex-1">
+                <div className={`text-sm font-medium ${
+                  item.status === 'passed' ? 'text-green-900' :
+                  item.status === 'failed' ? 'text-red-900' :
+                  'text-gray-900'
+                }`}>
+                  {item.label}
+                </div>
+                <div className={`text-xs mt-0.5 ${
+                  item.status === 'passed' ? 'text-green-700' :
+                  item.status === 'failed' ? 'text-red-700' :
+                  'text-gray-600'
+                }`}>
+                  {item.status === 'failed' && item.errorMessage ? item.errorMessage : item.description}
+                </div>
+                {item.status === 'failed' && item.helpLink && (
+                  <a
+                    href={item.helpLink}
+                    className="text-xs text-blue-600 hover:underline mt-1 inline-flex items-center gap-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    View troubleshooting guide
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {!allPassed && (
+        <button
+          onClick={onRunTest}
+          disabled={isChecking}
+          className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+            isChecking
+              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          {isChecking ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Checking...
+            </>
+          ) : (
+            <>
+              Run Verification
+              <ChevronRight className="w-4 h-4" />
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Realtime Log Guide Component
+function RealtimeLogGuide({ appName, onContinue, isCompleted = false }: {
+  appName: string;
+  onContinue: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Real-time log guide reviewed</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-100">
+          <MessageCircle className="w-5 h-5 text-indigo-600" />
+        </div>
+        <div>
+          <div className="font-medium text-gray-900">Real-time Log Monitoring</div>
+          <div className="text-xs text-gray-500">Verify your SDK events in real-time</div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {/* How to access */}
+        <div className="p-4 bg-indigo-50 rounded-lg">
+          <div className="text-sm font-medium text-indigo-900 mb-2">How to access</div>
+          <div className="space-y-2 text-xs text-indigo-700">
+            <div className="flex items-start gap-2">
+              <span className="bg-indigo-200 text-indigo-800 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">1</span>
+              <span>Go to Raw Data → App Real-time Log in your dashboard</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="bg-indigo-200 text-indigo-800 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">2</span>
+              <span>Trigger events from your test device</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="bg-indigo-200 text-indigo-800 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">3</span>
+              <span>Wait ~10 minutes for events to appear</span>
+            </div>
+          </div>
+        </div>
+
+        {/* What to check */}
+        <div className="p-4 bg-gray-50 rounded-lg">
+          <div className="text-sm font-medium text-gray-700 mb-2">What you can verify</div>
+          <div className="space-y-1.5 text-xs text-gray-600">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-3.5 h-3.5 text-gray-400" />
+              <span>Platform (OS) and SDK version</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-3.5 h-3.5 text-gray-400" />
+              <span>Event category and action</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-3.5 h-3.5 text-gray-400" />
+              <span>Device identifiers (ADID, Cookie ID)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-3.5 h-3.5 text-gray-400" />
+              <span>User ID and custom attributes</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Important notes */}
+        <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg">
+          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-amber-700">
+            <strong>Note:</strong> Events appear after ~10 minutes. Only the last 24 hours of data is available in real-time logs.
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-2 mt-4">
+        <a
+          href={`https://dashboard.airbridge.io/apps/${appName}/raw-data/app-real-time-log`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 py-3 border border-indigo-200 text-indigo-700 rounded-lg font-medium hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
+        >
+          <ExternalLink className="w-4 h-4" />
+          Open Real-time Logs
+        </a>
+        <button
+          onClick={onContinue}
+          className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+        >
+          Continue
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Test Scenario Guide Component
+function TestScenarioGuide({ scenarios, onTest, onComplete, isCompleted = false }: {
+  scenarios: TestScenario[];
+  onTest: (scenarioId: string) => void;
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  const allPassed = scenarios.every(s => s.status === 'passed');
+  const [expandedScenario, setExpandedScenario] = useState<string | null>(null);
+
+  if (isCompleted && allPassed) {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-xl p-4 mt-4">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-green-700">All test scenarios passed</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 shadow-sm">
+      <div className="text-sm font-medium text-gray-700 mb-1">Test Scenarios</div>
+      <div className="text-xs text-gray-500 mb-4">Complete these tests to verify your integration</div>
+
+      <div className="space-y-3">
+        {scenarios.map((scenario) => (
+          <div
+            key={scenario.id}
+            className={`rounded-lg border overflow-hidden ${
+              scenario.status === 'passed' ? 'border-green-200' :
+              scenario.status === 'failed' ? 'border-red-200' :
+              scenario.status === 'testing' ? 'border-blue-200' :
+              'border-gray-200'
+            }`}
+          >
+            {/* Header */}
+            <div
+              className={`p-4 cursor-pointer ${
+                scenario.status === 'passed' ? 'bg-green-50' :
+                scenario.status === 'failed' ? 'bg-red-50' :
+                scenario.status === 'testing' ? 'bg-blue-50' :
+                'bg-gray-50'
+              }`}
+              onClick={() => setExpandedScenario(
+                expandedScenario === scenario.id ? null : scenario.id
+              )}
+            >
+              <div className="flex items-start gap-3">
+                {scenario.status === 'testing' ? (
+                  <Loader2 className="w-5 h-5 text-blue-500 animate-spin flex-shrink-0" />
+                ) : scenario.status === 'passed' ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                ) : scenario.status === 'failed' ? (
+                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                ) : (
+                  <Circle className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                )}
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900">{scenario.name}</div>
+                  <div className="text-xs text-gray-600 mt-0.5">{scenario.description}</div>
+                </div>
+                {expandedScenario === scenario.id ? (
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                )}
+              </div>
+            </div>
+
+            {/* Expanded Content */}
+            {expandedScenario === scenario.id && (
+              <div className="p-4 bg-white border-t border-gray-100">
+                <div className="text-xs font-medium text-gray-700 mb-2">Steps:</div>
+                <div className="space-y-2 mb-3">
+                  {scenario.steps.map((step, index) => (
+                    <div key={index} className="flex items-start gap-2 text-xs text-gray-600">
+                      <span className="bg-gray-200 text-gray-700 w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">
+                        {index + 1}
+                      </span>
+                      <span>{step}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="p-2 bg-blue-50 rounded text-xs text-blue-700">
+                  <strong>Expected:</strong> {scenario.expectedResult}
+                </div>
+                {scenario.status !== 'passed' && scenario.status !== 'testing' && (
+                  <button
+                    onClick={() => onTest(scenario.id)}
+                    className="mt-3 w-full py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Run This Test
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {allPassed && (
+        <button
+          onClick={onComplete}
+          className="w-full mt-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+        >
+          All Tests Passed - Continue
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Error Recovery Component
+function ErrorRecovery({ errorType, message, suggestions, onRetry, onSkip, isCompleted = false }: {
+  errorType: string;
+  message: string;
+  suggestions: string[];
+  onRetry: () => void;
+  onSkip?: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return null;
+  }
+
+  return (
+    <div className="bg-red-50 border border-red-200 rounded-xl p-5 mt-4">
+      <div className="flex items-start gap-3">
+        <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
+        <div className="flex-1">
+          <div className="font-medium text-red-900 mb-1">{errorType}</div>
+          <div className="text-sm text-red-700 mb-3">{message}</div>
+
+          {suggestions.length > 0 && (
+            <div className="p-3 bg-white/50 rounded-lg mb-3">
+              <div className="text-xs font-medium text-red-800 mb-2">Suggested solutions:</div>
+              <div className="space-y-1.5">
+                {suggestions.map((suggestion, index) => (
+                  <div key={index} className="flex items-start gap-2 text-xs text-red-700">
+                    <Lightbulb className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>{suggestion}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={onRetry}
+              className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+            >
+              Try Again
+            </button>
+            {onSkip && (
+              <button
+                onClick={onSkip}
+                className="flex-1 py-2.5 border border-red-200 text-red-700 rounded-lg font-medium hover:bg-red-100 transition-colors"
+              >
+                Skip for Now
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Setup Warning Component
+function SetupWarning({ warningType, title, message, onDismiss, isCompleted = false }: {
+  warningType: 'info' | 'warning' | 'error';
+  title: string;
+  message: string;
+  onDismiss?: () => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return null;
+  }
+
+  const config = {
+    info: {
+      bg: 'bg-blue-50',
+      border: 'border-blue-200',
+      icon: Lightbulb,
+      iconColor: 'text-blue-600',
+      titleColor: 'text-blue-900',
+      textColor: 'text-blue-700',
+    },
+    warning: {
+      bg: 'bg-amber-50',
+      border: 'border-amber-200',
+      icon: AlertCircle,
+      iconColor: 'text-amber-600',
+      titleColor: 'text-amber-900',
+      textColor: 'text-amber-700',
+    },
+    error: {
+      bg: 'bg-red-50',
+      border: 'border-red-200',
+      icon: AlertCircle,
+      iconColor: 'text-red-600',
+      titleColor: 'text-red-900',
+      textColor: 'text-red-700',
+    },
+  };
+
+  const c = config[warningType];
+  const Icon = c.icon;
+
+  return (
+    <div className={`${c.bg} border ${c.border} rounded-xl p-4 mt-4`}>
+      <div className="flex items-start gap-3">
+        <Icon className={`w-5 h-5 ${c.iconColor} flex-shrink-0 mt-0.5`} />
+        <div className="flex-1">
+          <div className={`font-medium ${c.titleColor}`}>{title}</div>
+          <div className={`text-sm ${c.textColor} mt-1`}>{message}</div>
+        </div>
+        {onDismiss && (
+          <button
+            onClick={onDismiss}
+            className={`p-1 hover:bg-black/10 rounded transition-colors`}
+          >
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // App Name Input Component
 function AppNameInput({ onSubmit, isCompleted = false }: { onSubmit: (name: string) => void; isCompleted?: boolean }) {
   const [name, setName] = useState('');
@@ -2987,6 +5534,107 @@ function TimezoneCurrencyConfirm({
   );
 }
 
+// Searchable Select Component
+function SearchableSelect({
+  label,
+  placeholder,
+  options,
+  value,
+  onChange
+}: {
+  label: string;
+  placeholder: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filteredOptions = options.filter(option =>
+    option.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (option: string) => {
+    onChange(option);
+    setSearchText('');
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="text-xs text-gray-500 block mb-2">{label}</label>
+      <div
+        className={`relative w-full rounded-lg border ${isOpen ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200'} bg-white transition-all`}
+      >
+        <div className="flex items-center">
+          <Search className="w-4 h-4 text-gray-400 ml-4" />
+          <input
+            type="text"
+            value={isOpen ? searchText : value}
+            onChange={e => {
+              setSearchText(e.target.value);
+              if (!isOpen) setIsOpen(true);
+            }}
+            onFocus={() => {
+              setIsOpen(true);
+              setSearchText('');
+            }}
+            placeholder={value || placeholder}
+            className="w-full px-3 py-3 rounded-lg focus:outline-none text-gray-900 text-sm"
+          />
+          {value && !isOpen && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange('');
+              }}
+              className="mr-2 p-1 hover:bg-gray-100 rounded"
+            >
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
+          )}
+          <ChevronDown className={`w-4 h-4 text-gray-400 mr-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+
+        {isOpen && (
+          <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map(option => (
+                <button
+                  key={option}
+                  onClick={() => handleSelect(option)}
+                  className={`w-full px-4 py-3 text-left text-sm hover:bg-blue-50 transition-colors ${
+                    value === option ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-900'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>{option}</span>
+                    {value === option && <Check className="w-4 h-4 text-blue-500" />}
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="px-4 py-3 text-sm text-gray-500">No results found</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Timezone & Currency Input Component
 function TimezoneCurrencyInput({ onSubmit, isCompleted = false }: { onSubmit: (timezone: string, currency: string) => void; isCompleted?: boolean }) {
   const [timezone, setTimezone] = useState('');
@@ -3004,10 +5652,30 @@ function TimezoneCurrencyInput({ onSubmit, isCompleted = false }: { onSubmit: (t
   const timezones = [
     'Asia/Seoul (KST, UTC+9)',
     'Asia/Tokyo (JST, UTC+9)',
+    'Asia/Shanghai (CST, UTC+8)',
+    'Asia/Singapore (SGT, UTC+8)',
+    'Asia/Hong_Kong (HKT, UTC+8)',
+    'Asia/Taipei (CST, UTC+8)',
+    'Asia/Bangkok (ICT, UTC+7)',
+    'Asia/Jakarta (WIB, UTC+7)',
+    'Asia/Manila (PHT, UTC+8)',
+    'Asia/Kolkata (IST, UTC+5:30)',
+    'Asia/Dubai (GST, UTC+4)',
     'America/New_York (EST, UTC-5)',
     'America/Los_Angeles (PST, UTC-8)',
+    'America/Chicago (CST, UTC-6)',
+    'America/Denver (MST, UTC-7)',
+    'America/Sao_Paulo (BRT, UTC-3)',
+    'America/Mexico_City (CST, UTC-6)',
+    'America/Toronto (EST, UTC-5)',
     'Europe/London (GMT, UTC+0)',
     'Europe/Paris (CET, UTC+1)',
+    'Europe/Berlin (CET, UTC+1)',
+    'Europe/Amsterdam (CET, UTC+1)',
+    'Europe/Moscow (MSK, UTC+3)',
+    'Australia/Sydney (AEDT, UTC+11)',
+    'Australia/Melbourne (AEDT, UTC+11)',
+    'Pacific/Auckland (NZDT, UTC+13)',
   ];
 
   const currencies = [
@@ -3017,6 +5685,24 @@ function TimezoneCurrencyInput({ onSubmit, isCompleted = false }: { onSubmit: (t
     'EUR (Euro)',
     'GBP (British Pound)',
     'CNY (Chinese Yuan)',
+    'TWD (Taiwan Dollar)',
+    'HKD (Hong Kong Dollar)',
+    'SGD (Singapore Dollar)',
+    'THB (Thai Baht)',
+    'IDR (Indonesian Rupiah)',
+    'PHP (Philippine Peso)',
+    'VND (Vietnamese Dong)',
+    'MYR (Malaysian Ringgit)',
+    'INR (Indian Rupee)',
+    'AUD (Australian Dollar)',
+    'CAD (Canadian Dollar)',
+    'CHF (Swiss Franc)',
+    'BRL (Brazilian Real)',
+    'MXN (Mexican Peso)',
+    'AED (UAE Dirham)',
+    'SAR (Saudi Riyal)',
+    'RUB (Russian Ruble)',
+    'NZD (New Zealand Dollar)',
   ];
 
   const isValid = timezone && currency;
@@ -3031,36 +5717,20 @@ function TimezoneCurrencyInput({ onSubmit, isCompleted = false }: { onSubmit: (t
         <span className="text-xs text-amber-800">Timezone and currency cannot be changed after registration</span>
       </div>
       <div className="space-y-4">
-        <div>
-          <label className="text-xs text-gray-500 block mb-2">
-            Timezone
-          </label>
-          <select
-            value={timezone}
-            onChange={e => setTimezone(e.target.value)}
-            className="w-full rounded-lg focus:outline-none border border-gray-200 text-gray-900 px-4 py-3"
-          >
-            <option value="">Select timezone...</option>
-            {timezones.map(tz => (
-              <option key={tz} value={tz}>{tz}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 block mb-2">
-            Currency
-          </label>
-          <select
-            value={currency}
-            onChange={e => setCurrency(e.target.value)}
-            className="w-full rounded-lg focus:outline-none border border-gray-200 text-gray-900 px-4 py-3"
-          >
-            <option value="">Select currency...</option>
-            {currencies.map(cur => (
-              <option key={cur} value={cur}>{cur}</option>
-            ))}
-          </select>
-        </div>
+        <SearchableSelect
+          label="Timezone"
+          placeholder="Search timezone..."
+          options={timezones}
+          value={timezone}
+          onChange={setTimezone}
+        />
+        <SearchableSelect
+          label="Currency"
+          placeholder="Search currency..."
+          options={currencies}
+          value={currency}
+          onChange={setCurrency}
+        />
       </div>
       <button
         onClick={() => isValid && onSubmit(timezone, currency)}
@@ -3203,22 +5873,22 @@ function DashboardAction({
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-500" />
-          <span className="text-sm font-medium text-gray-700">앱 등록 완료</span>
+          <span className="text-sm font-medium text-gray-700">App Registration Complete</span>
         </div>
       </div>
     );
   }
 
   const registrationSteps = [
-    { label: '앱 정보 검증 중...', icon: '🔍' },
-    { label: '앱 생성 중...', icon: '📱' },
-    { label: '토큰 생성 중...', icon: '🔑' },
-    { label: '등록 완료!', icon: '✅' },
+    { label: 'Validating app info...', icon: '🔍' },
+    { label: 'Creating app...', icon: '📱' },
+    { label: 'Generating tokens...', icon: '🔑' },
+    { label: 'Registration complete!', icon: '✅' },
   ];
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 min-w-[280px] max-w-full w-full">
-      <div className="text-sm font-medium text-gray-900 mb-4">앱 등록</div>
+      <div className="text-sm font-medium text-gray-900 mb-4">App Registration</div>
 
       {/* App Info Summary */}
       <div className="bg-gray-50 rounded-lg p-3 space-y-2 mb-4">
@@ -3402,6 +6072,909 @@ Airbridge.init({
   );
 }
 
+// React Native SDK Install Component
+function ReactNativeSdkInstall({
+  appName,
+  appToken,
+  onConfirm,
+  isCompleted = false
+}: {
+  appName: string;
+  appToken: string;
+  onConfirm: (status: string) => void;
+  isCompleted?: boolean;
+}) {
+  const [sdkType, setSdkType] = useState<'regular' | 'restricted'>('regular');
+  const [platform, setPlatform] = useState<'ios' | 'android'>('ios');
+  const [iosLanguage, setIosLanguage] = useState<'swift' | 'objc'>('swift');
+  const [androidLanguage, setAndroidLanguage] = useState<'kotlin' | 'java'>('kotlin');
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const handleCopy = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  // Installation commands
+  const npmInstallCommand = sdkType === 'regular'
+    ? 'npm install airbridge-react-native-sdk'
+    : 'npm install airbridge-react-native-sdk-restricted';
+
+  const podInstallCommand = 'cd ios; pod install';
+
+  // iOS initialization code
+  const iosSwiftCode = `import AirbridgeReactNative
+...
+func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+    AirbridgeReactNative.initializeSDK(name: "${appName}", token:"${appToken}")
+    ...
+}`;
+
+  const iosObjcCode = `#import <AirbridgeReactNative/AirbridgeReactNative.h>
+...
+- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+    [AirbridgeReactNative initializeSDKWithName:@"${appName}" token:@"${appToken}"];
+    ...
+}`;
+
+  // Android initialization code
+  const androidKotlinCode = `import co.ab180.airbridge.reactnative.AirbridgeReactNative
+...
+override fun onCreate() {
+    super.onCreate()
+    AirbridgeReactNative.initializeSDK(this, "${appName}", "${appToken}")
+    ...
+}`;
+
+  const androidJavaCode = `import co.ab180.airbridge.reactnative.AirbridgeReactNative;
+...
+@Override
+public void onCreate() {
+    super.onCreate();
+    AirbridgeReactNative.initializeSDK(this, "${appName}", "${appToken}");
+    ...
+}`;
+
+  const getCurrentInitCode = () => {
+    if (platform === 'ios') {
+      return iosLanguage === 'swift' ? iosSwiftCode : iosObjcCode;
+    }
+    return androidLanguage === 'kotlin' ? androidKotlinCode : androidJavaCode;
+  };
+
+  const getInitFilePath = () => {
+    if (platform === 'ios') {
+      return iosLanguage === 'swift'
+        ? 'ios/YOUR_PROJECT_NAME/AppDelegate.swift'
+        : 'ios/YOUR_PROJECT_NAME/AppDelegate.m';
+    }
+    return androidLanguage === 'kotlin'
+      ? 'android/app/src/main/java/.../MainApplication.kt'
+      : 'android/app/src/main/java/.../MainApplication.java';
+  };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">React Native SDK Setup Complete</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 w-full max-w-full">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+            <Smartphone className="w-4 h-4 text-white" />
+          </div>
+          <h2 className="text-base font-semibold text-gray-900">React Native SDK</h2>
+        </div>
+        <a
+          href="https://help.airbridge.io/developers/react-native-sdk"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          Documentation
+        </a>
+      </div>
+
+      {/* Auth Info */}
+      <div className="bg-gray-50 rounded-lg p-3 mb-4">
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <span className="text-gray-500">App Name:</span>
+            <span className="ml-2 font-mono text-gray-900">{appName}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">App Token:</span>
+            <span className="ml-2 font-mono text-gray-900">{appToken}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* SDK Type Selection */}
+      <div className="mb-5">
+        <div className="text-sm font-medium text-gray-700 mb-2">SDK Type</div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setSdkType('regular')}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              sdkType === 'regular'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Regular SDK
+          </button>
+          <button
+            onClick={() => setSdkType('restricted')}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              sdkType === 'restricted'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Restricted SDK
+          </button>
+        </div>
+        {sdkType === 'restricted' && (
+          <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs text-amber-800">
+              <strong>Restricted SDK</strong> does not collect device IDs (GAID, IDFA) for privacy compliance.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Step 1: Install Package */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center">1</div>
+          <span className="text-sm font-medium text-gray-700">Install Package</span>
+        </div>
+        <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#111827' }}>
+          <div className="flex items-center justify-between px-4 py-2" style={{ backgroundColor: '#1f2937' }}>
+            <span className="text-sm" style={{ color: '#9ca3af' }}>Terminal</span>
+            <button
+              onClick={() => handleCopy(npmInstallCommand, 'npm')}
+              className="flex items-center gap-1.5 text-sm hover:text-white transition-colors"
+              style={{ color: '#9ca3af' }}
+            >
+              {copiedCode === 'npm' ? <Check className="w-4 h-4" style={{ color: '#4ade80' }} /> : <Copy className="w-4 h-4" />}
+              {copiedCode === 'npm' ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <pre className="p-4 text-sm overflow-x-auto" style={{ backgroundColor: '#111827', color: '#f3f4f6' }}>
+            <code>{npmInstallCommand}</code>
+          </pre>
+        </div>
+      </div>
+
+      {/* Step 2: iOS Dependencies */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center">2</div>
+          <span className="text-sm font-medium text-gray-700">Install iOS Dependencies</span>
+        </div>
+        <p className="text-xs text-gray-500 mb-2 ml-7">Android dependencies are installed automatically.</p>
+        <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#111827' }}>
+          <div className="flex items-center justify-between px-4 py-2" style={{ backgroundColor: '#1f2937' }}>
+            <span className="text-sm" style={{ color: '#9ca3af' }}>Terminal</span>
+            <button
+              onClick={() => handleCopy(podInstallCommand, 'pod')}
+              className="flex items-center gap-1.5 text-sm hover:text-white transition-colors"
+              style={{ color: '#9ca3af' }}
+            >
+              {copiedCode === 'pod' ? <Check className="w-4 h-4" style={{ color: '#4ade80' }} /> : <Copy className="w-4 h-4" />}
+              {copiedCode === 'pod' ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <pre className="p-4 text-sm overflow-x-auto" style={{ backgroundColor: '#111827', color: '#f3f4f6' }}>
+            <code>{podInstallCommand}</code>
+          </pre>
+        </div>
+      </div>
+
+      {/* Step 3: Initialize SDK */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center">3</div>
+          <span className="text-sm font-medium text-gray-700">Initialize SDK</span>
+        </div>
+        <p className="text-xs text-gray-500 mb-3 ml-7">
+          iOS and Android require separate initialization. Add the code to your native files.
+        </p>
+
+        {/* Platform Tabs */}
+        <div className="flex gap-2 mb-3">
+          <button
+            onClick={() => setPlatform('ios')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              platform === 'ios'
+                ? 'bg-gray-900 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            iOS
+          </button>
+          <button
+            onClick={() => setPlatform('android')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              platform === 'android'
+                ? 'bg-gray-900 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Android
+          </button>
+        </div>
+
+        {/* Code Block */}
+        <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#111827' }}>
+          <div className="flex items-center justify-between px-4 py-2" style={{ backgroundColor: '#1f2937' }}>
+            <span className="text-sm" style={{ color: '#9ca3af' }}>{getInitFilePath()}</span>
+            <button
+              onClick={() => handleCopy(getCurrentInitCode(), 'init')}
+              className="flex items-center gap-1.5 text-sm hover:text-white transition-colors"
+              style={{ color: '#9ca3af' }}
+            >
+              {copiedCode === 'init' ? <Check className="w-4 h-4" style={{ color: '#4ade80' }} /> : <Copy className="w-4 h-4" />}
+              {copiedCode === 'init' ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          {/* Language Tabs */}
+          <div className="flex gap-2 px-4 pt-3">
+            {platform === 'ios' ? (
+              <>
+                <button
+                  onClick={() => setIosLanguage('swift')}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                    iosLanguage === 'swift'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                  }`}
+                >
+                  Swift
+                </button>
+                <button
+                  onClick={() => setIosLanguage('objc')}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                    iosLanguage === 'objc'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                  }`}
+                >
+                  Objective-C
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setAndroidLanguage('kotlin')}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                    androidLanguage === 'kotlin'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                  }`}
+                >
+                  Kotlin
+                </button>
+                <button
+                  onClick={() => setAndroidLanguage('java')}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                    androidLanguage === 'java'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                  }`}
+                >
+                  Java
+                </button>
+              </>
+            )}
+          </div>
+          <pre className="p-4 text-sm overflow-x-auto" style={{ backgroundColor: '#111827', color: '#f3f4f6' }}>
+            <code>{getCurrentInitCode()}</code>
+          </pre>
+        </div>
+      </div>
+
+      {/* Token Help */}
+      <p className="text-xs text-gray-500 mb-4 flex items-center gap-1">
+        <AlertCircle className="w-3 h-3" />
+        You can find App Name and App Token in Dashboard &gt; Settings &gt; Tokens
+      </p>
+
+      {/* Action Buttons */}
+      <div className="pt-4 border-t border-gray-100 space-y-2">
+        {[
+          { label: 'Done!', value: 'completed' },
+          { label: 'I can\'t find App Token', value: 'help-token' },
+        ].map(option => (
+          <button
+            key={option.value}
+            onClick={() => onConfirm(option.value)}
+            className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+          >
+            <Circle className="w-5 h-5 text-gray-400" />
+            <span className="text-sm">{option.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// React Native SDK Config Component
+function ReactNativeSdkConfig({
+  onComplete,
+  isCompleted = false
+}: {
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [showAllSettings, setShowAllSettings] = useState(false);
+
+  const handleCopy = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const configJson = `{
+  "sdkEnabled": true,
+  "logLevel": "warning",
+  "autoStartTrackingEnabled": true,
+  "sessionTimeoutInSecond": 300
+}`;
+
+  const fullConfigJson = `{
+  "sdkEnabled": boolean,
+  "logLevel": "debug" | "info" | "warning" | "error" | "fault",
+  "autoStartTrackingEnabled": boolean,
+  "autoDetermineTrackingAuthorizationTimeoutInSecond": number,
+  "trackMetaDeferredAppLinkEnabled": boolean,
+  "sessionTimeoutInSecond": number,
+  "metaInstallReferrerAppID": string,
+  "trackAirbridgeDeeplinkOnlyEnabled": boolean,
+  "trackInSessionLifecycleEventEnabled": boolean,
+  "trackingLinkCustomDomains": [string],
+  "hashUserInformationEnabled": boolean,
+  "sdkSignatureID": string,
+  "sdkSignatureSecret": string,
+  "clearEventBufferOnInitializeEnabled": boolean,
+  "eventBufferCountLimit": number,
+  "eventBufferSizeLimitInGibibyte": number,
+  "eventTransmitIntervalInSecond": number,
+  "isHandleAirbridgeDeeplinkOnly": boolean,
+  "collectTCFDataEnabled": boolean,
+  "trackingBlocklist": [string],
+  "calculateSKAdNetworkByServerEnabled": boolean
+}`;
+
+  const settingsGuide = [
+    { key: 'sdkEnabled', desc: 'SDK 비활성화 상태로 초기화', link: '#sdk-enabled' },
+    { key: 'logLevel', desc: 'SDK 로그 레벨 설정', link: '#log-level' },
+    { key: 'autoStartTrackingEnabled', desc: '옵트인/옵트아웃 설정', link: '#auto-start' },
+    { key: 'autoDetermineTrackingAuthorizationTimeoutInSecond', desc: 'ATT 프롬프트 타임아웃', link: '#att-timeout' },
+    { key: 'trackMetaDeferredAppLinkEnabled', desc: '메타 디퍼드 앱 링크', link: '#meta-deferred' },
+    { key: 'sessionTimeoutInSecond', desc: '세션 타임아웃 설정', link: '#session-timeout' },
+    { key: 'metaInstallReferrerAppID', desc: '메타 인스톨 리퍼러', link: '#meta-referrer' },
+    { key: 'trackAirbridgeDeeplinkOnlyEnabled', desc: '에어브릿지 딥링크만 추적', link: '#airbridge-deeplink-only' },
+    { key: 'hashUserInformationEnabled', desc: '유저 정보 해시화', link: '#hash-user' },
+    { key: 'sdkSignatureID', desc: 'SDK 시그니처 ID', link: '#sdk-signature' },
+    { key: 'sdkSignatureSecret', desc: 'SDK 시그니처 Secret', link: '#sdk-signature' },
+    { key: 'trackingBlocklist', desc: '식별자 추적 제한', link: '#tracking-blocklist' },
+    { key: 'calculateSKAdNetworkByServerEnabled', desc: 'SKAdNetwork 서버 계산', link: '#skan-server' },
+  ];
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">SDK Configuration Complete</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 w-full max-w-full">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
+            <Code className="w-4 h-4 text-white" />
+          </div>
+          <h2 className="text-base font-semibold text-gray-900">SDK Configuration</h2>
+        </div>
+        <a
+          href="https://help.airbridge.io/developers/react-native-sdk#sdk-settings"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          Documentation
+        </a>
+      </div>
+
+      {/* Instructions */}
+      <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4">
+        <div className="flex gap-2">
+          <Lightbulb className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-blue-800">
+            <p className="font-medium mb-1">Configuration Steps:</p>
+            <ol className="list-decimal list-inside space-y-1 text-xs">
+              <li>Create <code className="bg-blue-100 px-1 rounded">airbridge.json</code> in your React Native project root</li>
+              <li>Add the configuration options you need (omit unused keys)</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      {/* Example Config */}
+      <div className="mb-4">
+        <div className="text-sm font-medium text-gray-700 mb-2">Example Configuration</div>
+        <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#111827' }}>
+          <div className="flex items-center justify-between px-4 py-2" style={{ backgroundColor: '#1f2937' }}>
+            <span className="text-sm" style={{ color: '#9ca3af' }}>airbridge.json</span>
+            <button
+              onClick={() => handleCopy(configJson, 'config')}
+              className="flex items-center gap-1.5 text-sm hover:text-white transition-colors"
+              style={{ color: '#9ca3af' }}
+            >
+              {copiedCode === 'config' ? <Check className="w-4 h-4" style={{ color: '#4ade80' }} /> : <Copy className="w-4 h-4" />}
+              {copiedCode === 'config' ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <pre className="p-4 text-sm overflow-x-auto" style={{ backgroundColor: '#111827', color: '#f3f4f6' }}>
+            <code>{configJson}</code>
+          </pre>
+        </div>
+      </div>
+
+      {/* All Available Options Toggle */}
+      <button
+        onClick={() => setShowAllSettings(!showAllSettings)}
+        className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4"
+      >
+        {showAllSettings ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        <span>View all available options</span>
+      </button>
+
+      {showAllSettings && (
+        <>
+          {/* Full Config JSON */}
+          <div className="mb-4">
+            <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#111827' }}>
+              <div className="flex items-center justify-between px-4 py-2" style={{ backgroundColor: '#1f2937' }}>
+                <span className="text-sm" style={{ color: '#9ca3af' }}>All Configuration Options</span>
+                <button
+                  onClick={() => handleCopy(fullConfigJson, 'full-config')}
+                  className="flex items-center gap-1.5 text-sm hover:text-white transition-colors"
+                  style={{ color: '#9ca3af' }}
+                >
+                  {copiedCode === 'full-config' ? <Check className="w-4 h-4" style={{ color: '#4ade80' }} /> : <Copy className="w-4 h-4" />}
+                  {copiedCode === 'full-config' ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <pre className="p-4 text-xs overflow-x-auto" style={{ backgroundColor: '#111827', color: '#f3f4f6' }}>
+                <code>{fullConfigJson}</code>
+              </pre>
+            </div>
+          </div>
+
+          {/* Settings Guide Table */}
+          <div className="mb-4">
+            <div className="text-sm font-medium text-gray-700 mb-2">Settings Guide</div>
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-3 py-2 font-medium text-gray-700">Setting</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-700">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {settingsGuide.map((setting, index) => (
+                    <tr key={setting.key} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-3 py-2">
+                        <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-800">{setting.key}</code>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-gray-600">{setting.desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Note */}
+      <p className="text-xs text-gray-500 mb-4 flex items-center gap-1">
+        <AlertCircle className="w-3 h-3" />
+        Only include settings you need. Omit unused keys for cleaner configuration.
+      </p>
+
+      {/* Action Button */}
+      <button
+        onClick={onComplete}
+        className="w-full py-3 rounded-lg font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+      >
+        <Check className="w-4 h-4" />
+        Configuration Complete
+      </button>
+    </div>
+  );
+}
+
+// iOS ATT Prompt Config Component
+function IosAttPromptConfig({
+  appName,
+  appToken,
+  onComplete,
+  isCompleted = false
+}: {
+  appName: string;
+  appToken: string;
+  onComplete: () => void;
+  isCompleted?: boolean;
+}) {
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [promptTiming, setPromptTiming] = useState<'launch' | 'custom'>('launch');
+  const [codeLanguage, setCodeLanguage] = useState<'swift' | 'objc'>('swift');
+  const [timeout, setTimeout] = useState(30);
+
+  const handleCopy = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    window.setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  // Info.plist code
+  const infoPlistCode = `<key>NSUserTrackingUsageDescription</key>
+<string>We use your data to provide personalized ads and improve your experience.</string>`;
+
+  // ATT at desired time
+  const attCustomSwift = `import AppTrackingTransparency
+...
+ATTrackingManager.requestTrackingAuthorization { _ in }`;
+
+  const attCustomObjc = `#import <AppTrackingTransparency/AppTrackingTransparency.h>
+...
+[ATTrackingManager requestTrackingAuthorizationWithCompletionHandler:^(ATTrackingManagerAuthorizationStatus status) {}];`;
+
+  // ATT at launch
+  const attLaunchSwift = `import UIKit
+import Airbridge
+import AppTrackingTransparency
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    var observer: Any?
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+        let option = AirbridgeOptionBuilder(name: "${appName}", token: "${appToken}")
+            .build()
+        Airbridge.initializeSDK(option: option)
+
+        observer = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            if #available(iOS 14, *) {
+                ATTrackingManager.requestTrackingAuthorization { _ in }
+            }
+            if let observer = self?.observer {
+                NotificationCenter.default.removeObserver(observer)
+            }
+        }
+
+        return true
+    }
+}`;
+
+  const attLaunchObjc = `#import <UIKit/UIKit.h>
+#import <Airbridge/Airbridge.h>
+#import <AppTrackingTransparency/AppTrackingTransparency.h>
+
+@implementation AppDelegate {
+    id observer;
+}
+
+- (BOOL)application:(UIApplication *)application
+    didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+
+    AirbridgeOptionBuilder *builder = [[AirbridgeOptionBuilder alloc]
+        initWithName:@"${appName}" token:@"${appToken}"];
+    [Airbridge initializeSDKWithOption:[builder build]];
+
+    observer = [[NSNotificationCenter defaultCenter]
+        addObserverForName:UIApplicationDidBecomeActiveNotification
+        object:nil queue:nil usingBlock:^(NSNotification *note) {
+            if (@available(iOS 14, *)) {
+                [ATTrackingManager requestTrackingAuthorizationWithCompletionHandler:
+                    ^(ATTrackingManagerAuthorizationStatus status) {}];
+            }
+            [[NSNotificationCenter defaultCenter] removeObserver:self->observer];
+        }];
+
+    return YES;
+}
+@end`;
+
+  // Timeout setting code
+  const timeoutSwift = `import Airbridge
+...
+let option = AirbridgeOptionBuilder(name: "${appName}", token: "${appToken}")
+    .setAutoDetermineTrackingAuthorizationTimeout(second: ${timeout})
+    .build()
+Airbridge.initializeSDK(option: option)`;
+
+  const timeoutObjc = `#import <Airbridge/Airbridge.h>
+...
+AirbridgeOptionBuilder *builder = [[AirbridgeOptionBuilder alloc]
+    initWithName:@"${appName}" token:@"${appToken}"];
+[builder setAutoDetermineTrackingAuthorizationTimeoutWithSecond:${timeout}];
+[Airbridge initializeSDKWithOption:[builder build]];`;
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">ATT Prompt Configuration Complete</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 w-full max-w-full">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+            <Bell className="w-4 h-4 text-white" />
+          </div>
+          <h2 className="text-base font-semibold text-gray-900">Configure ATT Prompt</h2>
+        </div>
+        <a
+          href="https://help.airbridge.io/developers/ios-sdk#configure-att-prompt"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          Documentation
+        </a>
+      </div>
+
+      {/* Warning Notice */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+        <div className="flex gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-800">
+            <p className="font-medium">Important</p>
+            <p className="text-xs mt-1">
+              IDFA can only be collected if users consent via the ATT prompt.
+              Event collection should be delayed until the user allows tracking.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Step 1: Info.plist */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center">1</div>
+          <span className="text-sm font-medium text-gray-700">Add NSUserTrackingUsageDescription to Info.plist</span>
+        </div>
+        <p className="text-xs text-gray-500 mb-3 ml-7">
+          Navigate to [YOUR_PROJECT] → [Info] → [Custom iOS Target Properties] in Xcode and add "Privacy - Tracking Usage Description".
+        </p>
+        <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#111827' }}>
+          <div className="flex items-center justify-between px-4 py-2" style={{ backgroundColor: '#1f2937' }}>
+            <span className="text-sm" style={{ color: '#9ca3af' }}>Info.plist</span>
+            <button
+              onClick={() => handleCopy(infoPlistCode, 'plist')}
+              className="flex items-center gap-1.5 text-sm hover:text-white transition-colors"
+              style={{ color: '#9ca3af' }}
+            >
+              {copiedCode === 'plist' ? <Check className="w-4 h-4" style={{ color: '#4ade80' }} /> : <Copy className="w-4 h-4" />}
+              {copiedCode === 'plist' ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <pre className="p-4 text-sm overflow-x-auto" style={{ backgroundColor: '#111827', color: '#f3f4f6' }}>
+            <code>{infoPlistCode}</code>
+          </pre>
+        </div>
+      </div>
+
+      {/* Step 2: ATT Prompt Timing */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center">2</div>
+          <span className="text-sm font-medium text-gray-700">Set ATT Prompt Timing</span>
+        </div>
+
+        {/* Timing Selection */}
+        <div className="flex gap-2 mb-3">
+          <button
+            onClick={() => setPromptTiming('launch')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              promptTiming === 'launch'
+                ? 'bg-gray-900 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            At App Launch
+          </button>
+          <button
+            onClick={() => setPromptTiming('custom')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              promptTiming === 'custom'
+                ? 'bg-gray-900 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            At Desired Time
+          </button>
+        </div>
+
+        {/* Code Block */}
+        <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#111827' }}>
+          <div className="flex items-center justify-between px-4 py-2" style={{ backgroundColor: '#1f2937' }}>
+            <span className="text-sm" style={{ color: '#9ca3af' }}>
+              {promptTiming === 'launch' ? 'AppDelegate' : 'Your View Controller'}
+            </span>
+            <button
+              onClick={() => handleCopy(
+                promptTiming === 'launch'
+                  ? (codeLanguage === 'swift' ? attLaunchSwift : attLaunchObjc)
+                  : (codeLanguage === 'swift' ? attCustomSwift : attCustomObjc),
+                'att'
+              )}
+              className="flex items-center gap-1.5 text-sm hover:text-white transition-colors"
+              style={{ color: '#9ca3af' }}
+            >
+              {copiedCode === 'att' ? <Check className="w-4 h-4" style={{ color: '#4ade80' }} /> : <Copy className="w-4 h-4" />}
+              {copiedCode === 'att' ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          {/* Language Tabs */}
+          <div className="flex gap-2 px-4 pt-3">
+            <button
+              onClick={() => setCodeLanguage('swift')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                codeLanguage === 'swift'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+              }`}
+            >
+              Swift
+            </button>
+            <button
+              onClick={() => setCodeLanguage('objc')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                codeLanguage === 'objc'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+              }`}
+            >
+              Objective-C
+            </button>
+          </div>
+          <pre className="p-4 text-xs overflow-x-auto" style={{ backgroundColor: '#111827', color: '#f3f4f6' }}>
+            <code>
+              {promptTiming === 'launch'
+                ? (codeLanguage === 'swift' ? attLaunchSwift : attLaunchObjc)
+                : (codeLanguage === 'swift' ? attCustomSwift : attCustomObjc)}
+            </code>
+          </pre>
+        </div>
+      </div>
+
+      {/* Step 3: Timeout Setting */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center">3</div>
+          <span className="text-sm font-medium text-gray-700">Set Event Collection Delay</span>
+        </div>
+        <p className="text-xs text-gray-500 mb-3 ml-7">
+          Delay event collection until user responds to ATT prompt. Default is 30 seconds (max 3600 seconds).
+        </p>
+
+        {/* Timeout Slider */}
+        <div className="ml-7 mb-3">
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min="0"
+              max="120"
+              value={timeout}
+              onChange={(e) => setTimeout(Number(e.target.value))}
+              className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            />
+            <div className="w-20 text-center">
+              <span className="text-sm font-mono font-medium text-gray-900">{timeout}s</span>
+            </div>
+          </div>
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <span>0s</span>
+            <span>30s (default)</span>
+            <span>120s</span>
+          </div>
+        </div>
+
+        <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#111827' }}>
+          <div className="flex items-center justify-between px-4 py-2" style={{ backgroundColor: '#1f2937' }}>
+            <span className="text-sm" style={{ color: '#9ca3af' }}>SDK Initialization</span>
+            <button
+              onClick={() => handleCopy(codeLanguage === 'swift' ? timeoutSwift : timeoutObjc, 'timeout')}
+              className="flex items-center gap-1.5 text-sm hover:text-white transition-colors"
+              style={{ color: '#9ca3af' }}
+            >
+              {copiedCode === 'timeout' ? <Check className="w-4 h-4" style={{ color: '#4ade80' }} /> : <Copy className="w-4 h-4" />}
+              {copiedCode === 'timeout' ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          {/* Language Tabs for Timeout */}
+          <div className="flex gap-2 px-4 pt-3">
+            <button
+              onClick={() => setCodeLanguage('swift')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                codeLanguage === 'swift'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+              }`}
+            >
+              Swift
+            </button>
+            <button
+              onClick={() => setCodeLanguage('objc')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                codeLanguage === 'objc'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+              }`}
+            >
+              Objective-C
+            </button>
+          </div>
+          <pre className="p-4 text-sm overflow-x-auto" style={{ backgroundColor: '#111827', color: '#f3f4f6' }}>
+            <code>{codeLanguage === 'swift' ? timeoutSwift : timeoutObjc}</code>
+          </pre>
+        </div>
+      </div>
+
+      {/* Action Button */}
+      <button
+        onClick={onComplete}
+        className="w-full py-3 rounded-lg font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+      >
+        <Check className="w-4 h-4" />
+        ATT Configuration Complete
+      </button>
+    </div>
+  );
+}
+
 // Deep Link Choice Component
 function DeeplinkChoice({ onSelect, isCompleted = false }: { onSelect: (choice: string) => void; isCompleted?: boolean }) {
   if (isCompleted) {
@@ -3454,10 +7027,12 @@ function DeeplinkChoice({ onSelect, isCompleted = false }: { onSelect: (choice: 
 // Deep Link iOS Input Component
 function DeeplinkIosInput({
   bundleId,
+  appName,
   onSubmit,
   isCompleted = false
 }: {
   bundleId?: string;
+  appName?: string;
   onSubmit: (data: { uriScheme: string; appId: string }) => void;
   isCompleted?: boolean;
 }) {
@@ -3472,112 +7047,147 @@ function DeeplinkIosInput({
   };
 
   const appId = appIdPrefix && bundleId ? `${appIdPrefix}.${bundleId}` : '';
+  const airbrdigeHost = appName ? `${appName}.airbridge.io` : '[your_app_name].airbridge.io';
+  const applinksValue = `applinks:${airbrdigeHost}`;
 
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">iOS Deep Link Setup</div>
-        <div className="text-xs text-gray-400">Setup Complete</div>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">iOS Deep Link Setup Complete</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
-      <div className="text-sm font-medium text-gray-900 mb-4">🍎 iOS Deep Link Configuration</div>
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 w-full max-w-full">
+      {/* Section Header */}
+      <div className="flex items-center justify-between mb-5 pb-3 border-b border-gray-100">
+        <h2 className="text-base font-semibold text-gray-900">iOS</h2>
+        <a
+          href="https://help.airbridge.io/ko/developers/ios-sdk-v4#%EC%97%90%EC%96%B4%EB%B8%8C%EB%A6%BF%EC%A7%80%EC%97%90-%EB%94%A5%EB%A7%81%ED%81%AC-%EC%A0%95%EB%B3%B4-%EB%93%B1%EB%A1%9D%ED%95%98%EA%B8%B0"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium"
+        >
+          <Code className="w-3.5 h-3.5" />
+          Developer Guide
+        </a>
+      </div>
 
-      {/* URI Scheme Input */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          URL Scheme <span className="text-red-500">*</span>
-        </label>
+      {/* iOS URL Scheme Section */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-2">
+          <h3 className="text-sm font-medium text-gray-900">iOS URL Scheme</h3>
+          <span className="text-red-500 text-xs">*</span>
+        </div>
+        <p className="text-xs text-gray-500 mb-3">
+          Only values specified in the iOS configuration file info.plist can be entered.
+        </p>
         <div className="flex gap-2">
           <input
             type="text"
             value={uriScheme}
-            onChange={(e) => setUriScheme(e.target.value.toLowerCase().replace(/[^a-z0-9+]/g, ''))}
-            placeholder="myapp"
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+            onChange={(e) => setUriScheme(e.target.value.toLowerCase().replace(/[^a-z0-9+.-]/g, ''))}
+            placeholder="Enter iOS URL scheme"
+            className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
-          <span className="flex items-center px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500">://</span>
+          <span className="flex items-center px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 font-mono">://</span>
         </div>
-        <p className="mt-1.5 text-xs text-gray-500">
-          Only lowercase letters, numbers, and + are allowed. e.g., myapp, myapp+web
-        </p>
       </div>
 
-      {/* App ID Prefix Input */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          App ID Prefix <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          value={appIdPrefix}
-          onChange={(e) => setAppIdPrefix(e.target.value.toUpperCase())}
-          placeholder="9JA89QQLNQ"
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-        />
-        <p className="mt-1.5 text-xs text-gray-500">
-          Find this in your Apple Developer Dashboard
-        </p>
-      </div>
-
-      {/* Generated App ID Display */}
-      {bundleId && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-          <div className="text-xs font-medium text-blue-700 mb-1">Generated App ID</div>
-          <div className="flex items-center justify-between">
-            <code className="text-sm text-blue-900">
-              {appId || `[App ID Prefix].${bundleId}`}
-            </code>
-            {appId && (
-              <button
-                onClick={() => handleCopy(appId, 'appId')}
-                className="p-1.5 hover:bg-blue-100 rounded transition-colors"
-              >
-                {copySuccess === 'appId' ? (
-                  <Check className="w-4 h-4 text-green-600" />
-                ) : (
-                  <Copy className="w-4 h-4 text-blue-600" />
-                )}
-              </button>
-            )}
+      {/* iOS App ID Section */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium text-gray-900">iOS App ID</h3>
+            <span className="text-red-500 text-xs">*</span>
           </div>
+          <a
+            href="https://help.airbridge.io/en/developers/ios-sdk-v4"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+          >
+            <Code className="w-3 h-3" />
+            Developer Guide
+          </a>
         </div>
-      )}
+        <div className="text-xs text-gray-500 mb-3 space-y-1">
+          <p>A value used to verify deep links on iOS. Combine the App ID Prefix from Apple Developer Center with a period (.) and Bundle ID.</p>
+          <p className="text-gray-400">Example: 1AB23CDEFG.com.your.bundleid</p>
+        </div>
 
-      {/* Help Section */}
-      <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-        <div className="text-xs font-medium text-gray-700 mb-2">📍 How to find App ID Prefix</div>
-        <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
-          <li>Go to Apple Developer Dashboard</li>
-          <li>Navigate to Certificates, Identifiers & Profiles</li>
-          <li>Identifiers → Select your app</li>
-          <li>Copy the App ID Prefix value</li>
-        </ol>
-        <a
-          href="https://developer.apple.com/account/resources/identifiers/list"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:text-blue-700"
+        {/* App ID Prefix Input */}
+        <div className="mb-3">
+          <label className="block text-xs text-gray-500 mb-1.5">App ID Prefix</label>
+          <input
+            type="text"
+            value={appIdPrefix}
+            onChange={(e) => setAppIdPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+            placeholder="1AB23CDEFG"
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+          />
+        </div>
+
+        {/* Generated App ID Preview */}
+        {bundleId && (
+          <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+            <div className="text-xs text-blue-600 mb-1">Generated iOS App ID</div>
+            <div className="flex items-center justify-between">
+              <code className="text-sm text-blue-900 font-medium">
+                {appId || `[App ID Prefix].${bundleId}`}
+              </code>
+              {appId && (
+                <button
+                  onClick={() => handleCopy(appId, 'appId')}
+                  className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                >
+                  {copySuccess === 'appId' ? (
+                    <Check className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-blue-600" />
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* SDK Configuration Info */}
+      <div className="mb-5 pt-4 border-t border-gray-100">
+        <h3 className="text-sm font-medium text-gray-900 mb-2">iOS SDK Configuration Info</h3>
+        <p className="text-xs text-gray-500 mb-3">
+          Use the following value when adding applinks:your_app_name.airbridge.io to Xcode.
+        </p>
+        <button
+          onClick={() => handleCopy(applinksValue, 'applinks')}
+          className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors group"
         >
-          <ExternalLink className="w-3 h-3" />
-          Open Apple Developer Dashboard
-        </a>
+          <code className="text-sm text-gray-700 font-medium">{applinksValue}</code>
+          {copySuccess === 'applinks' ? (
+            <Check className="w-4 h-4 text-green-600" />
+          ) : (
+            <Copy className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+          )}
+        </button>
       </div>
 
       {/* Submit Button */}
       <button
         onClick={() => onSubmit({ uriScheme: uriScheme + '://', appId })}
         disabled={!uriScheme || !appIdPrefix}
-        className={`w-full py-2.5 rounded-lg font-medium transition-colors ${
+        className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
           uriScheme && appIdPrefix
-            ? 'bg-blue-500 text-white hover:bg-blue-600'
+            ? 'bg-blue-600 text-white hover:bg-blue-700'
             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
         }`}
       >
-        Continue
+        Save Settings
+        <ChevronRight className="w-4 h-4" />
       </button>
     </div>
   );
@@ -3586,16 +7196,19 @@ function DeeplinkIosInput({
 // Deep Link Android Input Component
 function DeeplinkAndroidInput({
   packageName,
+  appName,
   onSubmit,
   isCompleted = false
 }: {
   packageName?: string;
+  appName?: string;
   onSubmit: (data: { uriScheme: string; sha256Fingerprints: string[] }) => void;
   isCompleted?: boolean;
 }) {
   const [uriScheme, setUriScheme] = useState('');
   const [fingerprints, setFingerprints] = useState('');
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [showKeytoolGuide, setShowKeytoolGuide] = useState(false);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -3603,101 +7216,186 @@ function DeeplinkAndroidInput({
     setTimeout(() => setCopySuccess(null), 2000);
   };
 
+  const airbrdigeHost = appName ? `${appName}.airbridge.io` : '[your_app_name].airbridge.io';
   const keytoolCommand = 'keytool -list -v -keystore YOUR_KEYSTORE.keystore';
 
   if (isCompleted) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
-        <div className="text-sm font-medium text-gray-500 mb-2">Android Deep Link Setup</div>
-        <div className="text-xs text-gray-400">Setup Complete</div>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium text-gray-700">Android Deep Link Setup Complete</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
-      <div className="text-sm font-medium text-gray-900 mb-4">🤖 Android Deep Link Configuration</div>
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 w-full max-w-full">
+      {/* Section Header */}
+      <div className="flex items-center justify-between mb-5 pb-3 border-b border-gray-100">
+        <h2 className="text-base font-semibold text-gray-900">Android</h2>
+        <a
+          href="https://help.airbridge.io/en/developers/android-sdk-v4"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium"
+        >
+          <Code className="w-3.5 h-3.5" />
+          Developer Guide
+        </a>
+      </div>
 
-      {/* URI Scheme Input */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          URL Scheme <span className="text-red-500">*</span>
-        </label>
+      {/* Warning Banner */}
+      <div className="mb-5 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+        <div className="flex gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-amber-800">
+            <span className="font-medium">Important</span>
+            <p className="mt-1">Production and development apps must have different Android URI schemes and sha256_cert_fingerprints to ensure proper user redirection.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Android URL Scheme Section */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-2">
+          <h3 className="text-sm font-medium text-gray-900">Android URL Scheme</h3>
+          <span className="text-red-500 text-xs">*</span>
+        </div>
+        <p className="text-xs text-gray-500 mb-3">
+          Converts Airbridge deep links to scheme deep links based on the Android URI scheme. Required for App Links and URI scheme deep links.
+        </p>
         <div className="flex gap-2">
           <input
             type="text"
             value={uriScheme}
-            onChange={(e) => setUriScheme(e.target.value.toLowerCase().replace(/[^a-z0-9+]/g, ''))}
-            placeholder="myapp"
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+            onChange={(e) => setUriScheme(e.target.value.toLowerCase().replace(/[^a-z0-9+.-]/g, ''))}
+            placeholder="e.g., demo"
+            className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
-          <span className="flex items-center px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500">://</span>
+          <span className="flex items-center px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 font-mono">://</span>
         </div>
-        <p className="mt-1.5 text-xs text-gray-500">
-          Using the same scheme as iOS is recommended
-        </p>
+        {uriScheme && (
+          <p className="mt-2 text-xs text-green-600">
+            Registered value: <code className="bg-green-50 px-1 rounded">{uriScheme}://</code>
+          </p>
+        )}
       </div>
 
-      {/* Package Name Display */}
-      {packageName && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-100 rounded-lg">
-          <div className="text-xs font-medium text-green-700 mb-1">Package Name (Auto-filled)</div>
-          <code className="text-sm text-green-900">{packageName}</code>
+      {/* Package Name Section */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-2">
+          <h3 className="text-sm font-medium text-gray-900">Package Name</h3>
         </div>
-      )}
+        <div className="text-xs text-gray-500 mb-3 space-y-1">
+          <p>Identifies the Android app. Required for App Links and URI scheme deep links.</p>
+          <p className="text-gray-400">Example: com.your.packagename</p>
+        </div>
+        {packageName && (
+          <div className="p-3 bg-green-50 border border-green-100 rounded-lg">
+            <div className="flex items-center justify-between">
+              <code className="text-sm text-green-900 font-medium">{packageName}</code>
+              <button
+                onClick={() => handleCopy(packageName, 'package')}
+                className="p-1.5 hover:bg-green-100 rounded transition-colors"
+              >
+                {copySuccess === 'package' ? (
+                  <Check className="w-4 h-4 text-green-600" />
+                ) : (
+                  <Copy className="w-4 h-4 text-green-600" />
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
-      {/* SHA256 Fingerprint Input */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          SHA256 Fingerprint <span className="text-red-500">*</span>
-        </label>
+      {/* SHA256 Fingerprints Section */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium text-gray-900">sha256_cert_fingerprints</h3>
+            <span className="text-red-500 text-xs">*</span>
+          </div>
+          <a
+            href="https://help.airbridge.io/en/developers/android-sdk-v4"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+          >
+            <Code className="w-3 h-3" />
+            Developer Guide
+          </a>
+        </div>
+        <p className="text-xs text-gray-500 mb-3">
+          Used to configure App Links domain. You can enter multiple values separated by commas (,).
+        </p>
+
+        {/* Keytool Guide Toggle */}
+        <button
+          onClick={() => setShowKeytoolGuide(!showKeytoolGuide)}
+          className="w-full mb-3 flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors text-left"
+        >
+          <span className="text-xs font-medium text-gray-700">How to find SHA256 value</span>
+          <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showKeytoolGuide ? 'rotate-180' : ''}`} />
+        </button>
+
+        {showKeytoolGuide && (
+          <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
+            <p className="text-xs text-gray-600">Run the following command on your release keystore file:</p>
+            <div className="relative">
+              <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto">
+                <code>{keytoolCommand}</code>
+              </pre>
+              <button
+                onClick={() => handleCopy(keytoolCommand, 'keytool')}
+                className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+              >
+                {copySuccess === 'keytool' ? (
+                  <Check className="w-3 h-3 text-green-400" />
+                ) : (
+                  <Copy className="w-3 h-3 text-gray-400" />
+                )}
+              </button>
+            </div>
+            <p className="text-xs text-gray-600">Find the SHA256 value from the result:</p>
+            <pre className="bg-gray-100 p-3 rounded-lg text-xs text-gray-700 overflow-x-auto">
+{`Certificate fingerprints:
+    MD5:  4C:65:04:52:F0:3F:F8:65:08:D3:71:86:FC:EF:C3:49
+    SHA1: C8:BF:B7:B8:94:EA:5D:9D:38:59:FE:99:63:ED:47:B2:D9:5A:4E:CC
+    SHA256: B5:EF:4D:F9:DC:95:E6:9B:F3:9A:5E:E9:D6:E0:D8:F6:7B:AB:79:C8:78:67:34:D9:A7:01:AB:6A:86:01:0E:99`}
+            </pre>
+            <p className="text-xs text-gray-500">The SHA256 value is the sha256_cert_fingerprints.</p>
+          </div>
+        )}
+
         <textarea
           value={fingerprints}
           onChange={(e) => setFingerprints(e.target.value)}
-          placeholder="14:6D:E9:83:C5:73:06:50:D8:EE:..."
+          placeholder="B5:EF:4D:F9:DC:95:E6:9B:F3:9A:5E:E9:D6:E0:D8:F6:7B:AB:79:C8:78:67:34:D9:A7:01:AB:6A:86:01:0E:99"
           rows={3}
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 font-mono"
+          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
         />
-        <p className="mt-1.5 text-xs text-gray-500">
-          Separate multiple fingerprints with commas
-        </p>
       </div>
 
-      {/* Help Section */}
-      <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-        <div className="text-xs font-medium text-gray-700 mb-2">📍 How to find SHA256 Fingerprint</div>
-
-        <div className="mb-3">
-          <div className="text-xs text-gray-600 mb-1">Terminal command:</div>
-          <div className="flex items-center gap-2 p-2 bg-gray-800 rounded-lg">
-            <code className="flex-1 text-xs text-green-400 overflow-x-auto">{keytoolCommand}</code>
-            <button
-              onClick={() => handleCopy(keytoolCommand, 'keytool')}
-              className="p-1.5 hover:bg-gray-700 rounded transition-colors"
-            >
-              {copySuccess === 'keytool' ? (
-                <Check className="w-4 h-4 text-green-400" />
-              ) : (
-                <Copy className="w-4 h-4 text-gray-400" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        <div className="text-xs text-gray-600">
-          Or find it in Google Play Console:
-          <br />App Integrity → App Signing → SHA-256 certificate fingerprint
-        </div>
-
-        <a
-          href="https://play.google.com/console"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:text-blue-700"
+      {/* SDK Configuration Info */}
+      <div className="mb-5 pt-4 border-t border-gray-100">
+        <h3 className="text-sm font-medium text-gray-900 mb-2">Android SDK Configuration Info</h3>
+        <p className="text-xs text-gray-500 mb-3">
+          Use the following value as the host in the intent filter when adding URI mapping to AndroidManifest.xml.
+        </p>
+        <button
+          onClick={() => handleCopy(airbrdigeHost, 'host')}
+          className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors group"
         >
-          <ExternalLink className="w-3 h-3" />
-          Open Google Play Console
-        </a>
+          <code className="text-sm text-gray-700 font-medium">{airbrdigeHost}</code>
+          {copySuccess === 'host' ? (
+            <Check className="w-4 h-4 text-green-600" />
+          ) : (
+            <Copy className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+          )}
+        </button>
       </div>
 
       {/* Submit Button */}
@@ -3707,19 +7405,20 @@ function DeeplinkAndroidInput({
           sha256Fingerprints: fingerprints.split(',').map(f => f.trim()).filter(Boolean)
         })}
         disabled={!uriScheme || !fingerprints}
-        className={`w-full py-2.5 rounded-lg font-medium transition-colors ${
+        className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
           uriScheme && fingerprints
-            ? 'bg-blue-500 text-white hover:bg-blue-600'
+            ? 'bg-blue-600 text-white hover:bg-blue-700'
             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
         }`}
       >
-        Continue
+        Save Settings
+        <ChevronRight className="w-4 h-4" />
       </button>
     </div>
   );
 }
 
-// Deep Link Auto-Configuration Component (Chat UI에서 자동 등록)
+// Deep Link Auto-Configuration Component
 function DeeplinkDashboardGuide({
   platform,
   data,
@@ -3769,7 +7468,7 @@ function DeeplinkDashboardGuide({
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-500" />
           <span className="text-sm font-medium text-gray-700">
-            {platform === 'ios' ? 'iOS' : 'Android'} 딥링크 설정 완료
+            {platform === 'ios' ? 'iOS' : 'Android'} Deep Link Setup Complete
           </span>
         </div>
       </div>
@@ -3777,16 +7476,16 @@ function DeeplinkDashboardGuide({
   }
 
   const configSteps = [
-    { label: '딥링크 정보 검증 중...', icon: '🔍' },
-    { label: 'URI Scheme 등록 중...', icon: '🔗' },
-    { label: platform === 'ios' ? 'Universal Links 설정 중...' : 'App Links 설정 중...', icon: '⚙️' },
-    { label: '설정 완료!', icon: '✅' },
+    { label: 'Validating deep link info...', icon: '🔍' },
+    { label: 'Registering URI Scheme...', icon: '🔗' },
+    { label: platform === 'ios' ? 'Configuring Universal Links...' : 'Configuring App Links...', icon: '⚙️' },
+    { label: 'Setup complete!', icon: '✅' },
   ];
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4 min-w-[280px] max-w-full w-full">
       <div className="text-sm font-medium text-gray-900 mb-4">
-        {platform === 'ios' ? '🍎' : '🤖'} {platform === 'ios' ? 'iOS' : 'Android'} 딥링크 자동 설정
+        {platform === 'ios' ? '🍎' : '🤖'} {platform === 'ios' ? 'iOS' : 'Android'} Deep Link Auto-Configuration
       </div>
 
       {/* Configuration Summary */}
@@ -3900,18 +7599,83 @@ function DeeplinkSdkSetup({
 
   const schemeWithoutProtocol = uriScheme.replace('://', '');
 
-  // iOS Setup Steps
+  // ==================== iOS Setup Steps ====================
+  const iosHandleDeeplinkCode = `import Airbridge
+...
+/** when app is opened with deeplink */
+
+// track deeplink
+Airbridge.trackDeeplink(url: url)
+// handle deeplink
+var isAirbridgeDeeplink = Airbridge.handleDeeplink(url: url) { url in
+    // when app is opened with airbridge deeplink
+    // show proper content using url (YOUR_SCHEME://...)
+    handleAirbridgeDeeplink(url: url)
+}
+if isAirbridgeDeeplink { return }
+// when app is opened with other deeplink
+// use existing logic as it is`;
+
+  const iosSceneDelegateCode = `import UIKit
+import Airbridge
+
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+
+    // when app is opened with airbridge deeplink
+    func handleAirbridgeDeeplink(url: URL) {
+        // show proper content using url (YOUR_SCHEME://...)
+    }
+
+    // when terminated app is opened with scheme deeplink or universal links
+    func scene(
+        _ scene: UIScene,
+        willConnectTo session: UISceneSession,
+        options connectionOptions: UIScene.ConnectionOptions
+    ) {
+        Airbridge.trackDeeplink(connectionOptions: connectionOptions)
+        var isAirbridgeDeeplink = Airbridge.handleDeeplink(connectionOptions: connectionOptions) { url in
+            handleAirbridgeDeeplink(url: url)
+        }
+        if isAirbridgeDeeplink { return }
+    }
+
+    // when backgrounded app is opened with scheme deeplink
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        Airbridge.trackDeeplink(openURLContexts: openURLContexts)
+        var isAirbridgeDeeplink = Airbridge.handleDeeplink(openURLContexts: openURLContexts) { url in
+            handleAirbridgeDeeplink(url: url)
+        }
+        if isAirbridgeDeeplink { return }
+    }
+
+    // when backgrounded app is opened with universal links
+    func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        Airbridge.trackDeeplink(userActivity: userActivity)
+        var isAirbridgeDeeplink = Airbridge.handleDeeplink(userActivity: userActivity) { url in
+            handleAirbridgeDeeplink(url: url)
+        }
+        if isAirbridgeDeeplink { return }
+    }
+}`;
+
+  const iosDeferredDeeplinkCode = `let isFirstCalled = Airbridge.handleDeferredDeeplink { uri in
+    // when handleDeferredDeeplink is called firstly after install
+    if let uri = uri {
+        // show proper content using uri (YOUR_SCHEME://...)
+    }
+}`;
+
   const iosSteps = [
     {
       id: 'step1',
-      title: 'Step 1: Configure URL Types',
+      title: 'Step 1: Configure URL Types (Scheme Deep Link)',
       content: (
         <div className="space-y-3">
           <p className="text-xs text-gray-600">
             Navigate to the following path in Xcode:
           </p>
           <div className="p-2 bg-gray-100 rounded text-xs font-mono text-gray-700">
-            [Project] → [Info] → [URL Types]
+            [YOUR_PROJECT] → [Info] → [URL Types]
           </div>
           <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
             <li>Click the + button</li>
@@ -3930,22 +7694,24 @@ function DeeplinkSdkSetup({
               )}
             </button>
           </div>
-          <p className="text-xs text-amber-600">
-            ⚠️ Enter without the :// suffix
-          </p>
+          <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs text-amber-700">
+              ⚠️ Enter without the :// suffix
+            </p>
+          </div>
         </div>
       )
     },
     {
       id: 'step2',
-      title: 'Step 2: Configure Associated Domains',
+      title: 'Step 2: Configure Associated Domains (Universal Links)',
       content: (
         <div className="space-y-3">
           <p className="text-xs text-gray-600">
             Navigate to the following path in Xcode:
           </p>
           <div className="p-2 bg-gray-100 rounded text-xs font-mono text-gray-700">
-            [Project] → [Signing & Capabilities]
+            [YOUR_PROJECT] → [Signing & Capabilities]
           </div>
           <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
             <li>Click + Capability</li>
@@ -3972,14 +7738,150 @@ function DeeplinkSdkSetup({
               </div>
             ))}
           </div>
+          <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-700">
+              💡 If using Password AutoFill, add webcredentials domains to prevent passwords showing airbridge.io domain.
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'step3',
+      title: 'Step 3: Handle Deep Link in App (SceneDelegate)',
+      content: (
+        <div className="space-y-3">
+          {/* Tracking Link Structure Explanation */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-800 font-medium mb-2">How Airbridge Tracking Links Work</p>
+            <div className="text-xs text-blue-700 space-y-1">
+              <p>When a user clicks your tracking link (e.g., https://{appName}.abr.ge/campaign):</p>
+              <div className="pl-2 border-l-2 border-blue-300 ml-1 mt-2 space-y-1">
+                <p>1. Airbridge detects if your app is installed</p>
+                <p>2. <strong>App installed:</strong> Opens via Universal Links / App Links</p>
+                <p>3. <strong>Not installed:</strong> Redirects to App Store (Deferred Deep Link)</p>
+                <p>4. <strong>Final callback:</strong> <code className="px-1 py-0.5 bg-blue-100 rounded">{schemeWithoutProtocol}://path?params</code></p>
+              </div>
+              <p className="mt-2 font-medium">You only need to handle the scheme deeplink in your code!</p>
+            </div>
+          </div>
+
+          {/* Your Responsibility Warning */}
+          <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg">
+            <p className="text-xs text-amber-800 font-medium mb-1">Your Responsibility</p>
+            <p className="text-xs text-amber-700">
+              The <code className="px-1 py-0.5 bg-amber-100 rounded">handleDeeplink</code> callback provides your scheme deeplink (e.g., {schemeWithoutProtocol}://product?id=123).
+              <strong> You must implement the screen navigation logic yourself:</strong>
+            </p>
+            <ul className="text-xs text-amber-600 mt-1 space-y-0.5 list-disc list-inside">
+              <li>Parse the deeplink path and parameters</li>
+              <li>Navigate to the appropriate screen in your app</li>
+              <li>Handle edge cases (invalid paths, missing params)</li>
+            </ul>
+          </div>
+
+          <p className="text-xs text-gray-600">
+            Call <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">trackDeeplink</code> and <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">handleDeeplink</code> to collect events and route users.
+          </p>
+          <div className="p-2 bg-purple-50 border border-purple-200 rounded-lg mb-2">
+            <p className="text-xs text-purple-700 font-medium mb-1">Which class to use?</p>
+            <ul className="text-xs text-purple-600 space-y-0.5">
+              <li>• SceneDelegate + AppDelegate → Use <strong>SceneDelegate</strong></li>
+              <li>• AppDelegate only → Use <strong>AppDelegate</strong></li>
+              <li>• SwiftUI App → Use <strong>App</strong> struct</li>
+            </ul>
+          </div>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-[10px] text-green-400 overflow-x-auto max-h-64 overflow-y-auto">
+              {iosSceneDelegateCode}
+            </pre>
+            <button
+              onClick={() => handleCopy(iosSceneDelegateCode, 'scenedelegate')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'scenedelegate' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+          <div className="p-2 bg-gray-50 border border-gray-200 rounded-lg">
+            <p className="text-xs text-gray-600">
+              <strong>Callback scenarios:</strong>
+            </p>
+            <ul className="text-xs text-gray-500 mt-1 space-y-0.5">
+              <li>• App terminated + URL Scheme/Universal Links → <code>scene:willConnectTo:options:</code></li>
+              <li>• App backgrounded + URL Scheme → <code>scene:openURLContexts:</code></li>
+              <li>• App backgrounded + Universal Links → <code>scene:continue:</code></li>
+            </ul>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'step4',
+      title: 'Step 4: Deferred Deep Link Setup',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            For users clicking tracking links before app installation, use <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">handleDeferredDeeplink</code> to route them after install.
+          </p>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
+              {iosDeferredDeeplinkCode}
+            </pre>
+            <button
+              onClick={() => handleCopy(iosDeferredDeeplinkCode, 'deferredios')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'deferredios' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+          <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs text-amber-700">
+              ⚠️ If app is opened with a regular deep link, deferred deep link returns null to avoid conflicts.
+            </p>
+          </div>
         </div>
       )
     }
   ];
 
-  // Android Setup Steps
-  const androidAppLinksCode = `<intent-filter android:autoVerify="true">
+  // ==================== Android Setup Steps ====================
+  const androidActivityCode = `import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+
+class DeeplinkActivity: AppCompatActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+    }
+}`;
+
+  const androidManifestActivityCode = `<application
+    ...>
+
+    <activity android:name=".DeeplinkActivity" />
+
+</application>`;
+
+  const androidUriSchemeCode = `<intent-filter>
     <action android:name="android.intent.action.VIEW" />
+
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+
+    <data android:scheme="${schemeWithoutProtocol}" />
+</intent-filter>`;
+
+  const androidAppLinksCode1 = `<intent-filter android:autoVerify="true">
+    <action android:name="android.intent.action.VIEW" />
+
     <category android:name="android.intent.category.DEFAULT" />
     <category android:name="android.intent.category.BROWSABLE" />
 
@@ -3987,32 +7889,79 @@ function DeeplinkSdkSetup({
     <data android:scheme="https" android:host="${appName}.abr.ge" />
 </intent-filter>`;
 
-  const androidUriSchemeCode = `<intent-filter>
+  const androidAppLinksCode2 = `<intent-filter android:autoVerify="true">
     <action android:name="android.intent.action.VIEW" />
+
     <category android:name="android.intent.category.DEFAULT" />
     <category android:name="android.intent.category.BROWSABLE" />
 
-    <data android:scheme="${schemeWithoutProtocol}" />
+    <data android:scheme="http" android:host="${appName}.airbridge.io" />
+    <data android:scheme="https" android:host="${appName}.airbridge.io" />
 </intent-filter>`;
+
+  const androidHandleDeeplinkCode = `// when activity is opened with scheme deeplink or app links
+override fun onResume() {
+    super.onResume()
+
+    // handle airbridge deeplink
+    val isAirbridgeDeeplink = Airbridge.handleDeeplink(intent) {
+        // when app is opened with airbridge deeplink
+        // show proper content using url (YOUR_SCHEME://...)
+    }
+    if (isAirbridgeDeeplink) return
+
+    // when app is opened with other deeplink
+    // use existing logic as it is
+}
+
+override fun onNewIntent(intent: Intent?) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+}`;
+
+  const androidDeferredDeeplinkCode = `val isFirstCalled = Airbridge.handleDeferredDeeplink { uri ->
+    // when handleDeferredDeeplink is called firstly after install
+    if (uri != null) {
+        // show proper content using uri (YOUR_SCHEME://...)
+    }
+}`;
 
   const androidSteps = [
     {
       id: 'step1',
-      title: 'Step 1: Add App Links Intent Filter',
+      title: 'Step 1: Create DeeplinkActivity',
       content: (
         <div className="space-y-3">
           <p className="text-xs text-gray-600">
-            Add this to MainActivity in AndroidManifest.xml:
+            Create a new Activity class to handle deep links:
           </p>
           <div className="relative">
             <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
-              {androidAppLinksCode}
+              {androidActivityCode}
             </pre>
             <button
-              onClick={() => handleCopy(androidAppLinksCode, 'applinks')}
+              onClick={() => handleCopy(androidActivityCode, 'activity')}
               className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
             >
-              {copySuccess === 'applinks' ? (
+              {copySuccess === 'activity' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+          <p className="text-xs text-gray-600">
+            Add the Activity to AndroidManifest.xml:
+          </p>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
+              {androidManifestActivityCode}
+            </pre>
+            <button
+              onClick={() => handleCopy(androidManifestActivityCode, 'manifest')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'manifest' ? (
                 <Check className="w-3.5 h-3.5 text-green-400" />
               ) : (
                 <Copy className="w-3.5 h-3.5 text-gray-400" />
@@ -4028,7 +7977,7 @@ function DeeplinkSdkSetup({
       content: (
         <div className="space-y-3">
           <p className="text-xs text-gray-600">
-            Add as a <span className="text-red-500 font-medium">separate</span> intent-filter tag:
+            Add this intent-filter to DeeplinkActivity in AndroidManifest.xml:
           </p>
           <div className="relative">
             <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
@@ -4047,8 +7996,152 @@ function DeeplinkSdkSetup({
           </div>
           <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg">
             <p className="text-xs text-amber-700">
-              ⚠️ Important: Always use separate intent-filter tags!
+              ⚠️ Use a <strong>separate</strong> intent-filter tag. Combining all data tags in one filter may cause deep links to fail.
             </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'step3',
+      title: 'Step 3: Add App Links Intent Filters',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Add these two <strong>separate</strong> intent-filters for App Links:
+          </p>
+          <div className="text-xs text-gray-500 mb-1">Filter 1: abr.ge domain</div>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
+              {androidAppLinksCode1}
+            </pre>
+            <button
+              onClick={() => handleCopy(androidAppLinksCode1, 'applinks1')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'applinks1' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+          <div className="text-xs text-gray-500 mb-1 mt-3">Filter 2: airbridge.io domain</div>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
+              {androidAppLinksCode2}
+            </pre>
+            <button
+              onClick={() => handleCopy(androidAppLinksCode2, 'applinks2')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'applinks2' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+          <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs text-amber-700">
+              ⚠️ These must be <strong>separate</strong> intent-filter tags with android:autoVerify="true"
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'step4',
+      title: 'Step 4: Handle Deep Link in Activity',
+      content: (
+        <div className="space-y-3">
+          {/* Tracking Link Structure Explanation */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-800 font-medium mb-2">How Airbridge Tracking Links Work</p>
+            <div className="text-xs text-blue-700 space-y-1">
+              <p>When a user clicks your tracking link (e.g., https://{appName}.abr.ge/campaign):</p>
+              <div className="pl-2 border-l-2 border-blue-300 ml-1 mt-2 space-y-1">
+                <p>1. Airbridge detects if your app is installed</p>
+                <p>2. <strong>App installed:</strong> Opens via App Links</p>
+                <p>3. <strong>Not installed:</strong> Redirects to Play Store (Deferred Deep Link)</p>
+                <p>4. <strong>Final callback:</strong> <code className="px-1 py-0.5 bg-blue-100 rounded">{schemeWithoutProtocol}://path?params</code></p>
+              </div>
+              <p className="mt-2 font-medium">You only need to handle the scheme deeplink in your code!</p>
+            </div>
+          </div>
+
+          {/* Your Responsibility Warning */}
+          <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg">
+            <p className="text-xs text-amber-800 font-medium mb-1">Your Responsibility</p>
+            <p className="text-xs text-amber-700">
+              The <code className="px-1 py-0.5 bg-amber-100 rounded">handleDeeplink</code> callback provides your scheme deeplink (e.g., {schemeWithoutProtocol}://product?id=123).
+              <strong> You must implement the screen navigation logic yourself:</strong>
+            </p>
+            <ul className="text-xs text-amber-600 mt-1 space-y-0.5 list-disc list-inside">
+              <li>Parse the deeplink path and parameters</li>
+              <li>Navigate to the appropriate screen in your app</li>
+              <li>Handle edge cases (invalid paths, missing params)</li>
+            </ul>
+          </div>
+
+          <p className="text-xs text-gray-600">
+            In DeeplinkActivity, use <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">Airbridge.handleDeeplink</code> to convert Airbridge deep links to scheme deep links and route users:
+          </p>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
+              {androidHandleDeeplinkCode}
+            </pre>
+            <button
+              onClick={() => handleCopy(androidHandleDeeplinkCode, 'handledeeplink')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'handledeeplink' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+          <div className="p-2 bg-gray-50 border border-gray-200 rounded-lg">
+            <p className="text-xs text-gray-600">
+              <code>handleDeeplink</code> returns true for Airbridge deep links and provides the converted scheme URL via callback.
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'step5',
+      title: 'Step 5: Deferred Deep Link Setup',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            For users clicking tracking links before app installation, use <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">handleDeferredDeeplink</code>:
+          </p>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
+              {androidDeferredDeeplinkCode}
+            </pre>
+            <button
+              onClick={() => handleCopy(androidDeferredDeeplinkCode, 'deferred')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'deferred' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+          <div className="p-2 bg-gray-50 border border-gray-200 rounded-lg">
+            <p className="text-xs text-gray-600">
+              <strong>Return values:</strong>
+            </p>
+            <ul className="text-xs text-gray-500 mt-1 space-y-0.5">
+              <li>• Returns <code>true</code> on first call after install</li>
+              <li>• Returns saved deep link URI or null if none</li>
+              <li>• Returns <code>false</code> if SDK not initialized or already called</li>
+            </ul>
           </div>
         </div>
       )
@@ -4069,8 +8162,15 @@ function DeeplinkSdkSetup({
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
       <div className="text-sm font-medium text-gray-900 mb-4">
-        {platform === 'ios' ? '🍎' : '🤖'} {platform === 'ios' ? 'iOS' : 'Android'} SDK Setup
+        {platform === 'ios' ? '🍎' : '🤖'} {platform === 'ios' ? 'iOS' : 'Android'} Deep Link Setup
         <span className="ml-2 text-xs font-normal text-gray-500">({framework})</span>
+      </div>
+
+      {/* Info Banner */}
+      <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg mb-4">
+        <p className="text-xs text-blue-700">
+          After registering deep link info on Airbridge dashboard, configure your app to handle deep links.
+        </p>
       </div>
 
       {/* Steps Accordion */}
@@ -4104,12 +8204,17 @@ function DeeplinkSdkSetup({
           {platform === 'ios' ? (
             <>
               <div>☐ URL scheme entered in URL Types</div>
-              <div>☐ Domains added to Associated Domains</div>
+              <div>☐ Associated Domains configured (airbridge.io & abr.ge)</div>
+              <div>☐ trackDeeplink & handleDeeplink implemented in delegate</div>
+              <div>☐ handleDeferredDeeplink called after SDK init</div>
             </>
           ) : (
             <>
-              <div>☐ autoVerify="true" set in App Links intent-filter</div>
-              <div>☐ URI Scheme intent-filter added separately</div>
+              <div>☐ DeeplinkActivity created and added to manifest</div>
+              <div>☐ URI Scheme intent-filter added (separate tag)</div>
+              <div>☐ App Links intent-filters added (autoVerify="true")</div>
+              <div>☐ handleDeeplink implemented in onResume</div>
+              <div>☐ handleDeferredDeeplink called after SDK init</div>
             </>
           )}
         </div>
@@ -4120,7 +8225,7 @@ function DeeplinkSdkSetup({
         onClick={onComplete}
         className="w-full py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors"
       >
-        SDK Setup Complete
+        Deep Link Setup Complete
       </button>
     </div>
   );
@@ -4253,12 +8358,12 @@ function DeeplinkTestScenarios({
 
       {/* Test Link Info */}
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
-        <div className="text-xs font-medium text-blue-800 mb-2">📱 테스트 링크</div>
+        <div className="text-xs font-medium text-blue-800 mb-2">📱 Test Links</div>
         <code className="text-xs text-blue-700 break-all block bg-white p-2 rounded">
           https://{appName}.abr.ge/test
         </code>
         <p className="text-xs text-blue-600 mt-2">
-          위 링크를 디바이스에서 클릭하여 각 시나리오를 테스트하세요.
+          Click the link above on your device to test each scenario.
         </p>
       </div>
 
@@ -4391,6 +8496,484 @@ function DeeplinkComplete({
           className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
         >
           Continue to Channel Integration
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Uninstall Tracking Setup Component
+function UninstallTrackingSetup({
+  platform,
+  onComplete,
+  onSkip,
+  isCompleted = false
+}: {
+  platform: 'ios' | 'android';
+  onComplete: () => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  const [expandedSection, setExpandedSection] = useState<string | null>('step1');
+  const [copySuccess, setCopySuccess] = useState<string | null>(null);
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopySuccess(id);
+    setTimeout(() => setCopySuccess(null), 2000);
+  };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Uninstall Tracking Setup</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  const iosSteps = [
+    {
+      id: 'step1',
+      title: 'Step 1: Enable Push Notifications',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Airbridge uses silent push notifications to track app uninstalls.
+            Make sure Push Notifications capability is enabled in your Xcode project.
+          </p>
+          <div className="p-2 bg-gray-100 rounded text-xs font-mono text-gray-700">
+            [YOUR_PROJECT] → [Signing & Capabilities] → [+ Capability] → Push Notifications
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'step2',
+      title: 'Step 2: Upload APNs Key to Airbridge',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Generate an APNs authentication key from Apple Developer Console and upload it to Airbridge Dashboard.
+          </p>
+          <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+            <li>Go to Apple Developer → Certificates, IDs & Profiles → Keys</li>
+            <li>Create a new key with Apple Push Notifications service (APNs) enabled</li>
+            <li>Download the .p8 file</li>
+            <li>Upload to Airbridge: Settings → Channels & Integrations → Uninstall Tracking</li>
+          </ol>
+          <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-700">
+              You'll need your Team ID and Key ID from Apple Developer Console.
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'step3',
+      title: 'Step 3: Register Device Token',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Call <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">registerPushToken</code> in your AppDelegate:
+          </p>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
+{`func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+) {
+    Airbridge.registerPushToken(deviceToken)
+}`}
+            </pre>
+            <button
+              onClick={() => handleCopy(`func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+) {
+    Airbridge.registerPushToken(deviceToken)
+}`, 'iostoken')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'iostoken' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+        </div>
+      )
+    }
+  ];
+
+  const androidSteps = [
+    {
+      id: 'step1',
+      title: 'Step 1: Add Firebase to Your Project',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Airbridge uses Firebase Cloud Messaging (FCM) to track app uninstalls.
+            Make sure Firebase is configured in your project.
+          </p>
+          <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+            <li>Go to Firebase Console and create/select a project</li>
+            <li>Add your Android app to the Firebase project</li>
+            <li>Download google-services.json and add to your app module</li>
+            <li>Add Firebase dependencies to build.gradle</li>
+          </ol>
+        </div>
+      )
+    },
+    {
+      id: 'step2',
+      title: 'Step 2: Upload FCM Server Key to Airbridge',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Get your FCM Server Key and upload it to Airbridge Dashboard.
+          </p>
+          <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+            <li>Go to Firebase Console → Project Settings → Cloud Messaging</li>
+            <li>Copy the Server key (or generate a new one)</li>
+            <li>Upload to Airbridge: Settings → Channels & Integrations → Uninstall Tracking</li>
+          </ol>
+          <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs text-amber-700">
+              Note: Firebase Cloud Messaging API (V1) is recommended over legacy Server Key.
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'step3',
+      title: 'Step 3: Register FCM Token',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Call <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">registerPushToken</code> when you receive the FCM token:
+          </p>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
+{`class MyFirebaseMessagingService : FirebaseMessagingService() {
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
+        Airbridge.registerPushToken(token)
+    }
+}`}
+            </pre>
+            <button
+              onClick={() => handleCopy(`class MyFirebaseMessagingService : FirebaseMessagingService() {
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
+        Airbridge.registerPushToken(token)
+    }
+}`, 'androidtoken')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'androidtoken' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+        </div>
+      )
+    }
+  ];
+
+  const steps = platform === 'ios' ? iosSteps : androidSteps;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <Bell className="w-5 h-5 text-blue-500" />
+        <div className="text-base font-medium text-gray-900">
+          Uninstall Tracking Setup ({platform === 'ios' ? 'iOS' : 'Android'})
+        </div>
+      </div>
+
+      <p className="text-sm text-gray-600 mb-4">
+        Track when users uninstall your app to understand user retention and measure campaign effectiveness.
+      </p>
+
+      <div className="space-y-2">
+        {steps.map((step) => (
+          <div key={step.id} className="border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setExpandedSection(expandedSection === step.id ? null : step.id)}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+            >
+              <span className="text-sm font-medium text-gray-700">{step.title}</span>
+              {expandedSection === step.id ? (
+                <ChevronUp className="w-4 h-4 text-gray-500" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-gray-500" />
+              )}
+            </button>
+            {expandedSection === step.id && (
+              <div className="p-3 bg-white border-t border-gray-200">
+                {step.content}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-2 mt-4">
+        <button
+          onClick={onComplete}
+          className="flex-1 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
+        >
+          Complete Setup
+        </button>
+        <button
+          onClick={onSkip}
+          className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+        >
+          Skip for Now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Hybrid App Setup Component
+function HybridAppSetup({
+  platform,
+  appName,
+  onComplete,
+  onSkip,
+  isCompleted = false
+}: {
+  platform: 'ios' | 'android';
+  appName: string;
+  onComplete: () => void;
+  onSkip: () => void;
+  isCompleted?: boolean;
+}) {
+  const [expandedSection, setExpandedSection] = useState<string | null>('step1');
+  const [copySuccess, setCopySuccess] = useState<string | null>(null);
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopySuccess(id);
+    setTimeout(() => setCopySuccess(null), 2000);
+  };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60">
+        <div className="text-sm font-medium text-gray-500 mb-2">Hybrid App Setup</div>
+        <div className="text-xs text-gray-400">Completed</div>
+      </div>
+    );
+  }
+
+  const webTokenCode = platform === 'ios'
+    ? `// In your WKWebView setup
+let webToken = Airbridge.getWebToken()
+
+// Inject token into WebView
+let script = "window.airbridge_web_token = '\\(webToken ?? "")';"
+webView.evaluateJavaScript(script)`
+    : `// In your WebView setup
+val webToken = Airbridge.getWebToken()
+
+// Inject token into WebView
+webView.evaluateJavascript(
+    "window.airbridge_web_token = '$webToken';",
+    null
+)`;
+
+  const webSdkCode = `<!-- Add to your WebView pages -->
+<script>
+(function(a,i,r,b,d,e,g){
+  a[d]=a[d]||function(){(a[d].q=a[d].q||[]).push(arguments)};
+  e=i.createElement(r);g=i.getElementsByTagName(r)[0];
+  e.async=1;e.src=b;g.parentNode.insertBefore(e,g);
+})(window,document,'script','//static.airbridge.io/sdk/latest/airbridge.min.js','airbridge');
+
+// Initialize with the web token from native app
+airbridge('init', {
+  app: '${appName || 'YOUR_APP_NAME'}',
+  webToken: window.airbridge_web_token || 'YOUR_WEB_TOKEN'
+});
+</script>`;
+
+  const steps = [
+    {
+      id: 'step1',
+      title: 'Step 1: Understanding Hybrid App Tracking',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Hybrid apps have both native code and WebViews. To track events in WebViews:
+          </p>
+          <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+            <li><strong>Native SDK:</strong> Handles app lifecycle events (install, open)</li>
+            <li><strong>Web SDK:</strong> Tracks events within WebViews</li>
+            <li><strong>Bridge:</strong> Connects native and web to maintain user identity</li>
+          </ul>
+          <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-700">
+              Event tagging in WebViews should be done using the Web SDK.
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'step2',
+      title: 'Step 2: Get Web Token from Native SDK',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Get the web token from the native SDK and inject it into your WebView:
+          </p>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
+              {webTokenCode}
+            </pre>
+            <button
+              onClick={() => handleCopy(webTokenCode, 'webtoken')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'webtoken' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'step3',
+      title: 'Step 3: Add Web SDK to WebView Pages',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Add the Airbridge Web SDK to your WebView HTML pages:
+          </p>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-[10px] text-green-400 overflow-x-auto max-h-48">
+              {webSdkCode}
+            </pre>
+            <button
+              onClick={() => handleCopy(webSdkCode, 'websdk')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'websdk' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'step4',
+      title: 'Step 4: Track Events in WebView',
+      content: (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Use the Web SDK to track events in your WebView:
+          </p>
+          <div className="relative">
+            <pre className="p-3 bg-gray-800 rounded-lg text-xs text-green-400 overflow-x-auto">
+{`// Track custom event
+airbridge('trackEvent', 'purchase', {
+  semantics: {
+    transactionID: 'order_123',
+    products: [{
+      productID: 'product_456',
+      price: 29.99,
+      quantity: 1
+    }]
+  }
+});`}
+            </pre>
+            <button
+              onClick={() => handleCopy(`airbridge('trackEvent', 'purchase', {
+  semantics: {
+    transactionID: 'order_123',
+    products: [{
+      productID: 'product_456',
+      price: 29.99,
+      quantity: 1
+    }]
+  }
+});`, 'trackevent')}
+              className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              {copySuccess === 'trackevent' ? (
+                <Check className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          </div>
+        </div>
+      )
+    }
+  ];
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <Globe className="w-5 h-5 text-purple-500" />
+        <div className="text-base font-medium text-gray-900">
+          Hybrid App Setup ({platform === 'ios' ? 'iOS' : 'Android'})
+        </div>
+      </div>
+
+      <p className="text-sm text-gray-600 mb-4">
+        Set up event tracking for WebViews in your hybrid app.
+      </p>
+
+      <div className="space-y-2">
+        {steps.map((step) => (
+          <div key={step.id} className="border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setExpandedSection(expandedSection === step.id ? null : step.id)}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+            >
+              <span className="text-sm font-medium text-gray-700">{step.title}</span>
+              {expandedSection === step.id ? (
+                <ChevronUp className="w-4 h-4 text-gray-500" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-gray-500" />
+              )}
+            </button>
+            {expandedSection === step.id && (
+              <div className="p-3 bg-white border-t border-gray-200">
+                {step.content}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-2 mt-4">
+        <button
+          onClick={onComplete}
+          className="flex-1 py-2.5 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors"
+        >
+          Complete Setup
+        </button>
+        <button
+          onClick={onSkip}
+          className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+        >
+          Skip for Now
         </button>
       </div>
     </div>
@@ -4710,10 +9293,10 @@ function MetaChannelIntegration({
   const [connectStep, setConnectStep] = useState(0);
 
   const connectSteps = [
-    { label: 'Meta 로그인 창 열기...', icon: '🔐' },
-    { label: 'Facebook 계정 인증 중...', icon: '👤' },
-    { label: '광고 계정 연결 중...', icon: '📊' },
-    { label: '권한 설정 완료!', icon: '✅' },
+    { label: 'Opening Meta login...', icon: '🔐' },
+    { label: 'Authenticating Facebook account...', icon: '👤' },
+    { label: 'Connecting ad account...', icon: '📊' },
+    { label: 'Permission setup complete!', icon: '✅' },
   ];
 
   const startOAuthSimulation = () => {
@@ -4783,7 +9366,7 @@ function MetaChannelIntegration({
             <div className="flex items-start gap-2">
               <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
               <div className="text-xs text-blue-800">
-                Meta 계정과 연동하면 광고 성과 데이터를 Airbridge에서 확인할 수 있습니다.
+                Connect your Meta account to view ad performance data in Airbridge.
               </div>
             </div>
           </div>
@@ -4799,14 +9382,14 @@ function MetaChannelIntegration({
             onClick={() => onHelp('meta-permission')}
             className="w-full py-2 text-xs text-gray-500 hover:text-gray-700"
           >
-            연동에 문제가 있나요?
+            Having trouble connecting?
           </button>
         </>
       )}
 
       {step === 'connecting' && (
         <div className="space-y-3">
-          <div className="text-sm font-medium text-gray-700 mb-3">Meta 계정 연동 중...</div>
+          <div className="text-sm font-medium text-gray-700 mb-3">Connecting Meta account...</div>
           {connectSteps.map((s, idx) => (
             <div key={idx} className="flex items-center gap-3">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
@@ -4830,8 +9413,8 @@ function MetaChannelIntegration({
       {step === 'done' && (
         <div className="text-center py-4">
           <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
-          <div className="text-sm font-medium text-gray-700">Meta 연동 완료!</div>
-          <div className="text-xs text-gray-500 mt-1">광고 계정이 성공적으로 연결되었습니다.</div>
+          <div className="text-sm font-medium text-gray-700">Meta Integration Complete!</div>
+          <div className="text-xs text-gray-500 mt-1">Ad account connected successfully.</div>
         </div>
       )}
     </div>
@@ -5016,10 +9599,10 @@ function GoogleChannelIntegration({
   const [connectStep, setConnectStep] = useState(0);
 
   const connectSteps = [
-    { label: 'Google 로그인 창 열기...', icon: '🔐' },
-    { label: 'Google 계정 인증 중...', icon: '👤' },
-    { label: 'Google Ads 계정 연결 중...', icon: '📊' },
-    { label: '연결 완료!', icon: '✅' },
+    { label: 'Opening Google login...', icon: '🔐' },
+    { label: 'Authenticating Google account...', icon: '👤' },
+    { label: 'Connecting Google Ads account...', icon: '📊' },
+    { label: 'Connection complete!', icon: '✅' },
   ];
 
   const startOAuthSimulation = () => {
@@ -5058,7 +9641,7 @@ function GoogleChannelIntegration({
             <div className="flex items-start gap-2">
               <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
               <div className="text-xs text-blue-800">
-                Google Ads 계정과 연동하면 광고 캠페인 성과를 Airbridge에서 확인할 수 있습니다.
+                Connect your Google Ads account to view campaign performance in Airbridge.
               </div>
             </div>
           </div>
@@ -5080,14 +9663,14 @@ function GoogleChannelIntegration({
             onClick={() => onHelp('google-permission')}
             className="w-full py-2 text-xs text-gray-500 hover:text-gray-700"
           >
-            연동에 문제가 있나요?
+            Having trouble connecting?
           </button>
         </>
       )}
 
       {step === 'connecting' && (
         <div className="space-y-3">
-          <div className="text-sm font-medium text-gray-700 mb-3">Google 계정 연동 중...</div>
+          <div className="text-sm font-medium text-gray-700 mb-3">Connecting Google account...</div>
           {connectSteps.map((s, idx) => (
             <div key={idx} className="flex items-center gap-3">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
@@ -5111,8 +9694,8 @@ function GoogleChannelIntegration({
       {step === 'done' && (
         <div className="text-center py-4">
           <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
-          <div className="text-sm font-medium text-gray-700">Google Ads 연동 완료!</div>
-          <div className="text-xs text-gray-500 mt-1">광고 계정이 성공적으로 연결되었습니다.</div>
+          <div className="text-sm font-medium text-gray-700">Google Ads Integration Complete!</div>
+          <div className="text-xs text-gray-500 mt-1">Ad account connected successfully.</div>
         </div>
       )}
     </div>
@@ -5133,9 +9716,9 @@ function GoogleCostIntegration({
   const [enableStep, setEnableStep] = useState(0);
 
   const enableSteps = [
-    { label: 'Cost Integration 활성화 중...', icon: '💰' },
-    { label: 'Google Ads 비용 데이터 연결 중...', icon: '📊' },
-    { label: '설정 완료!', icon: '✅' },
+    { label: 'Enabling Cost Integration...', icon: '💰' },
+    { label: 'Connecting Google Ads cost data...', icon: '📊' },
+    { label: 'Setup complete!', icon: '✅' },
   ];
 
   const startEnabling = () => {
@@ -5360,10 +9943,10 @@ function AppleChannelIntegration({
   const [connectStep, setConnectStep] = useState(0);
 
   const connectSteps = [
-    { label: 'Apple Search Ads API 연결 중...', icon: '🔐' },
-    { label: 'API 인증서 확인 중...', icon: '📜' },
-    { label: '캠페인 데이터 동기화 중...', icon: '📊' },
-    { label: '연결 완료!', icon: '✅' },
+    { label: 'Connecting Apple Search Ads API...', icon: '🔐' },
+    { label: 'Verifying API certificate...', icon: '📜' },
+    { label: 'Syncing campaign data...', icon: '📊' },
+    { label: 'Connection complete!', icon: '✅' },
   ];
 
   const startOAuthSimulation = () => {
@@ -5402,7 +9985,7 @@ function AppleChannelIntegration({
             <div className="flex items-start gap-2">
               <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
               <div className="text-xs text-blue-800">
-                Apple Search Ads 계정과 연동하면 앱스토어 검색 광고 성과를 Airbridge에서 확인할 수 있습니다.
+                Connect your Apple Search Ads account to view App Store search ad performance in Airbridge.
               </div>
             </div>
           </div>
@@ -5418,14 +10001,14 @@ function AppleChannelIntegration({
             onClick={() => onHelp('apple-api')}
             className="w-full py-2 text-xs text-gray-500 hover:text-gray-700"
           >
-            연동에 문제가 있나요?
+            Having trouble connecting?
           </button>
         </>
       )}
 
       {step === 'connecting' && (
         <div className="space-y-3">
-          <div className="text-sm font-medium text-gray-700 mb-3">Apple Search Ads 연동 중...</div>
+          <div className="text-sm font-medium text-gray-700 mb-3">Connecting Apple Search Ads...</div>
           {connectSteps.map((s, idx) => (
             <div key={idx} className="flex items-center gap-3">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
@@ -5449,8 +10032,8 @@ function AppleChannelIntegration({
       {step === 'done' && (
         <div className="text-center py-4">
           <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
-          <div className="text-sm font-medium text-gray-700">Apple Search Ads 연동 완료!</div>
-          <div className="text-xs text-gray-500 mt-1">광고 계정이 성공적으로 연결되었습니다.</div>
+          <div className="text-sm font-medium text-gray-700">Apple Search Ads Integration Complete!</div>
+          <div className="text-xs text-gray-500 mt-1">Ad account connected successfully.</div>
         </div>
       )}
     </div>
@@ -5534,10 +10117,10 @@ function TikTokChannelIntegration({
   const [connectStep, setConnectStep] = useState(0);
 
   const connectSteps = [
-    { label: 'TikTok 로그인 창 열기...', icon: '🔐' },
-    { label: 'TikTok 계정 인증 중...', icon: '👤' },
-    { label: '광고 계정 연결 중...', icon: '📊' },
-    { label: '연결 완료!', icon: '✅' },
+    { label: 'Opening TikTok login...', icon: '🔐' },
+    { label: 'Authenticating TikTok account...', icon: '👤' },
+    { label: 'Connecting ad account...', icon: '📊' },
+    { label: 'Connection complete!', icon: '✅' },
   ];
 
   const startOAuthSimulation = () => {
@@ -5576,10 +10159,10 @@ function TikTokChannelIntegration({
             <div className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
               <div className="text-xs text-amber-800">
-                <p className="font-medium mb-1">참고 사항:</p>
+                <p className="font-medium mb-1">Notes:</p>
                 <ul className="space-y-1">
-                  <li>• Pangle 성과는 리포트에서 "Sub-Publisher" GroupBy 필요</li>
-                  <li>• EPC 활성화 시 데이터 누락 가능</li>
+                  <li>• Pangle performance requires "Sub-Publisher" GroupBy in reports</li>
+                  <li>• Data may be missing when EPC is enabled</li>
                 </ul>
               </div>
             </div>
@@ -5596,14 +10179,14 @@ function TikTokChannelIntegration({
             onClick={() => onHelp('tiktok-permission')}
             className="w-full py-2 text-xs text-gray-500 hover:text-gray-700"
           >
-            연동에 문제가 있나요?
+            Having trouble connecting?
           </button>
         </>
       )}
 
       {step === 'connecting' && (
         <div className="space-y-3">
-          <div className="text-sm font-medium text-gray-700 mb-3">TikTok 계정 연동 중...</div>
+          <div className="text-sm font-medium text-gray-700 mb-3">Connecting TikTok account...</div>
           {connectSteps.map((s, idx) => (
             <div key={idx} className="flex items-center gap-3">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
@@ -5627,8 +10210,8 @@ function TikTokChannelIntegration({
       {step === 'done' && (
         <div className="text-center py-4">
           <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
-          <div className="text-sm font-medium text-gray-700">TikTok 연동 완료!</div>
-          <div className="text-xs text-gray-500 mt-1">광고 계정이 성공적으로 연결되었습니다.</div>
+          <div className="text-sm font-medium text-gray-700">TikTok Integration Complete!</div>
+          <div className="text-xs text-gray-500 mt-1">Ad account connected successfully.</div>
         </div>
       )}
     </div>
@@ -6442,6 +11025,26 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
   // Sidebar tab state
   const [sidebarTab, setSidebarTab] = useState<'apps' | 'chats'>('apps');
 
+  // Category collapse state for sidebar (per app)
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, Set<string>>>({});
+
+  const toggleCategoryCollapse = (appId: string, category: string) => {
+    setCollapsedCategories(prev => {
+      const appCategories = prev[appId] || new Set();
+      const newCategories = new Set(appCategories);
+      if (newCategories.has(category)) {
+        newCategories.delete(category);
+      } else {
+        newCategories.add(category);
+      }
+      return { ...prev, [appId]: newCategories };
+    });
+  };
+
+  const isCategoryCollapsed = (appId: string, category: string) => {
+    return collapsedCategories[appId]?.has(category) || false;
+  };
+
   // Chat rooms state (for Q&A chats)
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
@@ -6460,6 +11063,8 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     appInfo: { appName: '', storeUrl: '', bundleId: '', packageName: '', webUrl: '', timezone: '', currency: '' } as AppInfo,
     framework: '',
     channels: [] as string[],
+    plan: '' as 'growth' | 'deeplink' | '', // Plan type: Growth Plan or Deep Link Plan
+    role: '' as 'marketer' | 'developer' | '', // User role for customized guidance
   });
 
   // Deeplink setup state
@@ -6507,7 +11112,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     const welcomeMessage: Message = {
       id: `msg-${Date.now()}`,
       role: 'bot',
-      content: [{ type: 'text', text: '👋 안녕하세요! Airbridge Q&A 봇입니다.\nSDK 설치, 딥링크, 어트리뷰션 등 궁금한 것을 물어보세요.' }],
+      content: [{ type: 'text', text: '👋 Hello! This is the Airbridge Q&A bot.\nAsk me anything about SDK installation, deep links, attribution, and more.' }],
       timestamp: new Date(),
     };
     const newChatRoom: ChatRoom = {
@@ -7010,6 +11615,18 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       return;
     }
 
+    // Generate mock tokens
+    const generateToken = () => {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    };
+
+    const tokens: AppTokens = {
+      appSdkToken: generateToken(),
+      webSdkToken: generateToken(),
+      apiToken: generateToken(),
+    };
+
     const newAppId = Date.now().toString();
     const newApp: RegisteredApp = {
       id: newAppId,
@@ -7017,11 +11634,12 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       platforms: setupState.environment === 'dev' ? ['dev'] : setupState.platforms,
       environment: setupState.environment as 'dev' | 'production',
       steps: setupState.environment === 'dev' ? createDevAppSteps(setupState.platforms) : createAppSteps(setupState.platforms),
-      currentPhase: 1, // Stay in Phase 1 until token display is confirmed
+      currentPhase: 1, // Stay in Phase 1 until role is confirmed
       framework: '',
       channels: [],
       isExpanded: true,
       messages: [...messages], // Save current messages to the app
+      tokens, // Save tokens for later use
     };
 
     setRegisteredApps(prev => [
@@ -7032,22 +11650,11 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     setIsAddingApp(false);
     setCurrentPhase(1);
 
-    // Generate mock tokens
-    const generateToken = () => {
-      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-      return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    };
-
-    const tokens = {
-      appSdkToken: generateToken(),
-      webSdkToken: generateToken(),
-      apiToken: generateToken(),
-    };
-
+    // Show role capability check instead of token display
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: `🎉 Your app **"${setupState.appInfo.appName}"** has been registered!` },
-        { type: 'token-display', tokens },
+        { type: 'text', text: `Your app **"${setupState.appInfo.appName}"** has been registered successfully!\n\nBefore we proceed, let me understand your role to provide the right guidance.` },
+        { type: 'role-capability-check' },
       ]);
     }, 300);
   };
@@ -7179,6 +11786,18 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       return;
     }
 
+    // Generate mock tokens
+    const generateToken = () => {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    };
+
+    const tokens: AppTokens = {
+      appSdkToken: generateToken(),
+      webSdkToken: generateToken(),
+      apiToken: generateToken(),
+    };
+
     // Create new registered app
     const newAppId = Date.now().toString();
     const newApp: RegisteredApp = {
@@ -7187,11 +11806,12 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       platforms: setupState.platforms,
       environment: setupState.environment as 'dev' | 'production',
       steps: setupState.environment === 'dev' ? createDevAppSteps(setupState.platforms) : createAppSteps(setupState.platforms),
-      currentPhase: 2,
+      currentPhase: 1, // Stay in Phase 1 until role is confirmed
       framework: '',
       channels: [],
       isExpanded: true,
       messages: [...messages], // Save current messages to the app
+      tokens, // Save tokens for later use
     };
 
     // Collapse other apps and add new one
@@ -7201,17 +11821,13 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     ]);
     setCurrentAppId(newAppId);
     setIsAddingApp(false);
-    setCurrentPhase(2);
+    setCurrentPhase(1);
 
-    // Set first step as in_progress
-    setTimeout(() => {
-      updateAppStepStatus(newAppId, 'sdk-install', 'in_progress');
-    }, 100);
-
+    // Show role capability check instead of sdk-install-choice
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: `✅ I've detected your app registration for **"${setupState.appInfo.appName}"**. Great job!\n\n🔧 Now let's proceed with **SDK installation**.\n\nThe SDK needs to be installed by a developer. Who will handle this?` },
-        { type: 'sdk-install-choice' },
+        { type: 'text', text: `Your app **"${setupState.appInfo.appName}"** has been registered successfully!\n\nBefore we proceed, let me understand your role to provide the right guidance.` },
+        { type: 'role-capability-check' },
       ]);
     }, 300);
   };
@@ -7716,18 +12332,10 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     if (framework === 'react-native') {
       setTimeout(() => {
         addBotMessage([
-          { type: 'text', text: '⚛️ You\'re using **React Native**!\n\n📦 Here are the SDK installation commands.\nPlease run them in your terminal:' },
-          { type: 'code-block', title: 'Step 1: Install package', code: 'npm install airbridge-react-native-sdk', language: 'bash' },
-          { type: 'code-block', title: 'Step 2: iOS setup', code: 'cd ios && pod install', language: 'bash' },
+          { type: 'text', text: '⚛️ You\'re using **React Native**!\n\nFollow the steps below to install and initialize the SDK.\n💡 I\'ve already filled in the App Name and App Token for you!' },
+          { type: 'react-native-sdk-install', appName: setupState.appInfo?.appName?.toLowerCase().replace(/\s/g, '') || 'myapp', appToken: 'abc123token' },
         ]);
       }, 300);
-
-      setTimeout(() => {
-        addBotMessage([
-          { type: 'text', text: '👍 Great progress!\n\n⚙️ Now let\'s **initialize the SDK**.\n\nAdd the code below to your app entry point (App.js or index.js).\n💡 I\'ve already filled in the App Name and App Token for you!' },
-          { type: 'sdk-init-code', appName: setupState.appInfo?.appName?.toLowerCase().replace(/\s/g, '') || 'myapp', appToken: 'abc123token' },
-        ]);
-      }, 1500);
     } else {
       setTimeout(() => {
         addBotMessage([
@@ -7951,7 +12559,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
   // Deeplink continue to channel handler
   const handleDeeplinkContinue = () => {
-    addUserMessage('채널 연동으로 계속하기');
+    addUserMessage('Continue with channel integration');
 
     if (currentAppId) {
       updateAppStepStatus(currentAppId, 'deeplink', 'completed');
@@ -7960,13 +12568,13 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '🧪 이제 SDK 통합이 제대로 작동하는지 **테스트**해 보겠습니다.' },
+        { type: 'text', text: '🧪 Now let\'s **test** if the SDK integration is working properly.' },
         { type: 'sdk-test' },
       ]);
     }, 300);
   };
 
-  // Token display continue handler - proceeds to SDK setup
+  // Token display continue handler - proceeds directly to SDK install method select (role already confirmed)
   const handleTokenDisplayContinue = () => {
     setCurrentPhase(2);
     if (currentAppId) {
@@ -7978,10 +12586,213 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '📱 **SDK Installation**\n\nThe SDK needs to be installed by a developer. Who will handle this?' },
-        { type: 'sdk-install-choice' },
+        { type: 'text', text: `Now let's set up the SDK. Choose your preferred installation method:` },
+        { type: 'sdk-install-method-select' },
       ]);
     }, 300);
+  };
+
+  // Role capability check handler - determines if user can install SDK
+  const handleRoleCapabilityCheck = (canInstall: boolean) => {
+    const app = registeredApps.find(a => a.id === currentAppId);
+    const appName = app?.appInfo.appName || setupState.appInfo?.appName || 'Your App';
+
+    if (canInstall) {
+      // Developer path: show tokens first, then SDK install options
+      addUserMessage("I'm a developer - I'll install the SDK myself");
+
+      // Get tokens from registered app
+      const tokens = app?.tokens || {
+        appSdkToken: 'token_not_found',
+        webSdkToken: 'token_not_found',
+        apiToken: 'token_not_found',
+      };
+
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: `Great! Here are your API tokens. You'll need these for SDK integration.` },
+          { type: 'token-display', tokens },
+        ]);
+      }, 300);
+    } else {
+      // Marketer path: show SDK requires developer options
+      addUserMessage("I'm not a developer - someone else will handle SDK");
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'sdk-requires-developer', appName },
+        ]);
+      }, 300);
+    }
+  };
+
+  // SDK Requires Developer handler - handles user's choice when SDK installation requires developer
+  const handleSdkRequiresDeveloper = (choice: 'create-tracking-link' | 'explore-dashboard' | 'invite-developer' | 'self-install') => {
+    const app = registeredApps.find(a => a.id === currentAppId);
+    const appName = app?.appInfo.appName || setupState.appInfo?.appName || 'Your App';
+
+    switch (choice) {
+      case 'create-tracking-link':
+        addUserMessage("Create a tracking link");
+        if (currentAppId) {
+          updateAppStepStatus(currentAppId, 'tracking-link', 'in_progress');
+        }
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `**Create Your First Tracking Link**\n\nTracking links help you measure campaign performance. You can create these now while your developer works on the SDK.\n\nLet's create a tracking link for **${appName}**.` },
+            { type: 'tracking-link-form', channel: 'organic' },
+          ]);
+        }, 300);
+        break;
+
+      case 'explore-dashboard':
+        addUserMessage("Explore the dashboard");
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `**Explore Airbridge Dashboard**\n\nTake a look at what Airbridge can do! You can explore our demo app to see sample reports and features.` },
+          ]);
+          // Open dashboard in new tab (demo app)
+          window.open('https://dashboard.airbridge.io/app/demokr', '_blank');
+        }, 300);
+        break;
+
+      case 'invite-developer':
+        addUserMessage("Invite developer(s)");
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'developer-email-invite', appName },
+          ]);
+        }, 300);
+        break;
+
+      case 'self-install':
+        addUserMessage("I can do it myself");
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `Great! Let's get you set up with the Airbridge SDK.\n\nWhich SDK would you like to install?` },
+            { type: 'sdk-type-choice' },
+          ]);
+        }, 300);
+        break;
+    }
+  };
+
+  // SDK Type Choice handler - handles user's choice between App SDK and Web SDK
+  const handleSdkTypeChoice = (type: 'app' | 'web') => {
+    const app = registeredApps.find(a => a.id === currentAppId);
+    const appName = app?.appInfo.appName || setupState.appInfo?.appName || 'myapp';
+    const webToken = app?.tokens?.webSdkToken || 'YOUR_WEB_SDK_TOKEN';
+    const appSdkToken = app?.tokens?.appSdkToken || 'YOUR_APP_SDK_TOKEN';
+
+    if (type === 'web') {
+      addUserMessage("Web SDK");
+      if (currentAppId) {
+        updateAppStepStatus(currentAppId, 'sdk-integration', 'in_progress');
+      }
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: `**Web SDK Installation**\n\nLet's install the Airbridge Web SDK for **${appName}**.` },
+          { type: 'web-sdk-install', appName, webToken },
+        ]);
+      }, 300);
+    } else {
+      addUserMessage("App SDK");
+      if (currentAppId) {
+        updateAppStepStatus(currentAppId, 'sdk-integration', 'in_progress');
+      }
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: `**App SDK Installation**\n\nLet's install the Airbridge SDK for **${appName}**.\n\nChoose your platform and framework to get started:` },
+          { type: 'framework-select' },
+        ]);
+      }, 300);
+    }
+  };
+
+  // Developer Email Invite handler - after emails are sent, show options again
+  const handleDeveloperEmailInvite = (emails: string[]) => {
+    const app = registeredApps.find(a => a.id === currentAppId);
+    const appName = app?.appInfo.appName || setupState.appInfo?.appName || 'Your App';
+
+    addUserMessage(`Invited ${emails.length} developer${emails.length > 1 ? 's' : ''}`);
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: `✅ **Invitations Sent!**\n\nWe've sent SDK setup instructions to:\n${emails.map(e => `• ${e}`).join('\n')}\n\nThey'll receive an email with everything they need to get started.` },
+      ]);
+      // After a short delay, show the options again
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: `While waiting for your developer to complete the SDK setup, what would you like to do?` },
+          { type: 'sdk-requires-developer', appName },
+        ]);
+      }, 500);
+    }, 300);
+  };
+
+  // Developer Email Invite back handler - go back to SDK requires developer options
+  const handleDeveloperEmailInviteBack = () => {
+    const app = registeredApps.find(a => a.id === currentAppId);
+    const appName = app?.appInfo.appName || setupState.appInfo?.appName || 'Your App';
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'sdk-requires-developer', appName },
+      ]);
+    }, 100);
+  };
+
+  // Marketer next steps handler - handles marketer's choice after role check
+  const handleMarketerNextStep = (choice: 'invite-developer' | 'create-tracking-link' | 'explore-dashboard') => {
+    const app = registeredApps.find(a => a.id === currentAppId);
+    const appName = app?.appInfo.appName || setupState.appInfo?.appName || 'Your App';
+
+    switch (choice) {
+      case 'invite-developer':
+        addUserMessage("Invite a developer");
+        // Get tokens from registered app
+        const tokens = app?.tokens || {
+          appSdkToken: 'token_not_found',
+          webSdkToken: 'token_not_found',
+          apiToken: 'token_not_found',
+        };
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `Here's everything your developer needs to get started with SDK integration:` },
+            { type: 'token-display', tokens },
+            {
+              type: 'sdk-guide-share',
+              appName: appName,
+              platforms: app?.platforms || setupState.platforms || [],
+              framework: app?.framework
+            },
+          ]);
+        }, 300);
+        break;
+
+      case 'create-tracking-link':
+        addUserMessage("Create a tracking link");
+        // Update step status to show tracking link creation
+        if (currentAppId) {
+          updateAppStepStatus(currentAppId, 'tracking-link', 'in_progress');
+        }
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `**Create Your First Tracking Link**\n\nTracking links help you measure campaign performance. You can create these now while your developer works on the SDK.\n\nLet's create a tracking link for **${appName}**.` },
+            { type: 'tracking-link-create' },
+          ]);
+        }, 300);
+        break;
+
+      case 'explore-dashboard':
+        // Fallback to invite developer if someone triggers this old option
+        addUserMessage("Explore the dashboard");
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `The dashboard will be more useful once the SDK is installed. In the meantime, you can:` },
+            { type: 'marketer-next-steps', appName },
+          ]);
+        }, 300);
+        break;
+    }
   };
 
   // SDK verify confirm handler
@@ -8506,6 +13317,199 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
     window.open(`/app/${appSlug}`, '_blank');
   };
 
+  // Plan Selection handlers
+  const handlePlanSelect = (plan: 'growth' | 'deeplink') => {
+    addUserMessage(plan === 'growth' ? 'Growth Plan' : 'Deep Link Plan');
+
+    setSetupState(prev => ({ ...prev, plan }));
+
+    setTimeout(() => {
+      if (plan === 'growth') {
+        addBotMessage([
+          { type: 'text', text: 'Great choice! **Growth Plan** gives you the complete mobile measurement solution.\n\nNow, let\'s identify your role to customize the onboarding experience.' },
+          { type: 'role-select' },
+        ]);
+      } else {
+        addBotMessage([
+          { type: 'text', text: 'You\'ve selected the **Deep Link Plan**. This gives you powerful deep linking capabilities for seamless user experiences.\n\nLet\'s continue with the setup.' },
+          { type: 'environment-select' },
+        ]);
+      }
+    }, 300);
+  };
+
+  const handlePlanUpgrade = () => {
+    addBotMessage([
+      { type: 'text', text: 'Contact our sales team for plan upgrade information.' },
+    ]);
+  };
+
+  // Role Selection handlers
+  const handleRoleSelect = (role: 'marketer' | 'developer') => {
+    addUserMessage(role === 'marketer' ? 'Marketer' : 'Developer');
+
+    setSetupState(prev => ({ ...prev, role }));
+
+    setTimeout(() => {
+      if (role === 'marketer') {
+        addBotMessage([
+          { type: 'text', text: 'As a **Marketer**, I\'ll guide you through dashboard setup and channel integration. SDK implementation instructions will be generated for your development team.' },
+          { type: 'role-based-guide', role: 'marketer', context: 'Dashboard and channel setup' },
+        ]);
+      } else {
+        addBotMessage([
+          { type: 'text', text: 'As a **Developer**, I\'ll provide you with technical SDK documentation, code snippets, and debugging tools.' },
+          { type: 'role-based-guide', role: 'developer', context: 'SDK integration guide' },
+        ]);
+      }
+    }, 300);
+  };
+
+  const handleRoleGuideComplete = () => {
+    addUserMessage('Continue');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'Now let\'s set up your app environment.' },
+        { type: 'environment-select' },
+      ]);
+    }, 300);
+  };
+
+  // Mode Explainer handlers
+  const handleModeExplainerComplete = () => {
+    addUserMessage('I understand, continue');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'Now let\'s select your platforms.' },
+        { type: 'platform-multi-select' },
+      ]);
+    }, 300);
+  };
+
+  // App Name Validation handlers
+  const handleAppNameValidationSubmit = (name: string) => {
+    addUserMessage(name);
+
+    setSetupState(prev => ({
+      ...prev,
+      appInfo: { ...prev.appInfo!, appName: name }
+    }));
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: `App name **${name}** has been validated. Remember, this cannot be changed after registration.` },
+        { type: 'immutable-warning', field: 'appName' },
+      ]);
+    }, 300);
+  };
+
+  // Registration Checklist handlers
+  const handleRegistrationChecklistConfirm = () => {
+    addUserMessage('Register App');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'Your app has been registered successfully! Now let\'s set up the SDK.' },
+        { type: 'sdk-install-method-select' },
+      ]);
+    }, 300);
+  };
+
+  // Immutable Warning handlers
+  const handleImmutableWarningAcknowledge = () => {
+    addUserMessage('I understand, continue');
+
+    setTimeout(() => {
+      // Continue with the flow based on context
+      addBotMessage([
+        { type: 'text', text: 'Great! Let\'s continue with the setup.' },
+        { type: 'platform-multi-select' },
+      ]);
+    }, 300);
+  };
+
+  // Phase handlers
+  const handlePhaseClick = (phaseId: number) => {
+    // Navigate to specific phase
+    console.log('Phase clicked:', phaseId);
+  };
+
+  const handlePhaseStart = () => {
+    addUserMessage('Start');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'Let\'s begin this phase.' },
+      ]);
+    }, 300);
+  };
+
+  // Validation handlers
+  const handleValidationRunTest = () => {
+    addBotMessage([
+      { type: 'text', text: 'Running verification checks...' },
+    ]);
+  };
+
+  const handleValidationItemClick = (itemId: string) => {
+    console.log('Validation item clicked:', itemId);
+  };
+
+  // Realtime Log Guide handlers
+  const handleRealtimeLogGuideContinue = () => {
+    addUserMessage('Continue');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'Now let\'s proceed with the next step.' },
+      ]);
+    }, 300);
+  };
+
+  // Test Scenario handlers
+  const handleTestScenarioRun = (scenarioId: string) => {
+    console.log('Running test scenario:', scenarioId);
+  };
+
+  const handleTestScenarioComplete = () => {
+    addUserMessage('Continue');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'All tests passed! Your integration is complete.' },
+        { type: 'onboarding-complete' },
+      ]);
+    }, 300);
+  };
+
+  // Error handlers
+  const handleErrorRetry = () => {
+    addUserMessage('Retry');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'Let\'s try again...' },
+      ]);
+    }, 300);
+  };
+
+  const handleErrorSkip = () => {
+    addUserMessage('Skip for now');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'Skipped. You can come back to this later.' },
+      ]);
+    }, 300);
+  };
+
+  // Warning handlers
+  const handleWarningDismiss = () => {
+    // Simply dismiss the warning
+  };
+
   // Single select handler
   const handleSingleSelect = (value: string) => {
     addUserMessage(value);
@@ -8540,7 +13544,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       // Bot response for chat
       setTimeout(() => {
         addChatMessage([
-          { type: 'text', text: '네, 질문을 확인했습니다. 더 자세한 정보가 필요하시면 말씀해 주세요!' },
+          { type: 'text', text: 'Got it, I\'ve noted your question. Please let me know if you need more information!' },
         ], 'bot');
       }, 500);
     } else {
@@ -8634,8 +13638,8 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       case 'sdk-install':
         setTimeout(() => {
           addBotMessage([
-            { type: 'text', text: `📦 **SDK Installation** for **${app.appInfo.appName}**\n\nThe SDK needs to be installed by a developer. Who will handle this?` },
-            { type: 'sdk-install-choice' },
+            { type: 'text', text: `**SDK Installation** for **${app.appInfo.appName}**\n\nWhat's your role in this setup?` },
+            { type: 'role-capability-check' },
           ]);
         }, 300);
         break;
@@ -8866,6 +13870,21 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       case 'sdk-install-choice':
         return <SdkInstallChoice onSelect={handleSdkInstallChoice} isCompleted={isCompleted} />;
 
+      case 'role-capability-check':
+        return <RoleCapabilityCheck onSelect={handleRoleCapabilityCheck} isCompleted={isCompleted} />;
+
+      case 'marketer-next-steps':
+        return <MarketerNextSteps appName={content.appName} onSelect={handleMarketerNextStep} isCompleted={isCompleted} />;
+
+      case 'sdk-requires-developer':
+        return <SdkRequiresDeveloper appName={content.appName} onSelect={handleSdkRequiresDeveloper} isCompleted={isCompleted} />;
+
+      case 'sdk-type-choice':
+        return <SdkTypeChoice onSelect={handleSdkTypeChoice} isCompleted={isCompleted} />;
+
+      case 'developer-email-invite':
+        return <DeveloperEmailInvite appName={content.appName} onSend={handleDeveloperEmailInvite} onBack={handleDeveloperEmailInviteBack} isCompleted={isCompleted} />;
+
       case 'sdk-install-method-select':
         return <SdkInstallMethodSelect onSelect={handleSdkInstallMethodSelect} isCompleted={isCompleted} />;
 
@@ -8984,6 +14003,15 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
       case 'sdk-init-code':
         return <SDKInitCode appName={content.appName} appToken={content.appToken} onConfirm={handleSDKInitConfirm} isCompleted={isCompleted} />;
 
+      case 'react-native-sdk-install':
+        return <ReactNativeSdkInstall appName={content.appName} appToken={content.appToken} onConfirm={handleSDKInitConfirm} isCompleted={isCompleted} />;
+
+      case 'react-native-sdk-config':
+        return <ReactNativeSdkConfig onComplete={() => handleSDKInitConfirm('completed')} isCompleted={isCompleted} />;
+
+      case 'ios-att-prompt-config':
+        return <IosAttPromptConfig appName={content.appName} appToken={content.appToken} onComplete={() => handleSDKInitConfirm('completed')} isCompleted={isCompleted} />;
+
       case 'deeplink-choice':
         return <DeeplinkChoice onSelect={handleDeeplinkChoice} isCompleted={isCompleted} />;
 
@@ -8991,6 +14019,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
         return (
           <DeeplinkIosInput
             bundleId={content.bundleId}
+            appName={setupState.appInfo?.appName?.toLowerCase().replace(/\s/g, '')}
             onSubmit={handleDeeplinkIosSubmit}
             isCompleted={isCompleted}
           />
@@ -9000,6 +14029,7 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
         return (
           <DeeplinkAndroidInput
             packageName={content.packageName}
+            appName={setupState.appInfo?.appName?.toLowerCase().replace(/\s/g, '')}
             onSubmit={handleDeeplinkAndroidSubmit}
             isCompleted={isCompleted}
           />
@@ -9252,6 +14282,9 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
         return <SdkTest onRunTest={handleSdkTestComplete} isCompleted={isCompleted} />;
 
       // Tracking Link
+      case 'tracking-link-create':
+        return <TrackingLinkForm channel={content.channel || 'organic'} onCreate={handleTrackingLinkCreate} isCompleted={isCompleted} />;
+
       case 'tracking-link-form':
         return <TrackingLinkForm channel={content.channel} onCreate={handleTrackingLinkCreate} isCompleted={isCompleted} />;
 
@@ -9273,6 +14306,89 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
 
       case 'onboarding-complete':
         return <OnboardingComplete appName={currentApp?.appInfo.appName || 'App'} onViewDashboard={handleViewDashboard} />;
+
+      // Plan Selection
+      case 'plan-select':
+        return <PlanSelector onSelect={handlePlanSelect} isCompleted={isCompleted} />;
+
+      case 'plan-feature-comparison':
+        return <PlanFeatureComparison currentPlan={content.currentPlan} onUpgrade={handlePlanUpgrade} isCompleted={isCompleted} />;
+
+      // Role-based flow
+      case 'role-select':
+        return <RoleSelector onSelect={handleRoleSelect} isCompleted={isCompleted} />;
+
+      case 'role-based-guide':
+        return <RoleBasedGuide role={content.role} context={content.context} onContinue={handleRoleGuideComplete} isCompleted={isCompleted} />;
+
+      // Mode explanation
+      case 'mode-explainer':
+        return <ModeExplainer mode={content.mode} onContinue={handleModeExplainerComplete} isCompleted={isCompleted} />;
+
+      // App registration validation
+      case 'app-name-validation':
+        return <AppNameValidation name={content.name} onSubmit={handleAppNameValidationSubmit} isCompleted={isCompleted} />;
+
+      case 'registration-checklist':
+        return <RegistrationChecklist items={content.items} onConfirm={handleRegistrationChecklistConfirm} isCompleted={isCompleted} />;
+
+      case 'immutable-warning':
+        return <ImmutableWarning field={content.field} value={setupState.appInfo?.appName || ''} onAcknowledge={handleImmutableWarningAcknowledge} isCompleted={isCompleted} />;
+
+      // Onboarding phase guide
+      case 'phase-overview':
+        return (
+          <PhaseOverview
+            currentPhase={content.currentPhase}
+            totalPhases={content.totalPhases}
+            phases={[
+              { id: 1, title: 'App Registration', status: content.currentPhase > 1 ? 'completed' : content.currentPhase === 1 ? 'in_progress' : 'pending' },
+              { id: 2, title: 'SDK Setup', status: content.currentPhase > 2 ? 'completed' : content.currentPhase === 2 ? 'in_progress' : 'pending' },
+              { id: 3, title: 'Event Taxonomy', status: content.currentPhase > 3 ? 'completed' : content.currentPhase === 3 ? 'in_progress' : 'pending' },
+              { id: 4, title: 'Channel Integration', status: content.currentPhase > 4 ? 'completed' : content.currentPhase === 4 ? 'in_progress' : 'pending' },
+              { id: 5, title: 'Verification', status: content.currentPhase > 5 ? 'completed' : content.currentPhase === 5 ? 'in_progress' : 'pending' },
+            ]}
+            onPhaseClick={handlePhaseClick}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'phase-detail':
+        return <PhaseDetail phase={content.phase} onStart={handlePhaseStart} isCompleted={isCompleted} />;
+
+      // Validation and testing
+      case 'validation-checklist':
+        return (
+          <ValidationChecklist
+            category={content.category}
+            items={content.items}
+            onRunTest={handleValidationRunTest}
+            onItemClick={handleValidationItemClick}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'realtime-log-guide':
+        return <RealtimeLogGuide appName={currentApp?.appInfo.appName || 'myapp'} onContinue={handleRealtimeLogGuideContinue} isCompleted={isCompleted} />;
+
+      case 'test-scenario-guide':
+        return <TestScenarioGuide scenarios={content.scenarios} onTest={handleTestScenarioRun} onComplete={handleTestScenarioComplete} isCompleted={isCompleted} />;
+
+      // Error handling
+      case 'error-recovery':
+        return (
+          <ErrorRecovery
+            errorType={content.errorType}
+            message={content.message}
+            suggestions={content.suggestions}
+            onRetry={handleErrorRetry}
+            onSkip={handleErrorSkip}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'setup-warning':
+        return <SetupWarning warningType={content.warningType} title={content.title} message={content.message} onDismiss={handleWarningDismiss} isCompleted={isCompleted} />;
 
       default:
         return null;
@@ -9554,57 +14670,81 @@ export function ChatInterface({ userAnswers }: ChatInterfaceProps) {
                             const categoryCompleted = categorySteps.every(s => s.status === 'completed');
                             const categoryInProgress = categorySteps.some(s => s.status === 'in_progress');
 
+                            const isCollapsed = isCategoryCollapsed(app.id, category);
+                            const completedCount = categorySteps.filter(s => s.status === 'completed').length;
+
                             return (
                               <div key={category} className="mb-3">
-                                <div className={`text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5 ${
-                                  categoryCompleted ? 'text-green-600' : categoryInProgress ? 'text-blue-600' : 'text-gray-400'
-                                }`}>
-                                  {categoryCompleted && <CheckCircle2 className="w-3 h-3" />}
-                                  {categoryLabels[category]}
-                                </div>
-                                <div className="space-y-1">
-                                  {categorySteps.map((step) => {
-                                    const isDisabled = !canStartStep(app, step.id) && step.status === 'pending';
-                                    return (
-                                      <button
-                                        key={step.id}
-                                        onClick={() => !isDisabled && handleStepClick(app.id, step)}
-                                        disabled={isDisabled}
-                                        className={`w-full p-2 rounded-lg transition-all duration-150 text-sm text-left relative ${
-                                          isDisabled
-                                            ? 'opacity-50 cursor-not-allowed bg-gray-50'
-                                            : step.status === 'completed'
-                                            ? 'bg-green-50 hover:bg-green-100 hover:shadow-sm'
-                                            : step.status === 'in_progress'
-                                            ? 'bg-blue-100 hover:bg-blue-150 shadow-sm border-l-2 border-blue-500'
-                                            : 'bg-white hover:bg-gray-100 hover:shadow-sm border border-transparent hover:border-gray-200'
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-2">
-                                          {step.status === 'completed' ? (
-                                            <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
-                                          ) : step.status === 'in_progress' ? (
-                                            <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
-                                              <Loader2 className="w-3 h-3 text-white animate-spin" />
-                                            </div>
-                                          ) : (
-                                            <Circle className={`w-4 h-4 flex-shrink-0 ${isDisabled ? 'text-gray-200' : 'text-gray-300'}`} />
-                                          )}
-                                          <span className={`flex-1 truncate text-xs font-medium ${
-                                            isDisabled ? 'text-gray-400' :
-                                            step.status === 'completed' ? 'text-green-700' :
-                                            step.status === 'in_progress' ? 'text-blue-700' : 'text-gray-600'
-                                          }`}>
-                                            {step.title}
-                                          </span>
-                                          {step.status === 'in_progress' && (
-                                            <ChevronRight className="w-3 h-3 text-blue-500" />
-                                          )}
-                                        </div>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
+                                <button
+                                  onClick={() => toggleCategoryCollapse(app.id, category)}
+                                  className={`w-full text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center justify-between hover:opacity-80 transition-opacity ${
+                                    categoryCompleted ? 'text-green-600' : categoryInProgress ? 'text-blue-600' : 'text-gray-400'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5">
+                                    {categoryCompleted && <CheckCircle2 className="w-3 h-3" />}
+                                    {categoryLabels[category]}
+                                    <span className="text-[9px] font-normal normal-case">
+                                      ({completedCount}/{categorySteps.length})
+                                    </span>
+                                  </div>
+                                  <ChevronDown className={`w-3 h-3 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                                </button>
+                                <AnimatePresence initial={false}>
+                                  {!isCollapsed && (
+                                    <motion.div
+                                      initial={{ height: 0, opacity: 0 }}
+                                      animate={{ height: 'auto', opacity: 1 }}
+                                      exit={{ height: 0, opacity: 0 }}
+                                      transition={{ duration: 0.15 }}
+                                      className="overflow-hidden"
+                                    >
+                                      <div className="space-y-1">
+                                        {categorySteps.map((step) => {
+                                          const isDisabled = !canStartStep(app, step.id) && step.status === 'pending';
+                                          return (
+                                            <button
+                                              key={step.id}
+                                              onClick={() => !isDisabled && handleStepClick(app.id, step)}
+                                              disabled={isDisabled}
+                                              className={`w-full p-2 rounded-lg transition-all duration-150 text-sm text-left relative ${
+                                                isDisabled
+                                                  ? 'opacity-50 cursor-not-allowed bg-gray-50'
+                                                  : step.status === 'completed'
+                                                  ? 'bg-green-50 hover:bg-green-100 hover:shadow-sm'
+                                                  : step.status === 'in_progress'
+                                                  ? 'bg-blue-100 hover:bg-blue-150 shadow-sm border-l-2 border-blue-500'
+                                                  : 'bg-white hover:bg-gray-100 hover:shadow-sm border border-transparent hover:border-gray-200'
+                                              }`}
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                {step.status === 'completed' ? (
+                                                  <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                                ) : step.status === 'in_progress' ? (
+                                                  <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                                                    <Loader2 className="w-3 h-3 text-white animate-spin" />
+                                                  </div>
+                                                ) : (
+                                                  <Circle className={`w-4 h-4 flex-shrink-0 ${isDisabled ? 'text-gray-200' : 'text-gray-300'}`} />
+                                                )}
+                                                <span className={`flex-1 truncate text-xs font-medium ${
+                                                  isDisabled ? 'text-gray-400' :
+                                                  step.status === 'completed' ? 'text-green-700' :
+                                                  step.status === 'in_progress' ? 'text-blue-700' : 'text-gray-600'
+                                                }`}>
+                                                  {step.title}
+                                                </span>
+                                                {step.status === 'in_progress' && (
+                                                  <ChevronRight className="w-3 h-3 text-blue-500" />
+                                                )}
+                                              </div>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
                               </div>
                             );
                           })}

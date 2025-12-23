@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, CheckCircle2, Circle, Sparkles, Copy, Check, ExternalLink,
   Smartphone, Code, Tv, AlertCircle, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Loader2, Plus, Lightbulb,
-  Maximize2, MessageCircle, X, Share2, MessageSquare, BookOpen, Key, HelpCircle, Link2
+  Maximize2, MessageCircle, X, Share2, MessageSquare, BookOpen, Key, HelpCircle, Link2, Link, Mail, LayoutDashboard, Users, UserPlus
 } from 'lucide-react';
 import { AirbridgeBackground } from '../AirbridgeBackground';
 
@@ -95,6 +95,8 @@ type MessageContent =
   | { type: 'deeplink-test-checklist' }
   | { type: 'deeplink-test-scenarios'; appName: string }
   | { type: 'deeplink-complete' }
+  | { type: 'uninstall-tracking-setup'; platform: 'ios' | 'android' }
+  | { type: 'hybrid-app-setup'; platform: 'ios' | 'android'; appName: string }
   | { type: 'sdk-verify' }
   | { type: 'channel-select' }
   | { type: 'channel-integration-overview'; selectedChannels: string[] }
@@ -122,6 +124,10 @@ type MessageContent =
   | { type: 'token-display'; tokens: { appSdkToken: string; webSdkToken: string; apiToken: string } }
   | { type: 'dev-completion-summary'; appName: string }
   | { type: 'sdk-install-choice' }
+  | { type: 'role-capability-check' }
+  | { type: 'marketer-next-steps'; appName: string }
+  | { type: 'sdk-requires-developer'; appName: string }
+  | { type: 'developer-email-invite'; appName: string }
   | { type: 'sdk-guide-share'; appName: string; platforms: string[]; framework?: string }
   // GitHub Automation types
   | { type: 'sdk-install-method-select' }
@@ -350,8 +356,8 @@ const createAppSteps = (platforms: string[] = [], framework: string = ''): Onboa
   // Web SDK steps (always separate)
   if (hasWeb) {
     steps.push(
-      { id: 'web-sdk-install', phase: 2, title: 'Web SDK 설치', description: 'Install Web SDK', status: 'pending', category: 'web-sdk' },
-      { id: 'web-sdk-init', phase: 2, title: 'Web SDK 초기화', description: 'Initialize Web SDK', status: 'pending', category: 'web-sdk' },
+      { id: 'web-sdk-install', phase: 2, title: 'Web SDK Installation', description: 'Install Web SDK', status: 'pending', category: 'web-sdk' },
+      { id: 'web-sdk-init', phase: 2, title: 'Web SDK Initialization', description: 'Initialize Web SDK', status: 'pending', category: 'web-sdk' },
     );
   }
 
@@ -359,59 +365,67 @@ const createAppSteps = (platforms: string[] = [], framework: string = ''): Onboa
     // Native frameworks: separate iOS and Android SDK flows with integrated deeplink
     if (hasIos) {
       steps.push(
-        { id: 'ios-sdk-install', phase: 2, title: 'iOS SDK 설치', description: 'Install iOS SDK (CocoaPods/SPM)', status: 'pending', category: 'ios-sdk' },
-        { id: 'ios-sdk-init', phase: 2, title: 'iOS SDK 초기화', description: 'Initialize iOS SDK', status: 'pending', category: 'ios-sdk' },
-        { id: 'ios-deeplink-setup', phase: 2, title: 'iOS 딥링크 설정', description: 'Configure iOS deep links', status: 'pending', category: 'ios-sdk' },
+        { id: 'ios-sdk-install', phase: 2, title: 'iOS SDK Installation', description: 'Install iOS SDK (CocoaPods/SPM)', status: 'pending', category: 'ios-sdk' },
+        { id: 'ios-sdk-init', phase: 2, title: 'iOS SDK Initialization', description: 'Initialize iOS SDK', status: 'pending', category: 'ios-sdk' },
+        { id: 'ios-deeplink-setup', phase: 2, title: 'iOS Deep Link Setup', description: 'Configure iOS deep links', status: 'pending', category: 'ios-sdk' },
       );
     }
     if (hasAndroid) {
       steps.push(
-        { id: 'android-sdk-install', phase: 2, title: 'Android SDK 설치', description: 'Install Android SDK (Gradle)', status: 'pending', category: 'android-sdk' },
-        { id: 'android-sdk-init', phase: 2, title: 'Android SDK 초기화', description: 'Initialize Android SDK', status: 'pending', category: 'android-sdk' },
-        { id: 'android-deeplink-setup', phase: 2, title: 'Android 딥링크 설정', description: 'Configure Android deep links', status: 'pending', category: 'android-sdk' },
+        { id: 'android-sdk-install', phase: 2, title: 'Android SDK Installation', description: 'Install Android SDK (Gradle)', status: 'pending', category: 'android-sdk' },
+        { id: 'android-sdk-init', phase: 2, title: 'Android SDK Initialization', description: 'Initialize Android SDK', status: 'pending', category: 'android-sdk' },
+        { id: 'android-deeplink-setup', phase: 2, title: 'Android Deep Link Setup', description: 'Configure Android deep links', status: 'pending', category: 'android-sdk' },
       );
     }
   } else {
     // Cross-platform frameworks: unified SDK flow
     if (hasIos || hasAndroid) {
       steps.push(
-        { id: 'sdk-install', phase: 2, title: 'SDK 설치', description: 'Install SDK packages', status: 'pending', category: 'sdk' },
-        { id: 'sdk-init', phase: 2, title: 'SDK 초기화', description: 'Add SDK code to your app', status: 'pending', category: 'sdk' },
-        { id: 'deeplink', phase: 2, title: '딥링크 설정', description: 'Configure deep links', status: 'pending', category: 'deeplink' },
+        { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install SDK packages', status: 'pending', category: 'sdk' },
+        { id: 'sdk-init', phase: 2, title: 'SDK Initialization', description: 'Add SDK code to your app', status: 'pending', category: 'sdk' },
+        { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links', status: 'pending', category: 'deeplink' },
       );
     }
   }
 
   // SDK Test (common for all)
   if (hasIos || hasAndroid || hasWeb) {
-    steps.push({ id: 'sdk-test', phase: 2, title: 'SDK 테스트', description: 'Test SDK integration', status: 'pending', category: 'sdk' });
+    steps.push({ id: 'sdk-test', phase: 2, title: 'SDK Test', description: 'Test SDK integration', status: 'pending', category: 'sdk' });
+  }
+
+  // Advanced Settings (optional)
+  if (hasIos || hasAndroid) {
+    steps.push(
+      { id: 'uninstall-tracking', phase: 2, title: 'Uninstall Tracking', description: 'Track app uninstalls', status: 'pending', category: 'advanced' },
+      { id: 'hybrid-app', phase: 2, title: 'Hybrid App Setup', description: 'WebView event tracking', status: 'pending', category: 'advanced' },
+    );
   }
 
   // Tracking Link and Deep Link Test
   if (hasIos || hasAndroid) {
     steps.push(
-      { id: 'tracking-link', phase: 4, title: '트래킹 링크', description: 'Create tracking links', status: 'pending', category: 'deeplink' },
-      { id: 'deeplink-test', phase: 5, title: '딥링크 테스트', description: 'Test deep link functionality', status: 'pending', category: 'deeplink' },
+      { id: 'tracking-link', phase: 4, title: 'Tracking Link', description: 'Create tracking links', status: 'pending', category: 'deeplink' },
+      { id: 'deeplink-test', phase: 5, title: 'Deep Link Test', description: 'Test deep link functionality', status: 'pending', category: 'deeplink' },
     );
   }
 
   // Event Taxonomy category
-  steps.push({ id: 'event-taxonomy', phase: 3, title: '이벤트 설계', description: 'Define events to track', status: 'pending', category: 'event-taxonomy' });
+  steps.push({ id: 'event-taxonomy', phase: 3, title: 'Event Taxonomy', description: 'Define events to track', status: 'pending', category: 'event-taxonomy' });
 
   // Integration category
   steps.push(
-    { id: 'channel-select', phase: 4, title: '채널 선택', description: 'Select ad platforms', status: 'pending', category: 'integration' },
-    { id: 'channel-integration', phase: 4, title: '채널 연동', description: 'Connect to ad platforms', status: 'pending', category: 'integration' },
-    { id: 'cost-integration', phase: 4, title: '비용 연동', description: 'Enable cost data import', status: 'pending', category: 'integration' },
+    { id: 'channel-select', phase: 4, title: 'Channel Selection', description: 'Select ad platforms', status: 'pending', category: 'integration' },
+    { id: 'channel-integration', phase: 4, title: 'Channel Integration', description: 'Connect to ad platforms', status: 'pending', category: 'integration' },
+    { id: 'cost-integration', phase: 4, title: 'Cost Integration', description: 'Enable cost data import', status: 'pending', category: 'integration' },
   );
 
   if (hasIos) {
-    steps.push({ id: 'skan-integration', phase: 4, title: 'SKAN 연동', description: 'iOS attribution setup', status: 'pending', category: 'integration' });
+    steps.push({ id: 'skan-integration', phase: 4, title: 'SKAN Integration', description: 'iOS attribution setup', status: 'pending', category: 'integration' });
   }
 
   steps.push(
-    { id: 'attribution-test', phase: 5, title: '어트리뷰션 테스트', description: 'Verify attribution setup', status: 'pending', category: 'integration' },
-    { id: 'data-verify', phase: 5, title: '데이터 검증', description: 'Confirm data collection', status: 'pending', category: 'integration' },
+    { id: 'attribution-test', phase: 5, title: 'Attribution Test', description: 'Verify attribution setup', status: 'pending', category: 'integration' },
+    { id: 'data-verify', phase: 5, title: 'Data Verification', description: 'Confirm data collection', status: 'pending', category: 'integration' },
   );
 
   return steps;
@@ -428,8 +442,8 @@ const createDevAppSteps = (platforms: string[] = [], framework: string = ''): On
   // Web SDK steps (always separate)
   if (hasWeb) {
     steps.push(
-      { id: 'web-sdk-install', phase: 2, title: 'Web SDK 설치', description: 'Install Web SDK', status: 'pending', category: 'web-sdk' },
-      { id: 'web-sdk-init', phase: 2, title: 'Web SDK 초기화', description: 'Initialize Web SDK', status: 'pending', category: 'web-sdk' },
+      { id: 'web-sdk-install', phase: 2, title: 'Web SDK Installation', description: 'Install Web SDK', status: 'pending', category: 'web-sdk' },
+      { id: 'web-sdk-init', phase: 2, title: 'Web SDK Initialization', description: 'Initialize Web SDK', status: 'pending', category: 'web-sdk' },
     );
   }
 
@@ -437,32 +451,32 @@ const createDevAppSteps = (platforms: string[] = [], framework: string = ''): On
     // Native frameworks: separate iOS and Android SDK flows with integrated deeplink
     if (hasIos) {
       steps.push(
-        { id: 'ios-sdk-install', phase: 2, title: 'iOS SDK 설치', description: 'Install iOS SDK', status: 'pending', category: 'ios-sdk' },
-        { id: 'ios-sdk-init', phase: 2, title: 'iOS SDK 초기화', description: 'Initialize iOS SDK', status: 'pending', category: 'ios-sdk' },
-        { id: 'ios-deeplink-setup', phase: 2, title: 'iOS 딥링크 설정', description: 'Configure iOS deep links', status: 'pending', category: 'ios-sdk' },
+        { id: 'ios-sdk-install', phase: 2, title: 'iOS SDK Installation', description: 'Install iOS SDK', status: 'pending', category: 'ios-sdk' },
+        { id: 'ios-sdk-init', phase: 2, title: 'iOS SDK Initialization', description: 'Initialize iOS SDK', status: 'pending', category: 'ios-sdk' },
+        { id: 'ios-deeplink-setup', phase: 2, title: 'iOS Deep Link Setup', description: 'Configure iOS deep links', status: 'pending', category: 'ios-sdk' },
       );
     }
     if (hasAndroid) {
       steps.push(
-        { id: 'android-sdk-install', phase: 2, title: 'Android SDK 설치', description: 'Install Android SDK', status: 'pending', category: 'android-sdk' },
-        { id: 'android-sdk-init', phase: 2, title: 'Android SDK 초기화', description: 'Initialize Android SDK', status: 'pending', category: 'android-sdk' },
-        { id: 'android-deeplink-setup', phase: 2, title: 'Android 딥링크 설정', description: 'Configure Android deep links', status: 'pending', category: 'android-sdk' },
+        { id: 'android-sdk-install', phase: 2, title: 'Android SDK Installation', description: 'Install Android SDK', status: 'pending', category: 'android-sdk' },
+        { id: 'android-sdk-init', phase: 2, title: 'Android SDK Initialization', description: 'Initialize Android SDK', status: 'pending', category: 'android-sdk' },
+        { id: 'android-deeplink-setup', phase: 2, title: 'Android Deep Link Setup', description: 'Configure Android deep links', status: 'pending', category: 'android-sdk' },
       );
     }
   } else {
     // Cross-platform frameworks: unified SDK flow
     if (hasIos || hasAndroid) {
       steps.push(
-        { id: 'sdk-install', phase: 2, title: 'SDK 설치', description: 'Install SDK packages', status: 'pending', category: 'sdk' },
-        { id: 'sdk-init', phase: 2, title: 'SDK 초기화', description: 'Add SDK code to your app', status: 'pending', category: 'sdk' },
-        { id: 'deeplink', phase: 2, title: '딥링크 설정', description: 'Configure deep links', status: 'pending', category: 'deeplink' },
+        { id: 'sdk-install', phase: 2, title: 'SDK Installation', description: 'Install SDK packages', status: 'pending', category: 'sdk' },
+        { id: 'sdk-init', phase: 2, title: 'SDK Initialization', description: 'Add SDK code to your app', status: 'pending', category: 'sdk' },
+        { id: 'deeplink', phase: 2, title: 'Deep Link Setup', description: 'Configure deep links', status: 'pending', category: 'deeplink' },
       );
     }
   }
 
   // SDK Test (common for all)
   if (hasIos || hasAndroid || hasWeb) {
-    steps.push({ id: 'sdk-test', phase: 2, title: 'SDK 테스트', description: 'Test SDK integration', status: 'pending', category: 'sdk' });
+    steps.push({ id: 'sdk-test', phase: 2, title: 'SDK Test', description: 'Test SDK integration', status: 'pending', category: 'sdk' });
   }
 
   return steps;
@@ -698,8 +712,8 @@ function WebSdkInitOptions({ appName, webToken, onComplete, onSkip, isCompleted 
 }) {
   const [options, setOptions] = useState({
     autoStartTrackingEnabled: true,
-    utmParsing: false,
-    userHash: true,
+    utmParsing: true, // Recommended: Most web customers enable this
+    userHash: false, // Not recommended: Avoid collecting email/phone
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -753,9 +767,9 @@ ${optionEntries}
             className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
         </label>
-        <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+        <label className="flex items-center justify-between p-3 bg-blue-50 border border-blue-100 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
           <div>
-            <div className="text-sm font-medium text-gray-900">UTM Parsing</div>
+            <div className="text-sm font-medium text-gray-900">UTM Parsing <span className="text-xs text-blue-600 font-normal">(Recommended)</span></div>
             <div className="text-xs text-gray-500">Auto-extract UTM parameters from URL</div>
           </div>
           <input
@@ -765,10 +779,10 @@ ${optionEntries}
             className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
         </label>
-        <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+        <label className="flex items-center justify-between p-3 bg-amber-50 border border-amber-100 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors">
           <div>
-            <div className="text-sm font-medium text-gray-900">User Data Hashing</div>
-            <div className="text-xs text-gray-500">SHA-256 hash email and phone number</div>
+            <div className="text-sm font-medium text-gray-900">User Data Hashing <span className="text-xs text-amber-600 font-normal">(Not Recommended)</span></div>
+            <div className="text-xs text-amber-700">Airbridge advises against collecting email/phone data</div>
           </div>
           <input
             type="checkbox"
@@ -864,12 +878,19 @@ function WebSdkUserIdentity({ onComplete, onSkip, isCompleted = false }: {
 
   const loginCode = `// Set user identity on login
 airbridge.setUserID('user_12345');
-airbridge.setUserEmail('user@example.com');
-airbridge.setUserPhone('821012341234');
-airbridge.setUserAttribute('membership', 'gold');`;
+
+// Set user aliases (optional)
+airbridge.setUserAlias('externalId', 'ext_user_001');
+airbridge.setUserAlias('crmId', 'crm_12345');`;
 
   const logoutCode = `// Clear user info on logout
-airbridge.clearUser();`;
+airbridge.clearUserID();
+
+// Remove specific alias
+airbridge.removeUserAlias('externalId');
+
+// Or clear all aliases
+airbridge.clearUserAlias();`;
 
   if (isCompleted) {
     return (
@@ -889,14 +910,19 @@ airbridge.clearUser();`;
 
       {/* Available Methods */}
       <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-        <div className={LABEL_STYLES.fieldDesc}>Available methods:</div>
-        <table className="w-full text-xs">
+        <div className={LABEL_STYLES.fieldDesc}>User ID methods:</div>
+        <table className="w-full text-xs mb-3">
           <tbody className="text-gray-700">
             <tr><td className="py-1 font-mono text-blue-600">setUserID(id)</td><td>Set user ID</td></tr>
-            <tr><td className="py-1 font-mono text-blue-600">setUserEmail(email)</td><td>Set email</td></tr>
-            <tr><td className="py-1 font-mono text-blue-600">setUserPhone(phone)</td><td>Set phone number</td></tr>
-            <tr><td className="py-1 font-mono text-blue-600">setUserAttribute(key, value)</td><td>Set custom attribute</td></tr>
+            <tr><td className="py-1 font-mono text-blue-600">clearUserID()</td><td>Clear user ID</td></tr>
+          </tbody>
+        </table>
+        <div className={LABEL_STYLES.fieldDesc}>User Alias methods:</div>
+        <table className="w-full text-xs">
+          <tbody className="text-gray-700">
             <tr><td className="py-1 font-mono text-blue-600">setUserAlias(key, value)</td><td>Set user alias</td></tr>
+            <tr><td className="py-1 font-mono text-blue-600">removeUserAlias(key)</td><td>Remove specific alias</td></tr>
+            <tr><td className="py-1 font-mono text-blue-600">clearUserAlias()</td><td>Clear all aliases</td></tr>
           </tbody>
         </table>
       </div>
@@ -2509,6 +2535,319 @@ function SdkInstallChoice({ onSelect, isCompleted = false }: { onSelect: (choice
             <div className="font-medium text-gray-900">Send guide to developer</div>
             <div className="text-sm text-gray-500">I'm a marketer and need to share the setup guide with my dev team</div>
           </div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Role Capability Check Component - Asks if user can install SDK themselves
+function RoleCapabilityCheck({ onSelect, isCompleted = false }: { onSelect: (canInstall: boolean) => void; isCompleted?: boolean }) {
+  if (isCompleted) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="text-sm font-medium text-gray-500 mb-2">Setup Role</div>
+        <div className="text-xs text-gray-400">Role confirmed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>What's your role in this setup?</div>
+      <p className="text-xs text-gray-500 mb-4">This helps us guide you through the right steps.</p>
+      <div className="space-y-2">
+        <button
+          onClick={() => onSelect(true)}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-100">
+            <Code className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">I'm a developer - I'll install the SDK myself</div>
+            <div className="text-sm text-gray-500">I have codebase access and can integrate the SDK</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+        <button
+          onClick={() => onSelect(false)}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-purple-100">
+            <Users className="w-5 h-5 text-purple-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">I'm not a developer - someone else will handle SDK</div>
+            <div className="text-sm text-gray-500">I'm a marketer, PM, or analyst - technical setup will be done by others</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Marketer Next Steps Component - Shows options for non-developers
+function MarketerNextSteps({ appName, onSelect, isCompleted = false }: {
+  appName: string;
+  onSelect: (choice: 'invite-developer' | 'create-tracking-link') => void;
+  isCompleted?: boolean
+}) {
+  if (isCompleted) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="text-sm font-medium text-gray-500 mb-2">Next Steps</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>What would you like to do next?</div>
+      <div className="space-y-2">
+        <button
+          onClick={() => onSelect('invite-developer')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-purple-100">
+            <UserPlus className="w-5 h-5 text-purple-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">Invite a developer</div>
+            <div className="text-sm text-gray-500">Share SDK setup guide with your dev team</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+        <button
+          onClick={() => onSelect('create-tracking-link')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-blue-500 bg-blue-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-500 text-white">
+            <Link className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-900">Create a tracking link</span>
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Recommended</span>
+            </div>
+            <div className="text-sm text-gray-500">Start building campaign links right now</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-blue-400" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// SDK Requires Developer Component - Shows options when SDK installation is needed
+function SdkRequiresDeveloper({ appName, onSelect, isCompleted = false }: {
+  appName: string;
+  onSelect: (choice: 'create-tracking-link' | 'explore-dashboard' | 'invite-developer') => void;
+  isCompleted?: boolean;
+}) {
+  if (isCompleted) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="text-sm font-medium text-gray-500 mb-2">SDK Installation</div>
+        <div className="text-xs text-gray-400">Selection completed</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={CARD_STYLES.base}>
+      <div className="flex items-start gap-3 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+        <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <div className="font-medium text-amber-800">SDK Installation Requires a Developer</div>
+          <div className="text-sm text-amber-700 mt-1">
+            A developer with codebase access is needed to integrate the Airbridge SDK.
+          </div>
+        </div>
+      </div>
+
+      <div className={LABEL_STYLES.title}>In the meantime, what would you like to do?</div>
+      <div className="space-y-2">
+        <button
+          onClick={() => onSelect('create-tracking-link')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-blue-500 bg-blue-50 transition-all text-left hover:bg-blue-100"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-500 text-white">
+            <Link className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-900">Create a tracking link</span>
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Recommended</span>
+            </div>
+            <div className="text-sm text-gray-500">Start building campaign links right now</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-blue-400" />
+        </button>
+
+        <button
+          onClick={() => onSelect('explore-dashboard')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-indigo-100">
+            <LayoutDashboard className="w-5 h-5 text-indigo-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">Explore the dashboard</div>
+            <div className="text-sm text-gray-500">See what Airbridge can do with sample data</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+
+        <button
+          onClick={() => onSelect('invite-developer')}
+          className="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-purple-100">
+            <Mail className="w-5 h-5 text-purple-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">Invite developer(s)</div>
+            <div className="text-sm text-gray-500">Send SDK setup invitation via email</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Developer Email Invite Component - Input multiple developer emails
+function DeveloperEmailInvite({ appName, onSend, onBack, isCompleted = false }: {
+  appName: string;
+  onSend: (emails: string[]) => void;
+  onBack: () => void;
+  isCompleted?: boolean;
+}) {
+  const [emails, setEmails] = useState<string[]>(['']);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  if (isCompleted || sent) {
+    return (
+      <div className={CARD_STYLES.completed}>
+        <div className="flex items-center gap-2">
+          <Check className="w-4 h-4 text-green-600" />
+          <span className="text-sm font-medium text-gray-700">Invitations sent</span>
+        </div>
+        <div className="text-xs text-gray-400 mt-1">
+          {emails.filter(e => e.trim()).length} developer(s) invited
+        </div>
+      </div>
+    );
+  }
+
+  const addEmail = () => {
+    setEmails([...emails, '']);
+  };
+
+  const removeEmail = (index: number) => {
+    if (emails.length > 1) {
+      setEmails(emails.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateEmail = (index: number, value: string) => {
+    const newEmails = [...emails];
+    newEmails[index] = value;
+    setEmails(newEmails);
+  };
+
+  const isValidEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const validEmails = emails.filter(e => isValidEmail(e.trim()));
+  const canSend = validEmails.length > 0;
+
+  const handleSend = () => {
+    if (!canSend) return;
+    setSending(true);
+    // Simulate sending
+    setTimeout(() => {
+      setSending(false);
+      setSent(true);
+      onSend(validEmails);
+    }, 1000);
+  };
+
+  return (
+    <div className={CARD_STYLES.base}>
+      <div className={LABEL_STYLES.title}>Invite Developer(s) to Set Up SDK</div>
+      <p className="text-xs text-gray-500 mb-4">
+        We'll send them an email with SDK setup instructions and access to the <strong>{appName}</strong> dashboard.
+      </p>
+
+      <div className="space-y-2 mb-4">
+        {emails.map((email, index) => (
+          <div key={index} className="flex gap-2">
+            <div className="flex-1 relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => updateEmail(index, e.target.value)}
+                placeholder="developer@company.com"
+                className={`w-full pl-10 pr-4 py-3 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  email && !isValidEmail(email) ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                }`}
+              />
+            </div>
+            {emails.length > 1 && (
+              <button
+                onClick={() => removeEmail(index)}
+                className="p-3 text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={addEmail}
+        className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 mb-4"
+      >
+        <Plus className="w-4 h-4" />
+        Add another developer
+      </button>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onBack}
+          className="px-4 py-3 rounded-lg font-medium transition-colors border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          Back
+        </button>
+        <button
+          onClick={handleSend}
+          disabled={!canSend || sending}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-colors ${
+            canSend && !sending
+              ? 'bg-blue-500 text-white hover:bg-blue-600'
+              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          {sending ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Sending...
+            </>
+          ) : (
+            <>
+              <Send className="w-4 h-4" />
+              Send Invitation{validEmails.length > 1 ? 's' : ''}
+              {validEmails.length > 0 && ` (${validEmails.length})`}
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -8927,10 +9266,11 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     setCurrentPhase(1);
 
     // Use addBotMessageToApp with captured appId to avoid closure issues
+    // Show role capability check instead of token display
     setTimeout(() => {
       addBotMessageToApp(newAppId, [
-        { type: 'text', text: `🎉 Your app **"${appName}"** has been registered!` },
-        { type: 'token-display', tokens },
+        { type: 'text', text: `Your app **"${appName}"** has been registered successfully!\n\nBefore we proceed, let me understand your role to provide the right guidance.` },
+        { type: 'role-capability-check' },
       ]);
     }, 300);
   };
@@ -9093,8 +9433,8 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: `✅ I've detected your app registration for **"${setupState.appInfo.appName}"**. Great job!\n\n🔧 Now let's proceed with **SDK installation**.\n\nThe SDK needs to be installed by a developer. Who will handle this?` },
-        { type: 'sdk-install-choice' },
+        { type: 'text', text: `✅ I've detected your app registration for **"${setupState.appInfo.appName}"**. Great job!\n\nBefore we proceed, let me understand your role to provide the right guidance.` },
+        { type: 'role-capability-check' },
       ]);
     }, 300);
   };
@@ -9124,6 +9464,156 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
         ]);
       }, 300);
     }
+  };
+
+  // Role capability check handler - determines if user can install SDK
+  const handleRoleCapabilityCheck = (canInstall: boolean) => {
+    const app = registeredApps.find(a => a.id === currentAppId);
+    const appName = app?.appInfo.appName || setupState.appInfo?.appName || 'Your App';
+
+    if (canInstall) {
+      // Developer path: show tokens first, then SDK install options
+      addUserMessage("I'm a developer - I'll install the SDK myself");
+
+      // Get tokens from registered app
+      const tokens = app?.tokens || {
+        appSdkToken: 'token_not_found',
+        webSdkToken: 'token_not_found',
+        apiToken: 'token_not_found',
+      };
+
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: `Great! Here are your API tokens. You'll need these for SDK integration.` },
+          { type: 'token-display', tokens },
+        ]);
+      }, 300);
+    } else {
+      // Marketer path: show SDK requires developer options
+      addUserMessage("I'm not a developer - someone else will handle SDK");
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'sdk-requires-developer', appName },
+        ]);
+      }, 300);
+    }
+  };
+
+  // Marketer next steps handler - handles marketer's choice after role check
+  const handleMarketerNextStep = (choice: 'invite-developer' | 'create-tracking-link') => {
+    const app = registeredApps.find(a => a.id === currentAppId);
+    const appName = app?.appInfo.appName || setupState.appInfo?.appName || 'Your App';
+
+    switch (choice) {
+      case 'invite-developer':
+        addUserMessage("Invite a developer");
+        // Get tokens from registered app
+        const tokens = app?.tokens || {
+          appSdkToken: 'token_not_found',
+          webSdkToken: 'token_not_found',
+          apiToken: 'token_not_found',
+        };
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `Here's everything your developer needs to get started with SDK integration:` },
+            { type: 'token-display', tokens },
+            {
+              type: 'sdk-guide-share',
+              appName: appName,
+              platforms: app?.platforms || setupState.platforms || [],
+              framework: app?.framework
+            },
+          ]);
+        }, 300);
+        break;
+
+      case 'create-tracking-link':
+        addUserMessage("Create a tracking link");
+        // Update step status to show tracking link creation
+        if (currentAppId) {
+          updateAppStepStatus(currentAppId, 'tracking-link', 'in_progress');
+        }
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `**Create Your First Tracking Link**\n\nTracking links help you measure campaign performance. You can create these now while your developer works on the SDK.\n\nLet's create a tracking link for **${appName}**.` },
+            { type: 'tracking-link-form', channel: 'organic' },
+          ]);
+        }, 300);
+        break;
+    }
+  };
+
+  // SDK Requires Developer handler - handles user's choice when SDK installation requires developer
+  const handleSdkRequiresDeveloper = (choice: 'create-tracking-link' | 'explore-dashboard' | 'invite-developer') => {
+    const app = registeredApps.find(a => a.id === currentAppId);
+    const appName = app?.appInfo.appName || setupState.appInfo?.appName || 'Your App';
+
+    switch (choice) {
+      case 'create-tracking-link':
+        addUserMessage("Create a tracking link");
+        if (currentAppId) {
+          updateAppStepStatus(currentAppId, 'tracking-link', 'in_progress');
+        }
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `**Create Your First Tracking Link**\n\nTracking links help you measure campaign performance. You can create these now while your developer works on the SDK.\n\nLet's create a tracking link for **${appName}**.` },
+            { type: 'tracking-link-form', channel: 'organic' },
+          ]);
+        }, 300);
+        break;
+
+      case 'explore-dashboard':
+        addUserMessage("Explore the dashboard");
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'text', text: `**Explore Airbridge Dashboard**\n\nTake a look at what Airbridge can do! You can explore our demo app to see sample reports and features.` },
+          ]);
+          // Open dashboard in new tab (demo app)
+          window.open('https://dashboard.airbridge.io/app/demokr', '_blank');
+        }, 300);
+        break;
+
+      case 'invite-developer':
+        addUserMessage("Invite developer(s)");
+        setTimeout(() => {
+          addBotMessage([
+            { type: 'developer-email-invite', appName },
+          ]);
+        }, 300);
+        break;
+    }
+  };
+
+  // Developer Email Invite handler - after emails are sent, show options again
+  const handleDeveloperEmailInvite = (emails: string[]) => {
+    const app = registeredApps.find(a => a.id === currentAppId);
+    const appName = app?.appInfo.appName || setupState.appInfo?.appName || 'Your App';
+
+    addUserMessage(`Invited ${emails.length} developer${emails.length > 1 ? 's' : ''}`);
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: `✅ **Invitations Sent!**\n\nWe've sent SDK setup instructions to:\n${emails.map(e => `• ${e}`).join('\n')}\n\nThey'll receive an email with everything they need to get started.` },
+      ]);
+      // After a short delay, show the options again
+      setTimeout(() => {
+        addBotMessage([
+          { type: 'text', text: `While waiting for your developer to complete the SDK setup, what would you like to do?` },
+          { type: 'sdk-requires-developer', appName },
+        ]);
+      }, 500);
+    }, 300);
+  };
+
+  // Developer Email Invite back handler - go back to SDK requires developer options
+  const handleDeveloperEmailInviteBack = () => {
+    const app = registeredApps.find(a => a.id === currentAppId);
+    const appName = app?.appInfo.appName || setupState.appInfo?.appName || 'Your App';
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'sdk-requires-developer', appName },
+      ]);
+    }, 100);
   };
 
   // SDK Install Method handler (Automation vs Manual)
@@ -10280,8 +10770,8 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
     setTimeout(() => {
       addBotMessage([
-        { type: 'text', text: '🛠️ **SDK 설치**\n\n이제 SDK를 설치하겠습니다.\n앱 개발에 사용하신 프레임워크를 선택해 주세요.' },
-        { type: 'framework-select' },
+        { type: 'text', text: `Now let's set up the SDK. Choose your preferred installation method:` },
+        { type: 'sdk-install-method-select' },
       ]);
     }, 300);
   };
@@ -10737,6 +11227,64 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
     }
   };
 
+  // Uninstall Tracking handlers
+  const handleUninstallTrackingComplete = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('Uninstall tracking setup completed');
+    updateAppStepStatus(app.id, 'uninstall-tracking', 'completed');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '**Uninstall tracking is configured!** You can now monitor app uninstall rates in your dashboard.' },
+      ]);
+    }, 300);
+  };
+
+  const handleUninstallTrackingSkip = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('Skipped uninstall tracking for now');
+    updateAppStepStatus(app.id, 'uninstall-tracking', 'completed');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'You can set up uninstall tracking later from your dashboard settings.' },
+      ]);
+    }, 300);
+  };
+
+  // Hybrid App handlers
+  const handleHybridAppComplete = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('Hybrid app setup completed');
+    updateAppStepStatus(app.id, 'hybrid-app', 'completed');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: '**Hybrid app setup complete!** WebView events will now be tracked and attributed correctly.' },
+      ]);
+    }, 300);
+  };
+
+  const handleHybridAppSkip = () => {
+    const app = currentApp;
+    if (!app) return;
+
+    addUserMessage('Skipped hybrid app setup');
+    updateAppStepStatus(app.id, 'hybrid-app', 'completed');
+
+    setTimeout(() => {
+      addBotMessage([
+        { type: 'text', text: 'You can set up hybrid app tracking later if needed.' },
+      ]);
+    }, 300);
+  };
+
   // Tracking Link handlers
   const [trackingLinks, setTrackingLinks] = useState<TrackingLink[]>([]);
 
@@ -11039,8 +11587,8 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
       case 'sdk-install':
         setTimeout(() => {
           addBotMessage([
-            { type: 'text', text: `📦 **SDK Installation** for **${app.appInfo.appName}**\n\nThe SDK needs to be installed by a developer. Who will handle this?` },
-            { type: 'sdk-install-choice' },
+            { type: 'text', text: `📦 **SDK Installation** for **${app.appInfo.appName}**\n\nBefore we proceed, let me understand your role to provide the right guidance.` },
+            { type: 'role-capability-check' },
           ]);
         }, 300);
         break;
@@ -11103,6 +11651,28 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
           addBotMessage([
             { type: 'text', text: `🧪 **SDK Test** for **${app.appInfo.appName}**\n\nLet's verify your SDK integration is working correctly.` },
             { type: 'sdk-test' },
+          ]);
+        }, 300);
+        break;
+
+      case 'uninstall-tracking':
+        setTimeout(() => {
+          // Determine platform - prefer iOS if both available
+          const platform = app.platforms.includes('ios') ? 'ios' : 'android';
+          addBotMessage([
+            { type: 'text', text: `📱 **Uninstall Tracking** for **${app.appInfo.appName}**\n\nTrack when users uninstall your app to understand user retention.` },
+            { type: 'uninstall-tracking-setup', platform },
+          ]);
+        }, 300);
+        break;
+
+      case 'hybrid-app':
+        setTimeout(() => {
+          // Determine platform - prefer iOS if both available
+          const platform = app.platforms.includes('ios') ? 'ios' : 'android';
+          addBotMessage([
+            { type: 'text', text: `🌐 **Hybrid App Setup** for **${app.appInfo.appName}**\n\nSet up event tracking for WebViews in your app.` },
+            { type: 'hybrid-app-setup', platform, appName: app.appInfo.appName },
           ]);
         }, 300);
         break;
@@ -11270,6 +11840,18 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
 
       case 'sdk-install-choice':
         return <SdkInstallChoice onSelect={handleSdkInstallChoice} isCompleted={isCompleted} />;
+
+      case 'role-capability-check':
+        return <RoleCapabilityCheck onSelect={handleRoleCapabilityCheck} isCompleted={isCompleted} />;
+
+      case 'marketer-next-steps':
+        return <MarketerNextSteps appName={content.appName} onSelect={handleMarketerNextStep} isCompleted={isCompleted} />;
+
+      case 'sdk-requires-developer':
+        return <SdkRequiresDeveloper appName={content.appName} onSelect={handleSdkRequiresDeveloper} isCompleted={isCompleted} />;
+
+      case 'developer-email-invite':
+        return <DeveloperEmailInvite appName={content.appName} onSend={handleDeveloperEmailInvite} onBack={handleDeveloperEmailInviteBack} isCompleted={isCompleted} />;
 
       case 'sdk-install-method-select':
         return <SdkInstallMethodSelect onSelect={handleSdkInstallMethodSelect} isCompleted={isCompleted} />;
@@ -11734,6 +12316,28 @@ export function OnboardingManager({ userAnswers }: OnboardingManagerProps) {
       // SDK Test
       case 'sdk-test':
         return <SdkTest onRunTest={handleSdkTestComplete} isCompleted={isCompleted} />;
+
+      // Advanced Settings
+      case 'uninstall-tracking-setup':
+        return (
+          <UninstallTrackingSetup
+            platform={content.platform}
+            onComplete={() => handleUninstallTrackingComplete()}
+            onSkip={() => handleUninstallTrackingSkip()}
+            isCompleted={isCompleted}
+          />
+        );
+
+      case 'hybrid-app-setup':
+        return (
+          <HybridAppSetup
+            platform={content.platform}
+            appName={content.appName}
+            onComplete={() => handleHybridAppComplete()}
+            onSkip={() => handleHybridAppSkip()}
+            isCompleted={isCompleted}
+          />
+        );
 
       // Tracking Link
       case 'tracking-link-form':
