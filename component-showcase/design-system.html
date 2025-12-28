@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agentic Onboarding UI - Design System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .section-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #2563eb;
+    }
+    .component-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    .style-code {
+      background: #f3f4f6;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 11px;
+      color: #374151;
+      margin-top: 12px;
+      overflow-x: auto;
+    }
+    .demo-card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .tab-nav {
+      display: flex;
+      gap: 4px;
+      background: white;
+      padding: 6px;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 24px;
+      position: sticky;
+      top: 16px;
+      z-index: 100;
+    }
+    .tab-btn {
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #6b7280;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { background: #f3f4f6; color: #374151; }
+    .tab-btn.active { background: #2563eb; color: white; }
+    .section { display: none; }
+    .section.active { display: block; }
+  </style>
+</head>
+<body class="bg-gray-100 p-8">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-4xl font-bold text-gray-900 mb-2">Design System</h1>
+    <p class="text-gray-600 mb-6">Agentic Onboarding UI - Style Constants Reference</p>
+
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+      <button class="tab-btn active" data-section="buttons">Buttons</button>
+      <button class="tab-btn" data-section="inputs">Inputs</button>
+      <button class="tab-btn" data-section="cards">Cards</button>
+      <button class="tab-btn" data-section="labels">Labels</button>
+      <button class="tab-btn" data-section="patterns">Patterns</button>
+    </div>
+
+    <!-- ==================== BUTTONS ==================== -->
+    <div id="buttons" class="section active">
+      <h2 class="section-title">BUTTON_STYLES</h2>
+
+      <!-- Primary -->
+      <div class="demo-card">
+        <div class="component-label">BUTTON_STYLES.primary</div>
+        <button class="w-full py-3 rounded-lg font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700">
+          Primary Button
+        </button>
+        <div class="style-code">w-full py-3 rounded-lg font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700</div>
+      </div>
+
+      <!-- Primary Disabled -->
+      <div class="demo-card">
+        <div class="component-label">BUTTON_STYLES.primaryDisabled</div>
+        <button class="w-full py-3 rounded-lg font-medium transition-colors bg-gray-100 text-gray-400 cursor-not-allowed" disabled>
+          Disabled Button
+        </button>
+        <div class="style-code">w-full py-3 rounded-lg font-medium transition-colors bg-gray-100 text-gray-400 cursor-not-allowed</div>
+      </div>
+
+      <!-- Primary With Icon -->
+      <div class="demo-card">
+        <div class="component-label">BUTTON_STYLES.primaryWithIcon</div>
+        <button class="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          Continue
+        </button>
+        <div class="style-code">w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700</div>
+      </div>
+
+      <!-- Secondary -->
+      <div class="demo-card">
+        <div class="component-label">BUTTON_STYLES.secondary</div>
+        <button class="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-500 text-white hover:bg-blue-600">
+          Secondary Button
+        </button>
+        <div class="style-code">w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-500 text-white hover:bg-blue-600</div>
+      </div>
+
+      <!-- Purple -->
+      <div class="demo-card">
+        <div class="component-label">BUTTON_STYLES.purple</div>
+        <button class="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-purple-600 text-white hover:bg-purple-700">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Special Action
+        </button>
+        <div class="style-code">w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-purple-600 text-white hover:bg-purple-700 mb-3</div>
+      </div>
+
+      <!-- Conditional Example -->
+      <div class="demo-card">
+        <div class="component-label">Conditional Button (isValid ? primary : primaryDisabled)</div>
+        <div class="space-y-3">
+          <div class="flex items-center gap-2 mb-4">
+            <input type="checkbox" id="validToggle" class="w-4 h-4" onchange="toggleButton()">
+            <label for="validToggle" class="text-sm text-gray-600">isValid = true</label>
+          </div>
+          <button id="conditionalBtn" class="w-full py-3 rounded-lg font-medium transition-colors bg-gray-100 text-gray-400 cursor-not-allowed">
+            Submit
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== INPUTS ==================== -->
+    <div id="inputs" class="section">
+      <h2 class="section-title">INPUT_STYLES</h2>
+
+      <!-- Base Input -->
+      <div class="demo-card">
+        <div class="component-label">INPUT_STYLES.base</div>
+        <input type="text" placeholder="Enter text..." class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all" />
+        <div class="style-code">w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all</div>
+      </div>
+
+      <!-- Error Input -->
+      <div class="demo-card">
+        <div class="component-label">INPUT_STYLES.error</div>
+        <input type="text" value="Invalid input" class="w-full px-4 py-3 border border-red-500 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all" />
+        <p class="text-xs text-red-500 mt-1">This field has an error</p>
+        <div class="style-code">w-full px-4 py-3 border border-red-500 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all</div>
+      </div>
+
+      <!-- Readonly Input -->
+      <div class="demo-card">
+        <div class="component-label">INPUT_STYLES.readonly</div>
+        <input type="text" value="Read only value" readonly class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-600 bg-gray-50 cursor-not-allowed" />
+        <div class="style-code">w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-600 bg-gray-50 cursor-not-allowed</div>
+      </div>
+
+      <!-- Textarea -->
+      <div class="demo-card">
+        <div class="component-label">INPUT_STYLES.textarea</div>
+        <textarea rows="3" placeholder="Enter multiline text..." class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none font-mono"></textarea>
+        <div class="style-code">w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none font-mono</div>
+      </div>
+
+      <!-- Select -->
+      <div class="demo-card">
+        <div class="component-label">INPUT_STYLES.select</div>
+        <select class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer">
+          <option>Select an option</option>
+          <option>Option 1</option>
+          <option>Option 2</option>
+          <option>Option 3</option>
+        </select>
+        <div class="style-code">w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer</div>
+      </div>
+    </div>
+
+    <!-- ==================== CARDS ==================== -->
+    <div id="cards" class="section">
+      <h2 class="section-title">CARD_STYLES</h2>
+
+      <!-- Base Card -->
+      <div class="demo-card">
+        <div class="component-label">CARD_STYLES.base</div>
+        <div class="bg-white border border-gray-200 rounded-xl p-5 mt-4 min-w-[280px] max-w-full w-full">
+          <div class="text-sm font-medium text-gray-700 mb-4">Card Title</div>
+          <p class="text-xs text-gray-500">This is the base card style used throughout the application.</p>
+        </div>
+        <div class="style-code">bg-white border border-gray-200 rounded-xl p-5 mt-4 min-w-[280px] max-w-full w-full</div>
+      </div>
+
+      <!-- Completed Card -->
+      <div class="demo-card">
+        <div class="component-label">CARD_STYLES.completed</div>
+        <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60 min-w-[280px] max-w-full w-full">
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-sm font-medium text-gray-700">Completed Step</span>
+          </div>
+        </div>
+        <div class="style-code">bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60 min-w-[280px] max-w-full w-full</div>
+      </div>
+
+      <!-- Card with Shadow -->
+      <div class="demo-card">
+        <div class="component-label">CARD_STYLES.base + shadow-sm</div>
+        <div class="bg-white border border-gray-200 rounded-xl p-5 mt-4 min-w-[280px] max-w-full w-full shadow-sm">
+          <div class="text-sm font-medium text-gray-700 mb-4">Card with Shadow</div>
+          <p class="text-xs text-gray-500">Add shadow-sm for elevated appearance.</p>
+        </div>
+        <div class="style-code">${CARD_STYLES.base} shadow-sm</div>
+      </div>
+    </div>
+
+    <!-- ==================== LABELS ==================== -->
+    <div id="labels" class="section">
+      <h2 class="section-title">LABEL_STYLES</h2>
+
+      <!-- Title -->
+      <div class="demo-card">
+        <div class="component-label">LABEL_STYLES.title</div>
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <div class="text-sm font-medium text-gray-700 mb-4">Section Title</div>
+          <p class="text-xs text-gray-400">Content below the title...</p>
+        </div>
+        <div class="style-code">text-sm font-medium text-gray-700 mb-4</div>
+      </div>
+
+      <!-- Subtitle -->
+      <div class="demo-card">
+        <div class="component-label">LABEL_STYLES.subtitle</div>
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <div class="text-sm font-medium text-gray-700 mb-2">Title</div>
+          <div class="text-xs text-gray-500 mb-3">This is a subtitle with additional context or description.</div>
+          <p class="text-xs text-gray-400">Content below...</p>
+        </div>
+        <div class="style-code">text-xs text-gray-500 mb-3</div>
+      </div>
+
+      <!-- Field Label -->
+      <div class="demo-card">
+        <div class="component-label">LABEL_STYLES.field</div>
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Field Label</label>
+          <input type="text" placeholder="Enter value..." class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm" />
+        </div>
+        <div class="style-code">block text-sm font-medium text-gray-700 mb-2</div>
+      </div>
+
+      <!-- Field Description -->
+      <div class="demo-card">
+        <div class="component-label">LABEL_STYLES.fieldDesc</div>
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Field Label</label>
+          <p class="text-xs text-gray-500 mb-2">Helper text explaining what this field is for.</p>
+          <input type="text" placeholder="Enter value..." class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm" />
+        </div>
+        <div class="style-code">text-xs text-gray-500 mb-2</div>
+      </div>
+    </div>
+
+    <!-- ==================== PATTERNS ==================== -->
+    <div id="patterns" class="section">
+      <h2 class="section-title">Component Patterns</h2>
+
+      <!-- Complete Form Pattern -->
+      <div class="demo-card">
+        <div class="component-label">Complete Form Pattern</div>
+        <div class="bg-white border border-gray-200 rounded-xl p-5 mt-4 min-w-[280px] max-w-full w-full">
+          <!-- Header -->
+          <div class="text-sm font-medium text-gray-700 mb-4">App Registration</div>
+          <div class="text-xs text-gray-500 mb-3">Enter your application details below.</div>
+
+          <!-- Form Fields -->
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">App Name</label>
+              <p class="text-xs text-gray-500 mb-2">Use lowercase letters and numbers only.</p>
+              <input type="text" placeholder="myapp" class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Bundle ID</label>
+              <input type="text" placeholder="com.example.app" class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all" />
+            </div>
+          </div>
+
+          <!-- Action Button -->
+          <div class="mt-6">
+            <button class="w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700">
+              Register App
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Completed State Pattern -->
+      <div class="demo-card">
+        <div class="component-label">Completed State Pattern</div>
+        <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 opacity-60 min-w-[280px] max-w-full w-full">
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-sm font-medium text-gray-700">App Registered Successfully</span>
+          </div>
+          <p class="text-xs text-gray-500 mt-2 ml-7">myapp - com.example.app</p>
+        </div>
+      </div>
+
+      <!-- Selection Card Pattern -->
+      <div class="demo-card">
+        <div class="component-label">Selection Card Pattern</div>
+        <div class="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+          <div class="text-sm font-medium text-gray-700 mb-4">Select Environment</div>
+          <div class="space-y-2">
+            <button class="w-full flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 text-left transition-all">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-green-100">
+                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="font-medium text-gray-900">Development</div>
+                <div class="text-sm text-gray-500">For testing and SDK integration</div>
+              </div>
+            </button>
+            <button class="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-blue-500 bg-blue-50 text-left">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-100">
+                <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" clip-rule="evenodd"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="font-medium text-gray-900">Production</div>
+                <div class="text-sm text-gray-500">For live apps with real users</div>
+              </div>
+              <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Warning Banner Pattern -->
+      <div class="demo-card">
+        <div class="component-label">Warning Banner Pattern</div>
+        <div class="flex items-center gap-2 px-4 py-3 rounded-lg bg-amber-100">
+          <svg class="w-4 h-4 flex-shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <span class="text-sm text-amber-800">This setting cannot be changed after registration</span>
+        </div>
+      </div>
+
+      <!-- Success Banner Pattern -->
+      <div class="demo-card">
+        <div class="component-label">Success Banner Pattern</div>
+        <div class="flex items-center gap-2 px-4 py-3 rounded-lg bg-green-100">
+          <svg class="w-4 h-4 flex-shrink-0 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          <span class="text-sm text-green-800">Successfully connected!</span>
+        </div>
+      </div>
+
+      <!-- Spacing Guidelines -->
+      <div class="demo-card">
+        <div class="component-label">Spacing Guidelines</div>
+        <div class="bg-gray-50 rounded-lg p-4 text-sm text-gray-600 space-y-2">
+          <div><strong>Card internal:</strong> p-5 (padding)</div>
+          <div><strong>Field spacing:</strong> space-y-4 (wrapper)</div>
+          <div><strong>Header bottom:</strong> mb-6</div>
+          <div><strong>Button top:</strong> mt-6</div>
+          <div><strong>Section spacing:</strong> mt-4 (in CARD_STYLES)</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Tab navigation
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.section).classList.add('active');
+      });
+    });
+
+    // Conditional button toggle
+    function toggleButton() {
+      const checkbox = document.getElementById('validToggle');
+      const btn = document.getElementById('conditionalBtn');
+      if (checkbox.checked) {
+        btn.className = 'w-full py-3 rounded-lg font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700';
+        btn.disabled = false;
+      } else {
+        btn.className = 'w-full py-3 rounded-lg font-medium transition-colors bg-gray-100 text-gray-400 cursor-not-allowed';
+        btn.disabled = true;
+      }
+    }
+  </script>
+</body>
+</html>

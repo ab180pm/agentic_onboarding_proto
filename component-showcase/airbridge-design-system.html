@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Airbridge Design System - Complete Reference</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            // ========== NEW PALETTE (theme.css) ==========
+            // Blue (Primary Brand - Cobalt)
+            'ab-blue': {
+              50: '#ebf3ff',
+              100: '#d7e5ff',
+              200: '#b8d1ff',
+              300: '#85b0ff',
+              400: '#5287ff',
+              500: '#1e6eff',
+              600: '#0053eb',  // Primary
+              700: '#0041b8',
+              800: '#002f85',
+              900: '#001d52',
+            },
+            // Gray (New Scale)
+            'ab-gray': {
+              white: '#ffffff',
+              50: '#f4f7f9',
+              100: '#ecf0f4',
+              150: '#e5e9ee',
+              200: '#dde1e8',
+              250: '#d7dce4',
+              300: '#ced4dc',
+              350: '#c3c9d0',
+              400: '#bdc3ca',
+              450: '#b4bbc3',
+              500: '#b2b8bf',
+              550: '#a5abb2',
+              600: '#989ea4',
+              650: '#848a8f',
+              700: '#606468',
+              750: '#575a5e',
+              800: '#4a4d50',
+              850: '#3f4244',
+              900: '#2b2d2f',
+              950: '#191b1c',
+            },
+            // Green (Success - New)
+            'ab-green': {
+              50: '#f0fcf8',
+              100: '#dbf4eb',
+              200: '#84dcbf',
+              300: '#0ac285',
+              400: '#00ad74',
+              500: '#009463',
+              600: '#007a52',
+              700: '#00734a',
+              800: '#005a3a',
+              900: '#003d29',
+            },
+            // Red (Error - New)
+            'ab-red': {
+              50: '#fff3f3',
+              100: '#ffdfdf',
+              200: '#ffb9b9',
+              300: '#ff9090',
+              400: '#ff5b5b',
+              500: '#f70105',
+              600: '#dc0004',
+              700: '#c50003',
+              800: '#a90003',
+              900: '#950002',
+            },
+            // Orange (Warning - New)
+            'ab-orange': {
+              50: '#fff4eb',
+              100: '#ffe6d1',
+              200: '#ffc299',
+              300: '#ff944d',
+              400: '#ff7b24',
+              500: '#ff6600',
+              600: '#e75d00',
+              700: '#cc5200',
+              800: '#b24700',
+              900: '#993d00',
+            },
+
+            // ========== LEGACY PALETTE (base.ts) ==========
+            // Light Gray (Legacy - for backgrounds)
+            'ab-light-gray': {
+              100: '#f4f7f9',
+              200: '#ecf0f4',
+              300: '#e5e9ee',
+              400: '#dde1e8',
+              500: '#d7dce4',
+              600: '#ced4dc',
+              700: '#c3c9d0',
+              800: '#bdc3ca',
+              900: '#b4bbc3',
+            },
+            // Dark Gray (Legacy - for text)
+            'ab-dark-gray': {
+              100: '#b2b8bf',
+              200: '#a5abb2',
+              300: '#989ea4',
+              400: '#848a8f',
+              500: '#606468',
+              600: '#575a5e',
+              700: '#4a4d50',
+              800: '#3f4244',
+              900: '#2b2d2f',
+            },
+            // Pale Blue (Legacy)
+            'ab-pale-blue': {
+              100: '#effaff',
+              200: '#d7ebfa',
+              300: '#b4d7fa',
+              400: '#72acff',
+              500: '#5096fa',
+              600: '#3277d8',
+              700: '#3264c8',
+              800: '#285096',
+              900: '#1e3c6e',
+            },
+            // Blue (Legacy - different from Cobalt)
+            'ab-legacy-blue': {
+              100: '#e6f5ff',
+              200: '#c8e9ff',
+              300: '#b7ddff',
+              400: '#65b7ff',
+              500: '#2f87f7',
+              600: '#1e6eff',
+              700: '#0f50f0',
+              800: '#0a37d7',
+              900: '#002887',
+            },
+            // Cobalt (Legacy - BI Color)
+            'ab-cobalt': {
+              100: '#ebf2ff',
+              200: '#b8d1ff',
+              300: '#85b0ff',
+              400: '#528fff',
+              500: '#1e6eff',
+              600: '#0053eb',  // Primary BI
+              700: '#0041b8',
+              800: '#002f85',
+              900: '#001d52',
+            },
+            // Pale Green (Legacy)
+            'ab-pale-green': {
+              100: '#ebf5e1',
+              200: '#d6f0be',
+              300: '#c8e6a5',
+              400: '#8ece4f',
+              500: '#7ebf5a',
+              600: '#6eaf4b',
+              700: '#4b9628',
+              800: '#237300',
+              900: '#0f5f19',
+            },
+            // Green (Legacy)
+            'ab-legacy-green': {
+              100: '#effff6',
+              200: '#e7faee',
+              300: '#cdf6dd',
+              400: '#80e9ae',
+              500: '#00ce85',
+              600: '#00a469',
+              700: '#007657',
+              800: '#00645a',
+              900: '#004141',
+            },
+            // Pale Red (Legacy)
+            'ab-pale-red': {
+              100: '#ffebeb',
+              200: '#ffdcdc',
+              300: '#fabebe',
+              400: '#f68a8a',
+              500: '#f07878',
+              600: '#e86666',
+              700: '#af3c3c',
+              800: '#913232',
+              900: '#6e2323',
+            },
+            // Red (Legacy)
+            'ab-legacy-red': {
+              100: '#fff1f1',
+              200: '#ffd5d5',
+              300: '#ffc0c0',
+              400: '#ff9d9d',
+              500: '#ff323c',
+              600: '#f20808',
+              700: '#e30000',
+              800: '#ab0c0c',
+              900: '#8c0f0f',
+            },
+            // Pale Orange (Legacy)
+            'ab-pale-orange': {
+              100: '#fff4eb',
+              200: '#fae1c8',
+              300: '#fac89b',
+              400: '#f5aa78',
+              500: '#f08c4b',
+              600: '#dc8246',
+              700: '#be6e37',
+              800: '#a05a32',
+              900: '#825032',
+            },
+            // Orange (Legacy)
+            'ab-legacy-orange': {
+              100: '#FFF3EA',
+              200: '#ffdcaf',
+              300: '#ffb978',
+              400: '#ff9b4b',
+              500: '#FF7D2D',
+              600: '#E05B00',
+              700: '#B64C00',
+              800: '#914000',
+              900: '#5F3200',
+            },
+          },
+          fontFamily: {
+            'pretendard': ['Pretendard JP Variable', 'Pretendard Variable', 'system-ui', 'sans-serif'],
+            'mono': ['JetBrains Mono', 'monospace'],
+          },
+          fontSize: {
+            '11': '11px',
+            '12': '12px',
+            '13': '13px',
+            '14': '14px',
+            '15': '15px',
+            '16': '16px',
+            '18': '18px',
+            '20': '20px',
+            '24': '24px',
+            '28': '28px',
+            '32': '32px',
+            '48': '48px',
+          },
+          fontWeight: {
+            light: '300',
+            regular: '400',
+            medium: '500',
+            semibold: '600',
+            bold: '700',
+          },
+          lineHeight: {
+            tight: '1.4',
+            normal: '1.5',
+            loose: '1.6',
+          },
+          spacing: {
+            '0': '0px',
+            '1': '1px',
+            '2': '2px',
+            '4': '4px',
+            '6': '6px',
+            '8': '8px',
+            '10': '10px',
+            '12': '12px',
+            '16': '16px',
+            '20': '20px',
+            '24': '24px',
+            '32': '32px',
+            '48': '48px',
+            '60': '60px',
+          },
+          borderRadius: {
+            '0': '0px',
+            '3': '3px',
+            '6': '6px',
+            '12': '12px',
+            'pill': '99999px',
+          },
+          zIndex: {
+            'lowest': '-1',
+            '0': '0',
+            '100': '100',
+            '200': '200',
+            '300': '300',
+            '400': '400',
+            '500': '500',
+            'toppest': '99999',
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Pretendard JP Variable', 'Pretendard Variable', system-ui, sans-serif;
+      font-feature-settings: 'kern', 'calt', 'case', 'ss01', 'ss03', 'cv08', 'cv13', 'tnum';
+    }
+    .section-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #2b2d2f;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #0053eb;
+    }
+    .subsection-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #2b2d2f;
+      margin-bottom: 16px;
+      margin-top: 24px;
+    }
+    .component-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #606468;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    .token-code {
+      background: #f4f7f9;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #2b2d2f;
+      margin-top: 12px;
+      overflow-x: auto;
+    }
+    .demo-card {
+      background: white;
+      border: 1px solid #ced4dc;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .tab-nav {
+      display: flex;
+      gap: 4px;
+      background: white;
+      padding: 6px;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 24px;
+      position: sticky;
+      top: 16px;
+      z-index: 100;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #606468;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { background: #f4f7f9; color: #2b2d2f; }
+    .tab-btn.active { background: #0053eb; color: white; }
+    .section { display: none; }
+    .section.active { display: block; }
+    .color-swatch {
+      width: 48px;
+      height: 48px;
+      border-radius: 6px;
+      border: 1px solid #ced4dc;
+    }
+    .color-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .color-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      min-width: 56px;
+    }
+    .color-item code {
+      font-size: 10px;
+      color: #606468;
+    }
+    .legacy-badge {
+      background: #ffe6d1;
+      color: #cc5200;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 8px;
+      font-weight: 600;
+    }
+    .new-badge {
+      background: #dbf4eb;
+      color: #00734a;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 8px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body class="bg-ab-gray-50 p-8">
+  <div class="max-w-6xl mx-auto">
+    <div class="flex items-center gap-3 mb-2">
+      <div class="w-10 h-10 bg-ab-blue-600 rounded-6 flex items-center justify-center">
+        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <h1 class="text-32 font-bold text-ab-gray-900">Airbridge Design System</h1>
+    </div>
+    <p class="text-14 text-ab-gray-700 mb-6">Complete Design Token Reference - from airbridge-front/packages/design-system</p>
+
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+      <button class="tab-btn active" data-section="colors">Colors</button>
+      <button class="tab-btn" data-section="legacy-colors">Legacy Colors</button>
+      <button class="tab-btn" data-section="typography">Typography</button>
+      <button class="tab-btn" data-section="spacing">Spacing & Radius</button>
+      <button class="tab-btn" data-section="zindex">Z-Index</button>
+      <button class="tab-btn" data-section="buttons">Buttons</button>
+      <button class="tab-btn" data-section="inputs">Inputs</button>
+      <button class="tab-btn" data-section="components">Components</button>
+      <button class="tab-btn" data-section="semantic">Semantic Tokens</button>
+    </div>
+
+    <!-- ==================== COLORS (NEW) ==================== -->
+    <div id="colors" class="section active">
+      <h2 class="section-title">Color Palette <span class="new-badge">theme.css</span></h2>
+
+      <!-- Blue (Primary) -->
+      <div class="demo-card">
+        <div class="component-label">Blue (Primary Brand - Cobalt) - ab-blue-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch bg-ab-blue-50"></div><code>50</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-blue-100"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-blue-200"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-blue-300"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-blue-400"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-blue-500"></div><code>500</code></div>
+          <div class="color-item">
+            <div class="color-swatch bg-ab-blue-600 ring-2 ring-ab-blue-300"></div>
+            <code class="font-bold text-ab-blue-600">600*</code>
+          </div>
+          <div class="color-item"><div class="color-swatch bg-ab-blue-700"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-blue-800"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-blue-900"></div><code>900</code></div>
+        </div>
+        <div class="token-code">Primary: #0053eb (600) | Hover: #0041b8 (700) | Light BG: #ebf3ff (50)</div>
+      </div>
+
+      <!-- Gray -->
+      <div class="demo-card">
+        <div class="component-label">Gray Scale - ab-gray-*</div>
+        <div class="color-row mb-4">
+          <div class="color-item"><div class="color-swatch bg-ab-gray-white"></div><code>white</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-50"></div><code>50</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-100"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-150"></div><code>150</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-200"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-250"></div><code>250</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-300"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-350"></div><code>350</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-400"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-450"></div><code>450</code></div>
+        </div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch bg-ab-gray-500"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-550"></div><code>550</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-600"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-650"></div><code>650</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-700"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-750"></div><code>750</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-800"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-850"></div><code>850</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-900"></div><code>900</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-gray-950"></div><code>950</code></div>
+        </div>
+        <div class="token-code">Text Primary: #2b2d2f (900) | Text Secondary: #606468 (700) | Border: #ced4dc (300) | BG: #f4f7f9 (50)</div>
+      </div>
+
+      <!-- Green (Success) -->
+      <div class="demo-card">
+        <div class="component-label">Green (Success) - ab-green-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch bg-ab-green-50"></div><code>50</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-green-100"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-green-200"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-green-300"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-green-400"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-green-500"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-green-600"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-green-700"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-green-800"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-green-900"></div><code>900</code></div>
+        </div>
+        <div class="token-code">Success Base: #009463 (500) | Success Bold: #007a52 (600) | Success Text: #00734a (700)</div>
+      </div>
+
+      <!-- Red (Error) -->
+      <div class="demo-card">
+        <div class="component-label">Red (Error) - ab-red-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch bg-ab-red-50"></div><code>50</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-red-100"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-red-200"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-red-300"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-red-400"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-red-500"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-red-600"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-red-700"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-red-800"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-red-900"></div><code>900</code></div>
+        </div>
+        <div class="token-code">Error Base: #f70105 (500) | Error Bold: #dc0004 (600) | Error Text: #c50003 (700)</div>
+      </div>
+
+      <!-- Orange (Warning) -->
+      <div class="demo-card">
+        <div class="component-label">Orange (Warning) - ab-orange-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch bg-ab-orange-50"></div><code>50</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-orange-100"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-orange-200"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-orange-300"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-orange-400"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-orange-500"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-orange-600"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-orange-700"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-orange-800"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch bg-ab-orange-900"></div><code>900</code></div>
+        </div>
+        <div class="token-code">Warning Base: #ff6600 (500) | Warning Bold: #e75d00 (600) | Warning Text: #cc5200 (700)</div>
+      </div>
+    </div>
+
+    <!-- ==================== LEGACY COLORS ==================== -->
+    <div id="legacy-colors" class="section">
+      <h2 class="section-title">Legacy Color Palette <span class="legacy-badge">base.ts</span></h2>
+      <p class="text-14 text-ab-gray-600 mb-6">These colors are from the legacy Stitches configuration. Use for compatibility with older components.</p>
+
+      <!-- Light Gray -->
+      <div class="demo-card">
+        <div class="component-label">Light Gray (Backgrounds) - ab-light-gray-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch" style="background:#f4f7f9"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#ecf0f4"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#e5e9ee"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#dde1e8"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#d7dce4"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#ced4dc"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#c3c9d0"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#bdc3ca"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#b4bbc3"></div><code>900</code></div>
+        </div>
+        <div class="token-code">BG Normal: #fff | BG Hover: #f4f7f9 (100) | BG Disabled: #e5e9ee (300)</div>
+      </div>
+
+      <!-- Dark Gray -->
+      <div class="demo-card">
+        <div class="component-label">Dark Gray (Text) - ab-dark-gray-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch" style="background:#b2b8bf"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#a5abb2"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#989ea4"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#848a8f"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#606468"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#575a5e"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#4a4d50"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#3f4244"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#2b2d2f"></div><code>900</code></div>
+        </div>
+        <div class="token-code">Text Primary: #2b2d2f (900) | Text Secondary: #606468 (500) | Text Disabled: #a5abb2 (200)</div>
+      </div>
+
+      <!-- Pale Blue -->
+      <div class="demo-card">
+        <div class="component-label">Pale Blue - ab-pale-blue-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch" style="background:#effaff"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#d7ebfa"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#b4d7fa"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#72acff"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#5096fa"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#3277d8"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#3264c8"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#285096"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#1e3c6e"></div><code>900</code></div>
+        </div>
+      </div>
+
+      <!-- Legacy Blue -->
+      <div class="demo-card">
+        <div class="component-label">Blue (Legacy) - ab-legacy-blue-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch" style="background:#e6f5ff"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#c8e9ff"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#b7ddff"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#65b7ff"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#2f87f7"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#1e6eff"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#0f50f0"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#0a37d7"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#002887"></div><code>900</code></div>
+        </div>
+      </div>
+
+      <!-- Cobalt (BI) -->
+      <div class="demo-card">
+        <div class="component-label">Cobalt (BI Primary) - ab-cobalt-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch" style="background:#ebf2ff"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#b8d1ff"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#85b0ff"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#528fff"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#1e6eff"></div><code>500</code></div>
+          <div class="color-item">
+            <div class="color-swatch ring-2 ring-ab-blue-300" style="background:#0053eb"></div>
+            <code class="font-bold text-ab-blue-600">600*</code>
+          </div>
+          <div class="color-item"><div class="color-swatch" style="background:#0041b8"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#002f85"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#001d52"></div><code>900</code></div>
+        </div>
+        <div class="token-code">BI Primary: #0053eb (600) - This is the main Airbridge brand color</div>
+      </div>
+
+      <!-- Pale Green -->
+      <div class="demo-card">
+        <div class="component-label">Pale Green - ab-pale-green-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch" style="background:#ebf5e1"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#d6f0be"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#c8e6a5"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#8ece4f"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#7ebf5a"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#6eaf4b"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#4b9628"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#237300"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#0f5f19"></div><code>900</code></div>
+        </div>
+      </div>
+
+      <!-- Legacy Green -->
+      <div class="demo-card">
+        <div class="component-label">Green (Legacy) - ab-legacy-green-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch" style="background:#effff6"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#e7faee"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#cdf6dd"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#80e9ae"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#00ce85"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#00a469"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#007657"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#00645a"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#004141"></div><code>900</code></div>
+        </div>
+      </div>
+
+      <!-- Pale Red -->
+      <div class="demo-card">
+        <div class="component-label">Pale Red - ab-pale-red-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch" style="background:#ffebeb"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#ffdcdc"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#fabebe"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#f68a8a"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#f07878"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#e86666"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#af3c3c"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#913232"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#6e2323"></div><code>900</code></div>
+        </div>
+      </div>
+
+      <!-- Legacy Red -->
+      <div class="demo-card">
+        <div class="component-label">Red (Legacy) - ab-legacy-red-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch" style="background:#fff1f1"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#ffd5d5"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#ffc0c0"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#ff9d9d"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#ff323c"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#f20808"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#e30000"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#ab0c0c"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#8c0f0f"></div><code>900</code></div>
+        </div>
+      </div>
+
+      <!-- Pale Orange -->
+      <div class="demo-card">
+        <div class="component-label">Pale Orange - ab-pale-orange-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch" style="background:#fff4eb"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#fae1c8"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#fac89b"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#f5aa78"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#f08c4b"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#dc8246"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#be6e37"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#a05a32"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#825032"></div><code>900</code></div>
+        </div>
+      </div>
+
+      <!-- Legacy Orange -->
+      <div class="demo-card">
+        <div class="component-label">Orange (Legacy) - ab-legacy-orange-*</div>
+        <div class="color-row">
+          <div class="color-item"><div class="color-swatch" style="background:#FFF3EA"></div><code>100</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#ffdcaf"></div><code>200</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#ffb978"></div><code>300</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#ff9b4b"></div><code>400</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#FF7D2D"></div><code>500</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#E05B00"></div><code>600</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#B64C00"></div><code>700</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#914000"></div><code>800</code></div>
+          <div class="color-item"><div class="color-swatch" style="background:#5F3200"></div><code>900</code></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TYPOGRAPHY ==================== -->
+    <div id="typography" class="section">
+      <h2 class="section-title">Typography</h2>
+
+      <!-- Font Family -->
+      <div class="demo-card">
+        <div class="component-label">Font Family</div>
+        <div class="space-y-4">
+          <div class="flex justify-between items-center p-4 bg-ab-gray-50 rounded-6">
+            <span class="font-pretendard text-16">Pretendard JP Variable (Default)</span>
+            <code class="text-12 bg-white px-2 py-1 rounded-3">font-pretendard</code>
+          </div>
+          <div class="flex justify-between items-center p-4 bg-ab-gray-50 rounded-6">
+            <span class="font-mono text-16">JetBrains Mono (Code)</span>
+            <code class="text-12 bg-white px-2 py-1 rounded-3">font-mono</code>
+          </div>
+        </div>
+        <div class="token-code">FontFeatureSettings: 'kern', 'calt', 'case', 'ss01', 'ss03', 'cv08', 'cv13', 'tnum'</div>
+      </div>
+
+      <!-- Font Size -->
+      <div class="demo-card">
+        <div class="component-label">Font Sizes</div>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center"><span class="text-48 font-bold text-ab-gray-900">Heading 48</span><code class="text-12 text-ab-gray-600">text-48</code></div>
+          <div class="flex justify-between items-center"><span class="text-32 font-bold text-ab-gray-900">Heading 32</span><code class="text-12 text-ab-gray-600">text-32</code></div>
+          <div class="flex justify-between items-center"><span class="text-28 font-bold text-ab-gray-900">Heading 28</span><code class="text-12 text-ab-gray-600">text-28</code></div>
+          <div class="flex justify-between items-center"><span class="text-24 font-semibold text-ab-gray-900">Heading 24</span><code class="text-12 text-ab-gray-600">text-24</code></div>
+          <div class="flex justify-between items-center"><span class="text-20 font-semibold text-ab-gray-900">Heading 20</span><code class="text-12 text-ab-gray-600">text-20</code></div>
+          <div class="flex justify-between items-center"><span class="text-18 font-semibold text-ab-gray-900">Heading 18</span><code class="text-12 text-ab-gray-600">text-18</code></div>
+          <div class="flex justify-between items-center"><span class="text-16 font-medium text-ab-gray-900">Body 16</span><code class="text-12 text-ab-gray-600">text-16</code></div>
+          <div class="flex justify-between items-center"><span class="text-15 font-medium text-ab-gray-900">Body 15</span><code class="text-12 text-ab-gray-600">text-15</code></div>
+          <div class="flex justify-between items-center"><span class="text-14 font-regular text-ab-gray-900">Body 14</span><code class="text-12 text-ab-gray-600">text-14</code></div>
+          <div class="flex justify-between items-center"><span class="text-13 font-regular text-ab-gray-900">Caption 13</span><code class="text-12 text-ab-gray-600">text-13</code></div>
+          <div class="flex justify-between items-center"><span class="text-12 font-regular text-ab-gray-900">Caption 12</span><code class="text-12 text-ab-gray-600">text-12</code></div>
+          <div class="flex justify-between items-center"><span class="text-11 font-regular text-ab-gray-900">Caption 11</span><code class="text-12 text-ab-gray-600">text-11</code></div>
+        </div>
+      </div>
+
+      <!-- Font Weight -->
+      <div class="demo-card">
+        <div class="component-label">Font Weights</div>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center"><span class="text-16 font-light text-ab-gray-900">Light (300)</span><code class="text-12 text-ab-gray-600">font-light</code></div>
+          <div class="flex justify-between items-center"><span class="text-16 font-regular text-ab-gray-900">Regular (400)</span><code class="text-12 text-ab-gray-600">font-regular</code></div>
+          <div class="flex justify-between items-center"><span class="text-16 font-medium text-ab-gray-900">Medium (500)</span><code class="text-12 text-ab-gray-600">font-medium</code></div>
+          <div class="flex justify-between items-center"><span class="text-16 font-semibold text-ab-gray-900">Semibold (600)</span><code class="text-12 text-ab-gray-600">font-semibold</code></div>
+          <div class="flex justify-between items-center"><span class="text-16 font-bold text-ab-gray-900">Bold (700)</span><code class="text-12 text-ab-gray-600">font-bold</code></div>
+        </div>
+      </div>
+
+      <!-- Line Height -->
+      <div class="demo-card">
+        <div class="component-label">Line Heights</div>
+        <div class="space-y-4">
+          <div class="p-4 bg-ab-gray-50 rounded-6">
+            <div class="flex justify-between mb-2"><span class="text-14 font-medium">Tight (1.4)</span><code class="text-12">leading-tight</code></div>
+            <p class="text-14 leading-tight text-ab-gray-700">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore.</p>
+          </div>
+          <div class="p-4 bg-ab-gray-50 rounded-6">
+            <div class="flex justify-between mb-2"><span class="text-14 font-medium">Normal (1.5)</span><code class="text-12">leading-normal</code></div>
+            <p class="text-14 leading-normal text-ab-gray-700">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore.</p>
+          </div>
+          <div class="p-4 bg-ab-gray-50 rounded-6">
+            <div class="flex justify-between mb-2"><span class="text-14 font-medium">Loose (1.6)</span><code class="text-12">leading-loose</code></div>
+            <p class="text-14 leading-loose text-ab-gray-700">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SPACING & RADIUS ==================== -->
+    <div id="spacing" class="section">
+      <h2 class="section-title">Spacing & Border Radius</h2>
+
+      <!-- Spacing Scale -->
+      <div class="demo-card">
+        <div class="component-label">Spacing Scale</div>
+        <div class="space-y-2">
+          <div class="flex items-center gap-4"><div class="w-0 h-6 bg-ab-blue-600"></div><code class="text-12 w-16">0px</code><span class="text-12 text-ab-gray-600">spacing-0</span></div>
+          <div class="flex items-center gap-4"><div class="w-[1px] h-6 bg-ab-blue-600"></div><code class="text-12 w-16">1px</code><span class="text-12 text-ab-gray-600">spacing-1</span></div>
+          <div class="flex items-center gap-4"><div class="w-[2px] h-6 bg-ab-blue-600"></div><code class="text-12 w-16">2px</code><span class="text-12 text-ab-gray-600">spacing-2</span></div>
+          <div class="flex items-center gap-4"><div class="w-1 h-6 bg-ab-blue-600"></div><code class="text-12 w-16">4px</code><span class="text-12 text-ab-gray-600">spacing-4</span></div>
+          <div class="flex items-center gap-4"><div class="w-[6px] h-6 bg-ab-blue-600"></div><code class="text-12 w-16">6px</code><span class="text-12 text-ab-gray-600">spacing-6</span></div>
+          <div class="flex items-center gap-4"><div class="w-2 h-6 bg-ab-blue-600"></div><code class="text-12 w-16">8px</code><span class="text-12 text-ab-gray-600">spacing-8</span></div>
+          <div class="flex items-center gap-4"><div class="w-[10px] h-6 bg-ab-blue-600"></div><code class="text-12 w-16">10px</code><span class="text-12 text-ab-gray-600">spacing-10</span></div>
+          <div class="flex items-center gap-4"><div class="w-3 h-6 bg-ab-blue-600"></div><code class="text-12 w-16">12px</code><span class="text-12 text-ab-gray-600">spacing-12</span></div>
+          <div class="flex items-center gap-4"><div class="w-4 h-6 bg-ab-blue-600"></div><code class="text-12 w-16">16px</code><span class="text-12 text-ab-gray-600">spacing-16</span></div>
+          <div class="flex items-center gap-4"><div class="w-5 h-6 bg-ab-blue-600"></div><code class="text-12 w-16">20px</code><span class="text-12 text-ab-gray-600">spacing-20</span></div>
+          <div class="flex items-center gap-4"><div class="w-6 h-6 bg-ab-blue-600"></div><code class="text-12 w-16">24px</code><span class="text-12 text-ab-gray-600">spacing-24</span></div>
+          <div class="flex items-center gap-4"><div class="w-8 h-6 bg-ab-blue-600"></div><code class="text-12 w-16">32px</code><span class="text-12 text-ab-gray-600">spacing-32</span></div>
+          <div class="flex items-center gap-4"><div class="w-12 h-6 bg-ab-blue-600"></div><code class="text-12 w-16">48px</code><span class="text-12 text-ab-gray-600">spacing-48</span></div>
+          <div class="flex items-center gap-4"><div class="w-[60px] h-6 bg-ab-blue-600"></div><code class="text-12 w-16">60px</code><span class="text-12 text-ab-gray-600">spacing-60</span></div>
+        </div>
+      </div>
+
+      <!-- Border Radius -->
+      <div class="demo-card">
+        <div class="component-label">Border Radius</div>
+        <div class="flex gap-8 flex-wrap">
+          <div class="flex flex-col items-center gap-2">
+            <div class="w-16 h-16 bg-ab-blue-100 border-2 border-ab-blue-600 rounded-0"></div>
+            <code class="text-12">0px</code>
+            <span class="text-11 text-ab-gray-600">rounded-0</span>
+          </div>
+          <div class="flex flex-col items-center gap-2">
+            <div class="w-16 h-16 bg-ab-blue-100 border-2 border-ab-blue-600 rounded-3"></div>
+            <code class="text-12">3px</code>
+            <span class="text-11 text-ab-gray-600">rounded-3</span>
+            <span class="text-10 text-ab-gray-500">Small elements</span>
+          </div>
+          <div class="flex flex-col items-center gap-2">
+            <div class="w-16 h-16 bg-ab-blue-100 border-2 border-ab-blue-600 rounded-6"></div>
+            <code class="text-12 font-bold text-ab-blue-600">6px*</code>
+            <span class="text-11 text-ab-gray-600">rounded-6</span>
+            <span class="text-10 text-ab-gray-500">Default</span>
+          </div>
+          <div class="flex flex-col items-center gap-2">
+            <div class="w-16 h-16 bg-ab-blue-100 border-2 border-ab-blue-600 rounded-12"></div>
+            <code class="text-12">12px</code>
+            <span class="text-11 text-ab-gray-600">rounded-12</span>
+            <span class="text-10 text-ab-gray-500">Containers</span>
+          </div>
+          <div class="flex flex-col items-center gap-2">
+            <div class="w-16 h-16 bg-ab-blue-100 border-2 border-ab-blue-600 rounded-pill"></div>
+            <code class="text-12">pill</code>
+            <span class="text-11 text-ab-gray-600">rounded-pill</span>
+            <span class="text-10 text-ab-gray-500">Fully round</span>
+          </div>
+        </div>
+        <div class="token-code">0: Explicit corners | 3: Small (&lt;24px) | 6: Default | 12: Containers (Drawer, Dialog) | pill: Fully rounded</div>
+      </div>
+    </div>
+
+    <!-- ==================== Z-INDEX ==================== -->
+    <div id="zindex" class="section">
+      <h2 class="section-title">Z-Index Scale</h2>
+
+      <div class="demo-card">
+        <div class="component-label">Z-Index Tokens</div>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between p-3 bg-ab-gray-50 rounded-6">
+            <div>
+              <code class="text-14 font-medium">lowest</code>
+              <span class="text-12 text-ab-gray-600 ml-2">-1</span>
+            </div>
+            <span class="text-12 text-ab-gray-700">Component internal lower elements (e.g., shadows)</span>
+          </div>
+          <div class="flex items-center justify-between p-3 bg-ab-gray-50 rounded-6">
+            <div>
+              <code class="text-14 font-medium">0</code>
+              <span class="text-12 text-ab-gray-600 ml-2">0</span>
+            </div>
+            <span class="text-12 text-ab-gray-700">Reset positioned elements to normal stacking</span>
+          </div>
+          <div class="flex items-center justify-between p-3 bg-ab-gray-50 rounded-6">
+            <div>
+              <code class="text-14 font-medium">100</code>
+              <span class="text-12 text-ab-gray-600 ml-2">100</span>
+            </div>
+            <span class="text-12 text-ab-gray-700">Layer 1 - Sticky headers, active segmented buttons</span>
+          </div>
+          <div class="flex items-center justify-between p-3 bg-ab-gray-50 rounded-6">
+            <div>
+              <code class="text-14 font-medium">200</code>
+              <span class="text-12 text-ab-gray-600 ml-2">200</span>
+            </div>
+            <span class="text-12 text-ab-gray-700">Above Layer 1 - Non-interactive overlays (Popover)</span>
+          </div>
+          <div class="flex items-center justify-between p-3 bg-ab-gray-50 rounded-6">
+            <div>
+              <code class="text-14 font-medium">300</code>
+              <span class="text-12 text-ab-gray-600 ml-2">300</span>
+            </div>
+            <span class="text-12 text-ab-gray-700">Interactive overlays (Selector, Dropdown, Snackbar)</span>
+          </div>
+          <div class="flex items-center justify-between p-3 bg-ab-gray-50 rounded-6">
+            <div>
+              <code class="text-14 font-medium">400</code>
+              <span class="text-12 text-ab-gray-600 ml-2">400</span>
+            </div>
+            <span class="text-12 text-ab-gray-700">Layer 2 - Drawer, Full Screen Modal Dialog</span>
+          </div>
+          <div class="flex items-center justify-between p-3 bg-ab-gray-50 rounded-6">
+            <div>
+              <code class="text-14 font-medium">500</code>
+              <span class="text-12 text-ab-gray-600 ml-2">500</span>
+            </div>
+            <span class="text-12 text-ab-gray-700">Independent floating elements (Quick Search)</span>
+          </div>
+          <div class="flex items-center justify-between p-3 bg-ab-blue-50 rounded-6">
+            <div>
+              <code class="text-14 font-medium text-ab-blue-700">toppest</code>
+              <span class="text-12 text-ab-blue-600 ml-2">99999</span>
+            </div>
+            <span class="text-12 text-ab-blue-700">Always on top (Loading Screen)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== BUTTONS ==================== -->
+    <div id="buttons" class="section">
+      <h2 class="section-title">Buttons</h2>
+
+      <!-- Primary Button -->
+      <div class="demo-card">
+        <div class="component-label">Primary Button</div>
+        <div class="space-y-3">
+          <button class="w-full py-[10px] px-4 rounded-6 font-medium text-16 bg-ab-blue-600 text-white hover:bg-ab-blue-700 transition-colors">
+            Primary Button
+          </button>
+          <button class="w-full py-[10px] px-4 rounded-6 font-medium text-16 bg-ab-blue-600 text-white hover:bg-ab-blue-700 transition-colors flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            With Icon
+          </button>
+        </div>
+        <div class="token-code">bg: ab-blue-600 (#0053eb) | hover: ab-blue-700 (#0041b8) | text: white | radius: 6px | padding: 10px 16px</div>
+      </div>
+
+      <!-- Secondary Button -->
+      <div class="demo-card">
+        <div class="component-label">Secondary Button</div>
+        <div class="space-y-3">
+          <button class="w-full py-[10px] px-4 rounded-6 font-medium text-16 bg-ab-gray-100 text-ab-gray-900 hover:bg-ab-gray-200 transition-colors">
+            Secondary Button
+          </button>
+          <button class="w-full py-[10px] px-4 rounded-6 font-medium text-16 bg-ab-gray-850 text-white hover:bg-ab-gray-900 transition-colors">
+            Dark Button
+          </button>
+        </div>
+        <div class="token-code">Light: bg ab-gray-100 hover ab-gray-200 | Dark: bg ab-gray-850 hover ab-gray-900</div>
+      </div>
+
+      <!-- Disabled Button -->
+      <div class="demo-card">
+        <div class="component-label">Disabled Button</div>
+        <button class="w-full py-[10px] px-4 rounded-6 font-medium text-16 bg-ab-gray-200 text-ab-gray-550 cursor-not-allowed" disabled>
+          Disabled Button
+        </button>
+        <div class="token-code">bg: ab-gray-200 (#dde1e8) | text: ab-gray-550 (#a5abb2) | cursor: not-allowed</div>
+      </div>
+
+      <!-- Tinted Buttons -->
+      <div class="demo-card">
+        <div class="component-label">Tinted Buttons (Subtle)</div>
+        <div class="grid grid-cols-2 gap-3">
+          <button class="py-[10px] px-4 rounded-6 font-medium text-14 bg-ab-blue-100 text-ab-blue-700 hover:bg-ab-blue-200 transition-colors">
+            Accent Tinted
+          </button>
+          <button class="py-[10px] px-4 rounded-6 font-medium text-14 bg-ab-green-100 text-ab-green-700 hover:bg-ab-green-200 transition-colors">
+            Success Tinted
+          </button>
+          <button class="py-[10px] px-4 rounded-6 font-medium text-14 bg-ab-orange-100 text-ab-orange-700 hover:bg-ab-orange-200 transition-colors">
+            Warning Tinted
+          </button>
+          <button class="py-[10px] px-4 rounded-6 font-medium text-14 bg-ab-red-100 text-ab-red-700 hover:bg-ab-red-200 transition-colors">
+            Remove Tinted
+          </button>
+        </div>
+        <div class="token-code">Tinted pattern: bg {color}-100, hover {color}-200, text {color}-700</div>
+      </div>
+
+      <!-- Solid Intent Buttons -->
+      <div class="demo-card">
+        <div class="component-label">Solid Intent Buttons</div>
+        <div class="grid grid-cols-2 gap-3">
+          <button class="py-[10px] px-4 rounded-6 font-medium text-14 bg-ab-green-600 text-white hover:bg-ab-green-700 transition-colors">
+            Success
+          </button>
+          <button class="py-[10px] px-4 rounded-6 font-medium text-14 bg-ab-red-500 text-white hover:bg-ab-red-700 transition-colors">
+            Remove/Error
+          </button>
+          <button class="py-[10px] px-4 rounded-6 font-medium text-14 bg-ab-orange-500 text-white hover:bg-ab-orange-600 transition-colors">
+            Warning
+          </button>
+          <button class="py-[10px] px-4 rounded-6 font-medium text-14 bg-ab-gray-900 text-white hover:bg-ab-gray-800 transition-colors">
+            Dark Accent
+          </button>
+        </div>
+      </div>
+
+      <!-- Pill Buttons -->
+      <div class="demo-card">
+        <div class="component-label">Pill Buttons</div>
+        <div class="flex gap-3 flex-wrap">
+          <button class="py-2 px-4 rounded-pill font-medium text-14 bg-ab-blue-600 text-white hover:bg-ab-blue-700 transition-colors">
+            Pill Primary
+          </button>
+          <button class="py-2 px-4 rounded-pill font-medium text-14 bg-ab-gray-100 text-ab-gray-900 hover:bg-ab-gray-200 transition-colors">
+            Pill Secondary
+          </button>
+          <button class="py-2 px-4 rounded-pill font-medium text-14 border border-ab-gray-300 text-ab-gray-700 hover:bg-ab-gray-50 transition-colors">
+            Pill Outline
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== INPUTS ==================== -->
+    <div id="inputs" class="section">
+      <h2 class="section-title">Input Fields</h2>
+
+      <!-- Default Input -->
+      <div class="demo-card">
+        <div class="component-label">Default Input</div>
+        <input
+          type="text"
+          placeholder="Enter text..."
+          class="w-full px-3 py-[10px] border border-ab-gray-300 rounded-6 text-14 text-ab-gray-900 placeholder-ab-gray-500 focus:outline-none focus:border-ab-blue-600 focus:ring-2 focus:ring-ab-blue-100 transition-all"
+        />
+        <div class="token-code">border: ab-gray-300 (#ced4dc) | focus-border: ab-blue-600 | focus-ring: ab-blue-100 | radius: 6px</div>
+      </div>
+
+      <!-- Input with Label -->
+      <div class="demo-card">
+        <div class="component-label">Input with Label</div>
+        <div class="space-y-2">
+          <label class="block text-14 font-medium text-ab-gray-900">App Name</label>
+          <p class="text-12 text-ab-gray-600">Use lowercase letters and numbers only</p>
+          <input
+            type="text"
+            placeholder="myapp"
+            class="w-full px-3 py-[10px] border border-ab-gray-300 rounded-6 text-14 text-ab-gray-900 placeholder-ab-gray-500 focus:outline-none focus:border-ab-blue-600 focus:ring-2 focus:ring-ab-blue-100 transition-all"
+          />
+        </div>
+      </div>
+
+      <!-- Error Input -->
+      <div class="demo-card">
+        <div class="component-label">Error State</div>
+        <div class="space-y-2">
+          <label class="block text-14 font-medium text-ab-gray-900">Email</label>
+          <input
+            type="text"
+            value="invalid-email"
+            class="w-full px-3 py-[10px] border border-ab-red-500 rounded-6 text-14 text-ab-gray-900 focus:outline-none focus:border-ab-red-500 focus:ring-2 focus:ring-ab-red-100 transition-all"
+          />
+          <p class="text-12 text-ab-red-600">Please enter a valid email address</p>
+        </div>
+        <div class="token-code">border: ab-red-500 (#f70105) | error-text: ab-red-600 (#dc0004)</div>
+      </div>
+
+      <!-- Disabled Input -->
+      <div class="demo-card">
+        <div class="component-label">Disabled State</div>
+        <input
+          type="text"
+          value="Readonly value"
+          disabled
+          class="w-full px-3 py-[10px] border border-ab-gray-200 rounded-6 text-14 text-ab-gray-550 bg-ab-gray-100 cursor-not-allowed"
+        />
+        <div class="token-code">bg: ab-gray-100 (#ecf0f4) | border: ab-gray-200 | text: ab-gray-550</div>
+      </div>
+
+      <!-- Select -->
+      <div class="demo-card">
+        <div class="component-label">Select Dropdown</div>
+        <select class="w-full px-3 py-[10px] border border-ab-gray-300 rounded-6 text-14 text-ab-gray-900 bg-white focus:outline-none focus:border-ab-blue-600 focus:ring-2 focus:ring-ab-blue-100 transition-all cursor-pointer">
+          <option>Select an option</option>
+          <option>Option 1</option>
+          <option>Option 2</option>
+        </select>
+      </div>
+
+      <!-- Textarea -->
+      <div class="demo-card">
+        <div class="component-label">Textarea</div>
+        <textarea
+          rows="3"
+          placeholder="Enter description..."
+          class="w-full px-3 py-[10px] border border-ab-gray-300 rounded-6 text-14 text-ab-gray-900 placeholder-ab-gray-500 focus:outline-none focus:border-ab-blue-600 focus:ring-2 focus:ring-ab-blue-100 transition-all resize-y"
+        ></textarea>
+      </div>
+    </div>
+
+    <!-- ==================== COMPONENTS ==================== -->
+    <div id="components" class="section">
+      <h2 class="section-title">Common Components</h2>
+
+      <!-- Card -->
+      <div class="demo-card">
+        <div class="component-label">Card</div>
+        <div class="bg-white border border-ab-gray-300 rounded-12 p-5">
+          <h3 class="text-14 font-semibold text-ab-gray-900 mb-2">Card Title</h3>
+          <p class="text-13 text-ab-gray-700">Card content goes here with secondary text color.</p>
+        </div>
+        <div class="token-code">bg: white | border: ab-gray-300 | radius: 12px | padding: 20px</div>
+      </div>
+
+      <!-- Selection Card -->
+      <div class="demo-card">
+        <div class="component-label">Selection Cards</div>
+        <div class="space-y-2">
+          <button class="w-full flex items-center gap-3 p-4 rounded-12 border border-ab-gray-300 hover:border-ab-blue-600 hover:bg-ab-blue-50 text-left transition-all">
+            <div class="w-10 h-10 rounded-6 flex items-center justify-center bg-ab-green-100">
+              <svg class="w-5 h-5 text-ab-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="flex-1">
+              <div class="font-medium text-14 text-ab-gray-900">Option Unselected</div>
+              <div class="text-13 text-ab-gray-600">Description text</div>
+            </div>
+          </button>
+          <button class="w-full flex items-center gap-3 p-4 rounded-12 border-2 border-ab-blue-600 bg-ab-blue-50 text-left">
+            <div class="w-10 h-10 rounded-6 flex items-center justify-center bg-ab-blue-100">
+              <svg class="w-5 h-5 text-ab-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="flex-1">
+              <div class="font-medium text-14 text-ab-gray-900">Option Selected</div>
+              <div class="text-13 text-ab-gray-600">Description text</div>
+            </div>
+            <svg class="w-5 h-5 text-ab-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          </button>
+        </div>
+        <div class="token-code">Unselected: border ab-gray-300 | Hover: border ab-blue-600 bg ab-blue-50 | Selected: border-2 ab-blue-600 bg ab-blue-50</div>
+      </div>
+
+      <!-- Tags -->
+      <div class="demo-card">
+        <div class="component-label">Tags</div>
+        <div class="flex gap-2 flex-wrap">
+          <span class="px-2 py-1 rounded-3 text-12 font-medium bg-ab-gray-100 text-ab-gray-700">Default</span>
+          <span class="px-2 py-1 rounded-3 text-12 font-medium bg-ab-blue-100 text-ab-blue-700">Info</span>
+          <span class="px-2 py-1 rounded-3 text-12 font-medium bg-ab-green-100 text-ab-green-700">Success</span>
+          <span class="px-2 py-1 rounded-3 text-12 font-medium bg-ab-orange-100 text-ab-orange-700">Warning</span>
+          <span class="px-2 py-1 rounded-3 text-12 font-medium bg-ab-red-100 text-ab-red-700">Error</span>
+        </div>
+      </div>
+
+      <!-- Banners -->
+      <div class="demo-card">
+        <div class="component-label">Notification Banners</div>
+        <div class="space-y-3">
+          <div class="flex items-center gap-2 px-4 py-3 rounded-6 bg-ab-blue-50">
+            <svg class="w-4 h-4 text-ab-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="text-13 text-ab-blue-700">Information message</span>
+          </div>
+          <div class="flex items-center gap-2 px-4 py-3 rounded-6 bg-ab-green-50">
+            <svg class="w-4 h-4 text-ab-green-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-13 text-ab-green-700">Success message</span>
+          </div>
+          <div class="flex items-center gap-2 px-4 py-3 rounded-6 bg-ab-orange-50">
+            <svg class="w-4 h-4 text-ab-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <span class="text-13 text-ab-orange-700">Warning message</span>
+          </div>
+          <div class="flex items-center gap-2 px-4 py-3 rounded-6 bg-ab-red-50">
+            <svg class="w-4 h-4 text-ab-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="text-13 text-ab-red-700">Error message</span>
+          </div>
+        </div>
+        <div class="token-code">Pattern: bg {color}-50, icon {color}-600, text {color}-700</div>
+      </div>
+
+      <!-- Progress Steps -->
+      <div class="demo-card">
+        <div class="component-label">Progress Steps</div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center justify-center w-8 h-8 rounded-pill bg-ab-blue-600 text-white text-14 font-medium">1</div>
+          <div class="flex-1 h-1 bg-ab-blue-600 rounded-pill"></div>
+          <div class="flex items-center justify-center w-8 h-8 rounded-pill bg-ab-blue-600 text-white text-14 font-medium">2</div>
+          <div class="flex-1 h-1 bg-ab-gray-200 rounded-pill"></div>
+          <div class="flex items-center justify-center w-8 h-8 rounded-pill bg-ab-gray-200 text-ab-gray-600 text-14 font-medium">3</div>
+          <div class="flex-1 h-1 bg-ab-gray-200 rounded-pill"></div>
+          <div class="flex items-center justify-center w-8 h-8 rounded-pill bg-ab-gray-200 text-ab-gray-600 text-14 font-medium">4</div>
+        </div>
+      </div>
+
+      <!-- Toggle -->
+      <div class="demo-card">
+        <div class="component-label">Toggle Switch</div>
+        <div class="flex items-center gap-4">
+          <div class="relative">
+            <div class="w-11 h-6 bg-ab-gray-300 rounded-pill"></div>
+            <div class="absolute top-1 left-1 w-4 h-4 bg-white rounded-pill shadow"></div>
+          </div>
+          <span class="text-14 text-ab-gray-700">Off</span>
+        </div>
+        <div class="flex items-center gap-4 mt-3">
+          <div class="relative">
+            <div class="w-11 h-6 bg-ab-blue-600 rounded-pill"></div>
+            <div class="absolute top-1 right-1 w-4 h-4 bg-white rounded-pill shadow"></div>
+          </div>
+          <span class="text-14 text-ab-gray-900">On</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SEMANTIC TOKENS ==================== -->
+    <div id="semantic" class="section">
+      <h2 class="section-title">Semantic Tokens</h2>
+
+      <!-- Text Colors -->
+      <div class="demo-card">
+        <div class="component-label">Text Colors (theme.css)</div>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center"><span class="text-14 text-ab-gray-900">text-primary</span><code class="text-12">ab-gray-900 (#2b2d2f)</code></div>
+          <div class="flex justify-between items-center"><span class="text-14 text-ab-gray-700">text-secondary</span><code class="text-12">ab-gray-700 (#606468)</code></div>
+          <div class="flex justify-between items-center"><span class="text-14 text-ab-gray-600">text-tertiary</span><code class="text-12">ab-gray-600 (#989ea4)</code></div>
+          <div class="flex justify-between items-center"><span class="text-14 text-ab-gray-550">text-quaternary</span><code class="text-12">ab-gray-550 (#a5abb2)</code></div>
+          <div class="flex justify-between items-center"><span class="text-14 text-ab-gray-500">text-quinary (disabled)</span><code class="text-12">ab-gray-500 (#b2b8bf)</code></div>
+          <div class="flex justify-between items-center p-2 bg-ab-gray-900 rounded-6"><span class="text-14 text-white">text-inverse</span><code class="text-12 text-ab-gray-400">white</code></div>
+        </div>
+      </div>
+
+      <!-- Legacy Text Colors -->
+      <div class="demo-card">
+        <div class="component-label">Text Colors (aliases/text.ts) <span class="legacy-badge">Legacy</span></div>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center"><span class="text-14" style="color:#2b2d2f">text.primary</span><code class="text-12">darkGray[900] (#2b2d2f)</code></div>
+          <div class="flex justify-between items-center"><span class="text-14" style="color:#606468">text.secondary</span><code class="text-12">darkGray[500] (#606468)</code></div>
+          <div class="flex justify-between items-center"><span class="text-14" style="color:#a5abb2">text.disabled</span><code class="text-12">darkGray[200] (#a5abb2)</code></div>
+          <div class="flex justify-between items-center"><span class="text-14" style="color:#1e6eff">text.accent</span><code class="text-12">blue[600] (#1e6eff)</code></div>
+          <div class="flex justify-between items-center"><span class="text-14" style="color:#007657">text.success</span><code class="text-12">green[700] (#007657)</code></div>
+          <div class="flex justify-between items-center"><span class="text-14" style="color:#E05B00">text.warning</span><code class="text-12">orange[600] (#E05B00)</code></div>
+          <div class="flex justify-between items-center"><span class="text-14" style="color:#f20808">text.remove</span><code class="text-12">red[600] (#f20808)</code></div>
+        </div>
+      </div>
+
+      <!-- Background Colors -->
+      <div class="demo-card">
+        <div class="component-label">Background Colors (theme.css)</div>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center p-3 bg-white border border-ab-gray-200 rounded-6"><span class="text-14">bg-primary</span><code class="text-12">white</code></div>
+          <div class="flex justify-between items-center p-3 bg-ab-gray-50 rounded-6"><span class="text-14">bg-secondary</span><code class="text-12">ab-gray-50 (#f4f7f9)</code></div>
+          <div class="flex justify-between items-center p-3 bg-ab-gray-100 rounded-6"><span class="text-14">bg-tertiary</span><code class="text-12">ab-gray-100 (#ecf0f4)</code></div>
+          <div class="flex justify-between items-center p-3 bg-ab-gray-200 rounded-6"><span class="text-14">bg-disabled</span><code class="text-12">ab-gray-200 (#dde1e8)</code></div>
+          <div class="flex justify-between items-center p-3 bg-ab-gray-900 rounded-6"><span class="text-14 text-white">bg-inverse</span><code class="text-12 text-ab-gray-400">ab-gray-900 (#2b2d2f)</code></div>
+        </div>
+      </div>
+
+      <!-- Legacy Background Colors -->
+      <div class="demo-card">
+        <div class="component-label">Background Colors (aliases/background.ts) <span class="legacy-badge">Legacy</span></div>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center p-3 bg-white border border-ab-gray-200 rounded-6"><span class="text-14">background.normal</span><code class="text-12">white</code></div>
+          <div class="flex justify-between items-center p-3 rounded-6" style="background:#f4f7f9"><span class="text-14">background.hover</span><code class="text-12">lightGray[100] (#f4f7f9)</code></div>
+          <div class="flex justify-between items-center p-3 rounded-6" style="background:#e5e9ee"><span class="text-14">background.disabled</span><code class="text-12">lightGray[300] (#e5e9ee)</code></div>
+          <div class="flex justify-between items-center p-3 rounded-6" style="background:#3f4244"><span class="text-14 text-white">background.dark.normal</span><code class="text-12 text-gray-300">darkGray[800] (#3f4244)</code></div>
+          <div class="flex justify-between items-center p-3 rounded-6" style="background:#2b2d2f"><span class="text-14 text-white">background.dark.hover</span><code class="text-12 text-gray-300">darkGray[900] (#2b2d2f)</code></div>
+          <div class="flex justify-between items-center p-3 rounded-6" style="background:#1e6eff"><span class="text-14 text-white">background.accent.normal</span><code class="text-12 text-blue-100">blue[600] (#1e6eff)</code></div>
+          <div class="flex justify-between items-center p-3 rounded-6" style="background:#0f50f0"><span class="text-14 text-white">background.accent.hover</span><code class="text-12 text-blue-100">blue[700] (#0f50f0)</code></div>
+        </div>
+      </div>
+
+      <!-- Tinted Background Colors -->
+      <div class="demo-card">
+        <div class="component-label">Tinted Backgrounds (aliases/background.ts) <span class="legacy-badge">Legacy</span></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-3 rounded-6" style="background:#ecf0f4">
+            <div class="text-12">tinted.normal</div>
+            <code class="text-10">lightGray[200]</code>
+          </div>
+          <div class="p-3 rounded-6" style="background:#dde1e8">
+            <div class="text-12">tinted.hover</div>
+            <code class="text-10">lightGray[400]</code>
+          </div>
+          <div class="p-3 rounded-6" style="background:#e6f5ff">
+            <div class="text-12">tinted.accent.normal</div>
+            <code class="text-10">blue[100]</code>
+          </div>
+          <div class="p-3 rounded-6" style="background:#c8e9ff">
+            <div class="text-12">tinted.accent.hover</div>
+            <code class="text-10">blue[200]</code>
+          </div>
+          <div class="p-3 rounded-6" style="background:#effff6">
+            <div class="text-12">tinted.success.normal</div>
+            <code class="text-10">green[100]</code>
+          </div>
+          <div class="p-3 rounded-6" style="background:#e7faee">
+            <div class="text-12">tinted.success.hover</div>
+            <code class="text-10">green[200]</code>
+          </div>
+          <div class="p-3 rounded-6" style="background:#FFF3EA">
+            <div class="text-12">tinted.warning.normal</div>
+            <code class="text-10">orange[100]</code>
+          </div>
+          <div class="p-3 rounded-6" style="background:#ffdcaf">
+            <div class="text-12">tinted.warning.hover</div>
+            <code class="text-10">orange[200]</code>
+          </div>
+          <div class="p-3 rounded-6" style="background:#fff1f1">
+            <div class="text-12">tinted.remove.normal</div>
+            <code class="text-10">red[100]</code>
+          </div>
+          <div class="p-3 rounded-6" style="background:#ffd5d5">
+            <div class="text-12">tinted.remove.hover</div>
+            <code class="text-10">red[200]</code>
+          </div>
+        </div>
+      </div>
+
+      <!-- Border Colors -->
+      <div class="demo-card">
+        <div class="component-label">Border Colors (theme.css)</div>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center p-3 border-2 border-ab-gray-300 rounded-6"><span class="text-14">border-primary</span><code class="text-12">ab-gray-300 (#ced4dc)</code></div>
+          <div class="flex justify-between items-center p-3 border-2 border-ab-gray-200 rounded-6"><span class="text-14">border-secondary</span><code class="text-12">ab-gray-200 (#dde1e8)</code></div>
+          <div class="flex justify-between items-center p-3 border-2 border-ab-gray-100 rounded-6"><span class="text-14">border-tertiary</span><code class="text-12">ab-gray-100 (#ecf0f4)</code></div>
+          <div class="flex justify-between items-center p-3 border-2 border-ab-gray-650 rounded-6"><span class="text-14">border-accent</span><code class="text-12">ab-gray-650 (#848a8f)</code></div>
+          <div class="flex justify-between items-center p-3 border-2 border-ab-gray-900 rounded-6"><span class="text-14">border-prominent</span><code class="text-12">ab-gray-900 (#2b2d2f)</code></div>
+        </div>
+      </div>
+
+      <!-- Legacy Border Colors -->
+      <div class="demo-card">
+        <div class="component-label">Border Colors (aliases/border.ts) <span class="legacy-badge">Legacy</span></div>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center p-3 border-2 rounded-6" style="border-color:#e5e9ee"><span class="text-14">border.primary</span><code class="text-12">lightGray[300] (#e5e9ee)</code></div>
+          <div class="flex justify-between items-center p-3 border-2 rounded-6" style="border-color:#ecf0f4"><span class="text-14">border.secondary</span><code class="text-12">lightGray[200] (#ecf0f4)</code></div>
+          <div class="flex justify-between items-center p-3 border-2 rounded-6" style="border-color:#dde1e8"><span class="text-14">border.interactive</span><code class="text-12">lightGray[400] (#dde1e8)</code></div>
+          <div class="flex justify-between items-center p-3 border-2 rounded-6" style="border-color:#2f87f7"><span class="text-14">border.selected</span><code class="text-12">blue[500] (#2f87f7)</code></div>
+          <div class="flex justify-between items-center p-3 border-2 rounded-6" style="border-color:#ff323c"><span class="text-14">border.error</span><code class="text-12">red[500] (#ff323c)</code></div>
+        </div>
+      </div>
+
+      <!-- Status Colors -->
+      <div class="demo-card">
+        <div class="component-label">Status/Notification Colors (theme.css)</div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <div class="text-12 font-medium text-ab-gray-700 mb-2">Information</div>
+            <div class="space-y-1 text-12">
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-blue-50"></div>Tint (50)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-blue-100"></div>Soft (100)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-blue-500"></div>Base (500)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-blue-600"></div>Bold (600)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-blue-700"></div>Deep (700)</div>
+            </div>
+          </div>
+          <div>
+            <div class="text-12 font-medium text-ab-gray-700 mb-2">Success</div>
+            <div class="space-y-1 text-12">
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-green-50"></div>Tint (50)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-green-100"></div>Soft (100)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-green-500"></div>Base (500)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-green-600"></div>Bold (600)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-green-700"></div>Deep (700)</div>
+            </div>
+          </div>
+          <div>
+            <div class="text-12 font-medium text-ab-gray-700 mb-2">Warning</div>
+            <div class="space-y-1 text-12">
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-orange-50"></div>Tint (50)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-orange-100"></div>Soft (100)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-orange-500"></div>Base (500)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-orange-600"></div>Bold (600)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-orange-700"></div>Deep (700)</div>
+            </div>
+          </div>
+          <div>
+            <div class="text-12 font-medium text-ab-gray-700 mb-2">Error</div>
+            <div class="space-y-1 text-12">
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-red-50"></div>Tint (50)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-red-100"></div>Soft (100)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-red-500"></div>Base (500)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-red-600"></div>Bold (600)</div>
+              <div class="flex gap-2 items-center"><div class="w-4 h-4 rounded bg-ab-red-700"></div>Deep (700)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.section).classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>

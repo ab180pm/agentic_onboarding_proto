@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>In-App Event Generator - Airbridge</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'ab-blue': { 50: '#ebf3ff', 100: '#d7e5ff', 200: '#b8d1ff', 300: '#85b0ff', 400: '#5287ff', 500: '#1e6eff', 600: '#0053eb', 700: '#0041b8', 800: '#002f85', 900: '#001d52' },
+            'ab-gray': { white: '#ffffff', 50: '#f4f7f9', 100: '#ecf0f4', 150: '#e5e9ee', 200: '#dde1e8', 250: '#d7dce4', 300: '#ced4dc', 350: '#c3c9d0', 400: '#bdc3ca', 450: '#b4bbc3', 500: '#b2b8bf', 550: '#a5abb2', 600: '#989ea4', 650: '#848a8f', 700: '#606468', 750: '#575a5e', 800: '#4a4d50', 850: '#3f4244', 900: '#2b2d2f', 950: '#191b1c' },
+            'ab-green': { 50: '#f0fcf8', 100: '#dbf4eb', 300: '#0ac285', 500: '#009463', 700: '#00734a' },
+            'ab-red': { 50: '#fff3f3', 100: '#ffdfdf', 400: '#ff5b5b', 500: '#f70105' },
+            'ab-orange': { 50: '#fff4eb', 300: '#ff944d', 500: '#ff6600' },
+          },
+          fontFamily: { 'pretendard': ['Pretendard JP Variable', 'Pretendard Variable', 'Inter', 'system-ui', 'sans-serif'], 'mono': ['JetBrains Mono', 'Monaco', 'Menlo', 'monospace'] },
+          borderRadius: { '6': '6px', '12': '12px' },
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Pretendard JP Variable', 'Pretendard Variable', 'Inter', system-ui, sans-serif; }
+    .vertical-btn.active { background: #ebf3ff; border-color: #0053eb; color: #0053eb; }
+    .event-card.selected { border-color: #0053eb; background: #ebf3ff; }
+    .platform-tab.active { background: white; color: #0053eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .view-tab.active { background: #0053eb; color: white; }
+    .toast { animation: slideIn 0.3s ease, fadeOut 0.3s ease 2s forwards; }
+    @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+  </style>
+</head>
+<body class="bg-ab-gray-50 min-h-screen">
+  <!-- Header -->
+  <header class="bg-white border-b border-ab-gray-200 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-ab-blue-600 rounded-6 flex items-center justify-center">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <span class="text-xl font-bold text-ab-gray-900">Airbridge</span>
+          </div>
+          <div class="h-6 w-px bg-ab-gray-200"></div>
+          <nav class="flex items-center gap-1">
+            <a href="index-airbridge.html" class="px-3 py-2 text-sm font-medium text-ab-gray-600 hover:text-ab-gray-900 hover:bg-ab-gray-100 rounded-6 transition-colors">Onboarding Manager</a>
+            <a href="event-generator.html" class="px-3 py-2 text-sm font-medium text-ab-blue-600 bg-ab-blue-50 rounded-6">Event Generator</a>
+          </nav>
+        </div>
+        <div class="flex items-center gap-3">
+          <a href="https://developers.airbridge.io/docs/event" target="_blank" class="px-4 py-2 text-sm font-medium text-ab-gray-700 hover:bg-ab-gray-100 rounded-6 transition-colors flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            Documentation
+          </a>
+          <button class="px-4 py-2 text-sm font-medium text-white bg-ab-blue-600 hover:bg-ab-blue-700 rounded-6 transition-colors">Go to Dashboard</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex min-h-[calc(100vh-73px)]">
+    <!-- Left Sidebar -->
+    <aside class="w-64 bg-white border-r border-ab-gray-200 p-4 flex-shrink-0">
+      <div class="mb-4">
+        <h2 class="text-xs font-semibold text-ab-gray-500 uppercase tracking-wider mb-3">Select Vertical</h2>
+        <div class="space-y-1" id="verticalList">
+          <button class="vertical-btn active w-full px-3 py-2.5 text-left text-sm font-medium rounded-6 border border-transparent hover:bg-ab-gray-100 transition-colors flex items-center gap-2" data-vertical="ecommerce">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            E-Commerce
+          </button>
+          <button class="vertical-btn w-full px-3 py-2.5 text-left text-sm font-medium rounded-6 border border-transparent hover:bg-ab-gray-100 transition-colors flex items-center gap-2" data-vertical="gaming">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Gaming
+          </button>
+          <button class="vertical-btn w-full px-3 py-2.5 text-left text-sm font-medium rounded-6 border border-transparent hover:bg-ab-gray-100 transition-colors flex items-center gap-2" data-vertical="fintech">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Fintech
+          </button>
+          <button class="vertical-btn w-full px-3 py-2.5 text-left text-sm font-medium rounded-6 border border-transparent hover:bg-ab-gray-100 transition-colors flex items-center gap-2" data-vertical="subscription">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Subscription
+          </button>
+          <button class="vertical-btn w-full px-3 py-2.5 text-left text-sm font-medium rounded-6 border border-transparent hover:bg-ab-gray-100 transition-colors flex items-center gap-2" data-vertical="travel">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Travel
+          </button>
+          <button class="vertical-btn w-full px-3 py-2.5 text-left text-sm font-medium rounded-6 border border-transparent hover:bg-ab-gray-100 transition-colors flex items-center gap-2" data-vertical="content">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"/></svg>
+            Content/Media
+          </button>
+        </div>
+      </div>
+      <!-- Selected Events Summary -->
+      <div class="mt-6 pt-4 border-t border-ab-gray-200">
+        <h2 class="text-xs font-semibold text-ab-gray-500 uppercase tracking-wider mb-3">Selected Events (<span id="selectedCount">0</span>)</h2>
+        <div id="selectedEventsSummary" class="space-y-1 text-sm text-ab-gray-600 max-h-48 overflow-y-auto">
+          <div class="text-ab-gray-400 italic">No events selected</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-6 overflow-auto">
+      <div class="max-w-5xl">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold text-ab-gray-900 mb-2">Airbridge In-App Event Generator</h1>
+          <p class="text-ab-gray-600">Generate SDK code for tracking in-app events using <code class="px-1.5 py-0.5 bg-ab-gray-100 rounded text-sm">AirbridgeCategory</code> and <code class="px-1.5 py-0.5 bg-ab-gray-100 rounded text-sm">AirbridgeAttribute</code> constants.</p>
+        </div>
+
+        <!-- Event Selection -->
+        <div class="bg-white rounded-12 border border-ab-gray-200 mb-6">
+          <div class="px-5 py-4 border-b border-ab-gray-100">
+            <h2 class="font-semibold text-ab-gray-900">Select Events</h2>
+            <p class="text-sm text-ab-gray-600 mt-1">Choose standard events based on <a href="https://developers.airbridge.io/docs/event" target="_blank" class="text-ab-blue-600 hover:underline">Airbridge Event Structure</a></p>
+          </div>
+          <div class="p-5">
+            <div class="grid grid-cols-3 gap-3" id="eventGrid"></div>
+          </div>
+        </div>
+
+        <!-- Event Configuration -->
+        <div id="configSection" class="bg-white rounded-12 border border-ab-gray-200 mb-6 hidden">
+          <div class="px-5 py-4 border-b border-ab-gray-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="font-semibold text-ab-gray-900">Configure: <span id="configEventName">Event</span></h2>
+                <p class="text-sm text-ab-gray-600 mt-1">Set <code class="px-1 py-0.5 bg-ab-gray-100 rounded text-xs">semanticAttributes</code> and <code class="px-1 py-0.5 bg-ab-gray-100 rounded text-xs">customAttributes</code></p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="eventCategoryBadge" class="px-2 py-1 bg-ab-blue-100 text-ab-blue-700 text-xs font-mono rounded">AirbridgeCategory.ORDER_COMPLETED</span>
+              </div>
+            </div>
+          </div>
+          <div class="p-5" id="configContent"></div>
+        </div>
+
+        <!-- Generated Output -->
+        <div id="codeSection" class="bg-white rounded-12 border border-ab-gray-200 hidden">
+          <div class="px-5 py-4 border-b border-ab-gray-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="font-semibold text-ab-gray-900">Generated Output</h2>
+                <p class="text-sm text-ab-gray-600 mt-1">SDK code and JSON preview</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="downloadCode()" class="px-3 py-1.5 text-sm font-medium text-ab-gray-700 hover:bg-ab-gray-100 rounded-6 transition-colors flex items-center gap-1.5">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                  Download
+                </button>
+                <button onclick="copyCode()" class="px-3 py-1.5 text-sm font-medium text-white bg-ab-blue-600 hover:bg-ab-blue-700 rounded-6 transition-colors flex items-center gap-1.5">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                  Copy
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- View Tabs (Code vs JSON) -->
+          <div class="px-5 pt-4 flex items-center gap-4">
+            <div class="flex items-center gap-1 p-1 bg-ab-gray-100 rounded-6">
+              <button class="view-tab active px-3 py-1.5 text-sm font-medium rounded-6 transition-colors" data-view="code">SDK Code</button>
+              <button class="view-tab px-3 py-1.5 text-sm font-medium text-ab-gray-600 rounded-6 transition-colors" data-view="json">JSON Preview</button>
+            </div>
+            <!-- Platform Tabs -->
+            <div id="platformTabsContainer" class="flex items-center gap-1 p-1 bg-ab-gray-100 rounded-6">
+              <button class="platform-tab active px-3 py-1.5 text-sm font-medium rounded-6 transition-colors" data-platform="kotlin">Kotlin</button>
+              <button class="platform-tab px-3 py-1.5 text-sm font-medium text-ab-gray-600 rounded-6 transition-colors" data-platform="swift">Swift</button>
+              <button class="platform-tab px-3 py-1.5 text-sm font-medium text-ab-gray-600 rounded-6 transition-colors" data-platform="java">Java</button>
+              <button class="platform-tab px-3 py-1.5 text-sm font-medium text-ab-gray-600 rounded-6 transition-colors" data-platform="objc">Obj-C</button>
+              <button class="platform-tab px-3 py-1.5 text-sm font-medium text-ab-gray-600 rounded-6 transition-colors" data-platform="reactnative">React Native</button>
+              <button class="platform-tab px-3 py-1.5 text-sm font-medium text-ab-gray-600 rounded-6 transition-colors" data-platform="flutter">Flutter</button>
+            </div>
+          </div>
+
+          <!-- Code Block -->
+          <div class="p-5">
+            <div class="rounded-12 overflow-hidden border border-ab-gray-200">
+              <div class="flex items-center justify-between px-4 py-2 bg-ab-gray-100 border-b border-ab-gray-200">
+                <span class="text-xs font-medium text-ab-gray-700" id="codeFileName">MainActivity.kt</span>
+                <button onclick="copyCode()" class="p-1.5 text-ab-gray-500 hover:text-ab-gray-700 hover:bg-white rounded-6 transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                </button>
+              </div>
+              <div class="bg-ab-gray-950 p-4 overflow-x-auto" style="max-height: 500px;">
+                <pre class="text-sm text-ab-gray-100 font-mono" id="generatedCode"><code>// Select an event to generate code</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 hidden">
+    <div class="toast bg-ab-gray-900 text-white px-4 py-3 rounded-12 shadow-lg flex items-center gap-2">
+      <svg class="w-5 h-5 text-ab-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      <span id="toastMessage">Copied!</span>
+    </div>
+  </div>
+
+  <script>
+    // Airbridge Standard Events with correct category constants
+    const eventsByVertical = {
+      ecommerce: [
+        { id: 'order_completed', name: 'Order Completed', category: 'ORDER_COMPLETED', categoryFull: 'airbridge.ecommerce.order.completed', desc: 'Track completed purchases (af_purchase equivalent)', hasProducts: true, hasValue: true },
+        { id: 'added_to_cart', name: 'Added to Cart', category: 'ADDED_TO_CART', categoryFull: 'airbridge.ecommerce.product.addedToCart', desc: 'Track items added to cart (af_add_to_cart equivalent)', hasProducts: true },
+        { id: 'product_viewed', name: 'Product Viewed', category: 'PRODUCT_VIEWED', categoryFull: 'airbridge.ecommerce.product.viewed', desc: 'Track product detail views (af_content_view equivalent)', hasProducts: true },
+        { id: 'search_results_viewed', name: 'Search Results', category: 'SEARCH_RESULTS_VIEWED', categoryFull: 'airbridge.ecommerce.searchResults.viewed', desc: 'Track search queries (af_search equivalent)', hasQuery: true },
+        { id: 'product_list_viewed', name: 'Product List Viewed', category: 'PRODUCT_LIST_VIEWED', categoryFull: 'airbridge.ecommerce.productList.viewed', desc: 'Track category/list views', hasProducts: true },
+        { id: 'initiate_checkout', name: 'Initiate Checkout', category: 'INITIATE_CHECKOUT', categoryFull: 'airbridge.initiateCheckout', desc: 'Track checkout initiation (af_initiated_checkout equivalent)', hasProducts: true, hasValue: true },
+        { id: 'add_payment_info', name: 'Add Payment Info', category: 'ADD_PAYMENT_INFO', categoryFull: 'airbridge.addPaymentInfo', desc: 'Track payment info added (af_add_payment_info equivalent)' },
+        { id: 'add_to_wishlist', name: 'Add to Wishlist', category: 'ADD_TO_WISHLIST', categoryFull: 'airbridge.addToWishlist', desc: 'Track wishlist additions (af_add_to_wishlist equivalent)', hasProducts: true },
+      ],
+      gaming: [
+        { id: 'order_completed', name: 'In-App Purchase', category: 'ORDER_COMPLETED', categoryFull: 'airbridge.ecommerce.order.completed', desc: 'Track in-app purchases', hasProducts: true, hasValue: true },
+        { id: 'achieve_level', name: 'Achieve Level', category: 'ACHIEVE_LEVEL', categoryFull: 'airbridge.achieveLevel', desc: 'Track level achievements' },
+        { id: 'complete_tutorial', name: 'Complete Tutorial', category: 'COMPLETE_TUTORIAL', categoryFull: 'airbridge.completeTutorial', desc: 'Track tutorial completion' },
+        { id: 'unlock_achievement', name: 'Unlock Achievement', category: 'UNLOCK_ACHIEVEMENT', categoryFull: 'airbridge.unlockAchievement', desc: 'Track achievement unlocks' },
+        { id: 'sign_up', name: 'Sign Up', category: 'SIGN_UP', categoryFull: 'airbridge.user.signup', desc: 'Track new player registrations' },
+        { id: 'sign_in', name: 'Sign In', category: 'SIGN_IN', categoryFull: 'airbridge.user.signin', desc: 'Track player login' },
+        { id: 'share', name: 'Share', category: 'SHARE', categoryFull: 'airbridge.share', desc: 'Track content sharing' },
+        { id: 'invite', name: 'Invite', category: 'INVITE', categoryFull: 'airbridge.invite', desc: 'Track friend invitations' },
+      ],
+      fintech: [
+        { id: 'sign_up', name: 'Sign Up', category: 'SIGN_UP', categoryFull: 'airbridge.user.signup', desc: 'Track account creation (af_complete_registration equivalent)' },
+        { id: 'sign_in', name: 'Sign In', category: 'SIGN_IN', categoryFull: 'airbridge.user.signin', desc: 'Track user login (af_login equivalent)' },
+        { id: 'complete_registration', name: 'Complete Registration', category: 'COMPLETE_REGISTRATION', categoryFull: 'airbridge.completeRegistration', desc: 'Track KYC/verification completion' },
+        { id: 'add_payment_info', name: 'Link Account', category: 'ADD_PAYMENT_INFO', categoryFull: 'airbridge.addPaymentInfo', desc: 'Track bank account linking' },
+        { id: 'order_completed', name: 'Transaction', category: 'ORDER_COMPLETED', categoryFull: 'airbridge.ecommerce.order.completed', desc: 'Track completed transactions', hasValue: true },
+        { id: 'subscribe', name: 'Subscribe', category: 'SUBSCRIBE', categoryFull: 'airbridge.subscribe', desc: 'Track subscription signup', hasValue: true },
+        { id: 'start_trial', name: 'Start Trial', category: 'START_TRIAL', categoryFull: 'airbridge.startTrial', desc: 'Track trial starts' },
+        { id: 'schedule', name: 'Schedule', category: 'SCHEDULE', categoryFull: 'airbridge.schedule', desc: 'Track scheduled payments' },
+      ],
+      subscription: [
+        { id: 'sign_up', name: 'Sign Up', category: 'SIGN_UP', categoryFull: 'airbridge.user.signup', desc: 'Track new registrations' },
+        { id: 'sign_in', name: 'Sign In', category: 'SIGN_IN', categoryFull: 'airbridge.user.signin', desc: 'Track user login' },
+        { id: 'start_trial', name: 'Start Trial', category: 'START_TRIAL', categoryFull: 'airbridge.startTrial', desc: 'Track free trial starts' },
+        { id: 'subscribe', name: 'Subscribe', category: 'SUBSCRIBE', categoryFull: 'airbridge.subscribe', desc: 'Track subscription purchases', hasValue: true },
+        { id: 'order_completed', name: 'Order Completed', category: 'ORDER_COMPLETED', categoryFull: 'airbridge.ecommerce.order.completed', desc: 'Track one-time purchases', hasValue: true, hasProducts: true },
+        { id: 'unsubscribe', name: 'Unsubscribe', category: 'UNSUBSCRIBE', categoryFull: 'airbridge.unsubscribe', desc: 'Track subscription cancellations' },
+        { id: 'ad_impression', name: 'Ad Impression', category: 'AD_IMPRESSION', categoryFull: 'airbridge.adImpression', desc: 'Track ad impressions' },
+        { id: 'ad_click', name: 'Ad Click', category: 'AD_CLICK', categoryFull: 'airbridge.adClick', desc: 'Track ad clicks' },
+      ],
+      travel: [
+        { id: 'search_results_viewed', name: 'Search', category: 'SEARCH_RESULTS_VIEWED', categoryFull: 'airbridge.ecommerce.searchResults.viewed', desc: 'Track travel searches', hasQuery: true },
+        { id: 'product_viewed', name: 'View Listing', category: 'PRODUCT_VIEWED', categoryFull: 'airbridge.ecommerce.product.viewed', desc: 'Track listing views', hasProducts: true },
+        { id: 'order_completed', name: 'Booking', category: 'ORDER_COMPLETED', categoryFull: 'airbridge.ecommerce.order.completed', desc: 'Track completed bookings', hasValue: true, hasProducts: true },
+        { id: 'sign_up', name: 'Sign Up', category: 'SIGN_UP', categoryFull: 'airbridge.user.signup', desc: 'Track user registrations' },
+        { id: 'sign_in', name: 'Sign In', category: 'SIGN_IN', categoryFull: 'airbridge.user.signin', desc: 'Track user login' },
+        { id: 'add_to_wishlist', name: 'Save Listing', category: 'ADD_TO_WISHLIST', categoryFull: 'airbridge.addToWishlist', desc: 'Track saved listings', hasProducts: true },
+        { id: 'share', name: 'Share', category: 'SHARE', categoryFull: 'airbridge.share', desc: 'Track listing sharing' },
+        { id: 'rate', name: 'Leave Review', category: 'RATE', categoryFull: 'airbridge.rate', desc: 'Track reviews' },
+      ],
+      content: [
+        { id: 'sign_up', name: 'Sign Up', category: 'SIGN_UP', categoryFull: 'airbridge.user.signup', desc: 'Track user registrations' },
+        { id: 'sign_in', name: 'Sign In', category: 'SIGN_IN', categoryFull: 'airbridge.user.signin', desc: 'Track user login' },
+        { id: 'subscribe', name: 'Subscribe', category: 'SUBSCRIBE', categoryFull: 'airbridge.subscribe', desc: 'Track subscriptions', hasValue: true },
+        { id: 'start_trial', name: 'Start Trial', category: 'START_TRIAL', categoryFull: 'airbridge.startTrial', desc: 'Track trial starts' },
+        { id: 'product_viewed', name: 'Content View', category: 'PRODUCT_VIEWED', categoryFull: 'airbridge.ecommerce.product.viewed', desc: 'Track content views', hasProducts: true },
+        { id: 'share', name: 'Share', category: 'SHARE', categoryFull: 'airbridge.share', desc: 'Track content sharing' },
+        { id: 'rate', name: 'Rate', category: 'RATE', categoryFull: 'airbridge.rate', desc: 'Track content rating' },
+        { id: 'order_completed', name: 'Purchase', category: 'ORDER_COMPLETED', categoryFull: 'airbridge.ecommerce.order.completed', desc: 'Track purchases', hasValue: true, hasProducts: true },
+      ],
+    };
+
+    // State
+    let currentVertical = 'ecommerce';
+    let selectedEvents = new Set();
+    let currentConfigEvent = null;
+    let currentPlatform = 'kotlin';
+    let currentView = 'code';
+    let eventConfigs = {};
+
+    const fileNames = { kotlin: 'AirbridgeEvents.kt', java: 'AirbridgeEvents.java', swift: 'AirbridgeEvents.swift', objc: 'AirbridgeEvents.m', reactnative: 'AirbridgeEvents.js', flutter: 'airbridge_events.dart' };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderEventGrid();
+      setupVerticalButtons();
+      setupPlatformTabs();
+      setupViewTabs();
+    });
+
+    function setupVerticalButtons() {
+      document.querySelectorAll('.vertical-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.vertical-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentVertical = btn.dataset.vertical;
+          selectedEvents.clear();
+          eventConfigs = {};
+          currentConfigEvent = null;
+          renderEventGrid();
+          updateSelectedSummary();
+          hideConfigSection();
+          hideCodeSection();
+        });
+      });
+    }
+
+    function setupPlatformTabs() {
+      document.querySelectorAll('.platform-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.platform-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          currentPlatform = tab.dataset.platform;
+          document.getElementById('codeFileName').textContent = fileNames[currentPlatform];
+          generateOutput();
+        });
+      });
+    }
+
+    function setupViewTabs() {
+      document.querySelectorAll('.view-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          currentView = tab.dataset.view;
+          document.getElementById('platformTabsContainer').style.display = currentView === 'code' ? 'flex' : 'none';
+          document.getElementById('codeFileName').textContent = currentView === 'json' ? 'event_payload.json' : fileNames[currentPlatform];
+          generateOutput();
+        });
+      });
+    }
+
+    function renderEventGrid() {
+      const grid = document.getElementById('eventGrid');
+      const events = eventsByVertical[currentVertical] || [];
+      grid.innerHTML = events.map(event => `
+        <div class="event-card ${selectedEvents.has(event.id) ? 'selected' : ''} p-4 border-2 border-ab-gray-200 rounded-12 cursor-pointer hover:border-ab-blue-400 transition-colors" onclick="toggleEvent('${event.id}')">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-medium text-ab-gray-900">${event.name}</span>
+            <div class="w-5 h-5 rounded ${selectedEvents.has(event.id) ? 'bg-ab-blue-600 flex items-center justify-center' : 'border-2 border-ab-gray-300'}">
+              ${selectedEvents.has(event.id) ? '<svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>' : ''}
+            </div>
+          </div>
+          <p class="text-xs text-ab-gray-600 mb-2">${event.desc}</p>
+          <code class="text-xs text-ab-blue-600 bg-ab-blue-50 px-1.5 py-0.5 rounded">${event.category}</code>
+        </div>
+      `).join('') + `
+        <div class="event-card p-4 border-2 border-ab-gray-200 rounded-12 cursor-pointer hover:border-ab-blue-400 transition-colors bg-ab-gray-50 border-dashed" onclick="addCustomEvent()">
+          <div class="flex items-center justify-between mb-2"><span class="font-medium text-ab-gray-700">+ Custom Event</span></div>
+          <p class="text-xs text-ab-gray-500">Add your own custom event</p>
+        </div>
+      `;
+    }
+
+    function toggleEvent(eventId) {
+      if (selectedEvents.has(eventId)) {
+        selectedEvents.delete(eventId);
+        delete eventConfigs[eventId];
+        if (currentConfigEvent === eventId) currentConfigEvent = selectedEvents.size > 0 ? [...selectedEvents][0] : null;
+      } else {
+        selectedEvents.add(eventId);
+        initEventConfig(eventId);
+        currentConfigEvent = eventId;
+      }
+      renderEventGrid();
+      updateSelectedSummary();
+      if (selectedEvents.size > 0) { showConfigSection(); renderConfigContent(); showCodeSection(); generateOutput(); }
+      else { hideConfigSection(); hideCodeSection(); }
+    }
+
+    function initEventConfig(eventId) {
+      const event = eventsByVertical[currentVertical].find(e => e.id === eventId);
+      eventConfigs[eventId] = {
+        transactionID: '', currency: 'USD', value: '', query: '',
+        action: '', label: '',
+        products: [{ productID: '', name: '', price: '', quantity: '1', currency: 'USD', category: '' }],
+        customAttributes: []
+      };
+    }
+
+    function updateSelectedSummary() {
+      document.getElementById('selectedCount').textContent = selectedEvents.size;
+      const container = document.getElementById('selectedEventsSummary');
+      if (selectedEvents.size === 0) { container.innerHTML = '<div class="text-ab-gray-400 italic">No events selected</div>'; return; }
+      const events = eventsByVertical[currentVertical];
+      container.innerHTML = [...selectedEvents].map(eventId => {
+        const event = events.find(e => e.id === eventId);
+        return `
+          <div class="flex items-center justify-between py-1 px-2 rounded hover:bg-ab-gray-100 cursor-pointer ${currentConfigEvent === eventId ? 'bg-ab-blue-50 text-ab-blue-700' : ''}" onclick="selectConfigEvent('${eventId}')">
+            <span class="truncate text-xs">${event?.name || eventId}</span>
+            <button onclick="event.stopPropagation(); toggleEvent('${eventId}')" class="text-ab-gray-400 hover:text-ab-red-500 ml-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectConfigEvent(eventId) { currentConfigEvent = eventId; updateSelectedSummary(); renderConfigContent(); generateOutput(); }
+    function showConfigSection() { document.getElementById('configSection').classList.remove('hidden'); }
+    function hideConfigSection() { document.getElementById('configSection').classList.add('hidden'); }
+    function showCodeSection() { document.getElementById('codeSection').classList.remove('hidden'); }
+    function hideCodeSection() { document.getElementById('codeSection').classList.add('hidden'); }
+
+    function renderConfigContent() {
+      if (!currentConfigEvent) return;
+      const event = eventsByVertical[currentVertical].find(e => e.id === currentConfigEvent);
+      const config = eventConfigs[currentConfigEvent];
+      document.getElementById('configEventName').textContent = event?.name || currentConfigEvent;
+      document.getElementById('eventCategoryBadge').textContent = `AirbridgeCategory.${event.category}`;
+
+      const content = document.getElementById('configContent');
+      content.innerHTML = `
+        <!-- Semantic Attributes -->
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-ab-gray-900 mb-1">Semantic Attributes</h3>
+          <p class="text-xs text-ab-gray-500 mb-3">Based on <code class="px-1 py-0.5 bg-ab-gray-100 rounded">AirbridgeAttribute.*</code> constants</p>
+          <div class="grid grid-cols-2 gap-4">
+            ${event.hasValue !== false ? `
+            <div>
+              <label class="block text-sm font-medium text-ab-gray-700 mb-1.5">
+                <code class="text-xs text-ab-blue-600">VALUE</code> - Revenue
+              </label>
+              <input type="number" value="${config.value}" onchange="updateConfig('value', this.value)" placeholder="e.g., 99.99" class="w-full px-3 py-2 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none focus:ring-2 focus:ring-ab-blue-100">
+            </div>` : ''}
+            <div>
+              <label class="block text-sm font-medium text-ab-gray-700 mb-1.5">
+                <code class="text-xs text-ab-blue-600">CURRENCY</code>
+              </label>
+              <select onchange="updateConfig('currency', this.value)" class="w-full px-3 py-2 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none bg-white">
+                <option ${config.currency === 'USD' ? 'selected' : ''}>USD</option>
+                <option ${config.currency === 'KRW' ? 'selected' : ''}>KRW</option>
+                <option ${config.currency === 'JPY' ? 'selected' : ''}>JPY</option>
+                <option ${config.currency === 'EUR' ? 'selected' : ''}>EUR</option>
+                <option ${config.currency === 'GBP' ? 'selected' : ''}>GBP</option>
+                <option ${config.currency === 'CNY' ? 'selected' : ''}>CNY</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-ab-gray-700 mb-1.5">
+                <code class="text-xs text-ab-blue-600">TRANSACTION_ID</code>
+              </label>
+              <input type="text" value="${config.transactionID}" onchange="updateConfig('transactionID', this.value)" placeholder="e.g., order_123" class="w-full px-3 py-2 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none focus:ring-2 focus:ring-ab-blue-100">
+            </div>
+            ${event.hasQuery ? `
+            <div>
+              <label class="block text-sm font-medium text-ab-gray-700 mb-1.5">
+                <code class="text-xs text-ab-blue-600">QUERY</code> - Search String
+              </label>
+              <input type="text" value="${config.query}" onchange="updateConfig('query', this.value)" placeholder="e.g., blue shoes" class="w-full px-3 py-2 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none focus:ring-2 focus:ring-ab-blue-100">
+            </div>` : ''}
+          </div>
+        </div>
+
+        <!-- Action & Label (for filtering) -->
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-ab-gray-900 mb-1">Action & Label</h3>
+          <p class="text-xs text-ab-gray-500 mb-3">Optional fields for filtering in dashboard</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-ab-gray-700 mb-1.5">Action</label>
+              <input type="text" value="${config.action}" onchange="updateConfig('action', this.value)" placeholder="e.g., button_click" class="w-full px-3 py-2 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-ab-gray-700 mb-1.5">Label</label>
+              <input type="text" value="${config.label}" onchange="updateConfig('label', this.value)" placeholder="e.g., homepage_banner" class="w-full px-3 py-2 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none">
+            </div>
+          </div>
+        </div>
+
+        ${event.hasProducts ? `
+        <!-- Products Array -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-1">
+            <h3 class="text-sm font-semibold text-ab-gray-900">Products Array</h3>
+            <button onclick="addProduct()" class="text-sm text-ab-blue-600 hover:text-ab-blue-700 font-medium flex items-center gap-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Add Product
+            </button>
+          </div>
+          <p class="text-xs text-ab-gray-500 mb-3">Structured product data using <code class="px-1 py-0.5 bg-ab-gray-100 rounded">AirbridgeAttribute.PRODUCTS</code></p>
+          <div id="productsContainer" class="space-y-3">
+            ${config.products.map((p, i) => renderProductItem(p, i)).join('')}
+          </div>
+        </div>` : ''}
+
+        <!-- Custom Attributes -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <h3 class="text-sm font-semibold text-ab-gray-900">Custom Attributes</h3>
+            <button onclick="addCustomAttribute()" class="text-sm text-ab-blue-600 hover:text-ab-blue-700 font-medium flex items-center gap-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Add Attribute
+            </button>
+          </div>
+          <p class="text-xs text-ab-gray-500 mb-3">Additional custom data (separate from semanticAttributes)</p>
+          <div id="customAttributesContainer" class="space-y-2">
+            ${config.customAttributes.length === 0 ? '<div class="text-sm text-ab-gray-400 italic">No custom attributes</div>' : config.customAttributes.map((a, i) => renderCustomAttribute(a, i)).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderProductItem(product, index) {
+      return `
+        <div class="border border-ab-gray-200 rounded-12 overflow-hidden">
+          <div class="bg-ab-gray-50 px-4 py-2 border-b border-ab-gray-200 flex items-center justify-between">
+            <span class="text-xs font-medium text-ab-gray-600">Product ${index + 1}</span>
+            ${index > 0 ? `<button onclick="removeProduct(${index})" class="text-ab-gray-400 hover:text-ab-red-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>` : ''}
+          </div>
+          <div class="p-4 grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-ab-gray-600 mb-1"><code class="text-ab-blue-600">PRODUCT_ID</code></label>
+              <input type="text" value="${product.productID}" onchange="updateProduct(${index}, 'productID', this.value)" placeholder="sku_123" class="w-full px-2.5 py-1.5 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-ab-gray-600 mb-1"><code class="text-ab-blue-600">PRODUCT_NAME</code></label>
+              <input type="text" value="${product.name}" onchange="updateProduct(${index}, 'name', this.value)" placeholder="Product Name" class="w-full px-2.5 py-1.5 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-ab-gray-600 mb-1"><code class="text-ab-blue-600">PRODUCT_PRICE</code></label>
+              <input type="number" value="${product.price}" onchange="updateProduct(${index}, 'price', this.value)" placeholder="49.99" class="w-full px-2.5 py-1.5 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-ab-gray-600 mb-1"><code class="text-ab-blue-600">PRODUCT_QUANTITY</code></label>
+              <input type="number" value="${product.quantity}" onchange="updateProduct(${index}, 'quantity', this.value)" placeholder="1" class="w-full px-2.5 py-1.5 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-ab-gray-600 mb-1"><code class="text-ab-blue-600">PRODUCT_CURRENCY</code></label>
+              <select onchange="updateProduct(${index}, 'currency', this.value)" class="w-full px-2.5 py-1.5 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none bg-white">
+                <option ${product.currency === 'USD' ? 'selected' : ''}>USD</option>
+                <option ${product.currency === 'KRW' ? 'selected' : ''}>KRW</option>
+                <option ${product.currency === 'JPY' ? 'selected' : ''}>JPY</option>
+                <option ${product.currency === 'EUR' ? 'selected' : ''}>EUR</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-ab-gray-600 mb-1">Category</label>
+              <input type="text" value="${product.category}" onchange="updateProduct(${index}, 'category', this.value)" placeholder="Electronics" class="w-full px-2.5 py-1.5 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none">
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCustomAttribute(attr, index) {
+      return `
+        <div class="flex items-center gap-2">
+          <input type="text" value="${attr.key}" onchange="updateCustomAttribute(${index}, 'key', this.value)" placeholder="key" class="flex-1 px-3 py-2 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none">
+          <input type="text" value="${attr.value}" onchange="updateCustomAttribute(${index}, 'value', this.value)" placeholder="value" class="flex-1 px-3 py-2 border border-ab-gray-300 rounded-6 text-sm focus:border-ab-blue-600 focus:outline-none">
+          <select onchange="updateCustomAttribute(${index}, 'type', this.value)" class="px-3 py-2 border border-ab-gray-300 rounded-6 text-sm bg-white">
+            <option ${attr.type === 'String' ? 'selected' : ''}>String</option>
+            <option ${attr.type === 'Number' ? 'selected' : ''}>Number</option>
+            <option ${attr.type === 'Boolean' ? 'selected' : ''}>Boolean</option>
+          </select>
+          <button onclick="removeCustomAttribute(${index})" class="p-2 text-ab-gray-400 hover:text-ab-red-500">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      `;
+    }
+
+    function updateConfig(field, value) { if (!currentConfigEvent) return; eventConfigs[currentConfigEvent][field] = value; generateOutput(); }
+    function updateProduct(index, field, value) { if (!currentConfigEvent) return; eventConfigs[currentConfigEvent].products[index][field] = value; generateOutput(); }
+    function addProduct() { if (!currentConfigEvent) return; eventConfigs[currentConfigEvent].products.push({ productID: '', name: '', price: '', quantity: '1', currency: 'USD', category: '' }); renderConfigContent(); generateOutput(); }
+    function removeProduct(index) { if (!currentConfigEvent) return; eventConfigs[currentConfigEvent].products.splice(index, 1); renderConfigContent(); generateOutput(); }
+    function addCustomAttribute() { if (!currentConfigEvent) return; eventConfigs[currentConfigEvent].customAttributes.push({ key: '', value: '', type: 'String' }); renderConfigContent(); generateOutput(); }
+    function updateCustomAttribute(index, field, value) { if (!currentConfigEvent) return; eventConfigs[currentConfigEvent].customAttributes[index][field] = value; generateOutput(); }
+    function removeCustomAttribute(index) { if (!currentConfigEvent) return; eventConfigs[currentConfigEvent].customAttributes.splice(index, 1); renderConfigContent(); generateOutput(); }
+    function addCustomEvent() {
+      const name = prompt('Enter custom event name (e.g., custom_action):');
+      if (!name) return;
+      const eventId = name.toLowerCase().replace(/\s+/g, '_');
+      eventsByVertical[currentVertical].push({ id: eventId, name: name, category: name.toUpperCase(), categoryFull: `custom.${name}`, desc: 'Custom event', hasProducts: true, hasValue: true, hasQuery: true });
+      renderEventGrid();
+      toggleEvent(eventId);
+    }
+
+    function generateOutput() {
+      const codeElement = document.getElementById('generatedCode');
+      if (selectedEvents.size === 0) { codeElement.innerHTML = '<code>// Select an event to generate code</code>'; return; }
+      const code = currentView === 'json' ? generateJSON() : generateSDKCode();
+      codeElement.innerHTML = `<code>${code}</code>`;
+    }
+
+    function generateJSON() {
+      const events = [...selectedEvents].map(eventId => {
+        const event = eventsByVertical[currentVertical].find(e => e.id === eventId);
+        const config = eventConfigs[eventId];
+        const obj = { category: event.categoryFull, semanticAttributes: {} };
+        if (config.value) obj.semanticAttributes.value = parseFloat(config.value);
+        if (config.currency) obj.semanticAttributes.currency = config.currency;
+        if (config.transactionID) obj.semanticAttributes.transactionID = config.transactionID;
+        if (config.query) obj.semanticAttributes.query = config.query;
+        if (event.hasProducts && config.products.some(p => p.productID || p.name)) {
+          obj.semanticAttributes.products = config.products.filter(p => p.productID || p.name).map(p => {
+            const prod = {};
+            if (p.productID) prod.productID = p.productID;
+            if (p.name) prod.name = p.name;
+            if (p.price) prod.price = parseFloat(p.price);
+            if (p.quantity) prod.quantity = parseInt(p.quantity);
+            if (p.currency) prod.currency = p.currency;
+            if (p.category) prod.category = p.category;
+            return prod;
+          });
+        }
+        if (config.action) obj.action = config.action;
+        if (config.label) obj.label = config.label;
+        if (config.customAttributes.some(a => a.key)) {
+          obj.customAttributes = {};
+          config.customAttributes.filter(a => a.key).forEach(a => {
+            obj.customAttributes[a.key] = a.type === 'Number' ? parseFloat(a.value) : a.type === 'Boolean' ? a.value === 'true' : a.value;
+          });
+        }
+        return obj;
+      });
+      return highlightJSON(JSON.stringify(events.length === 1 ? events[0] : events, null, 2));
+    }
+
+    function highlightJSON(json) {
+      return json
+        .replace(/(".*?")(\s*:)/g, '<span class="text-cyan-400">$1</span>$2')
+        .replace(/:\s*(".*?")/g, ': <span class="text-green-400">$1</span>')
+        .replace(/:\s*(\d+\.?\d*)/g, ': <span class="text-orange-400">$1</span>')
+        .replace(/:\s*(true|false)/g, ': <span class="text-purple-400">$1</span>');
+    }
+
+    function generateSDKCode() {
+      const generators = { kotlin: generateKotlin, java: generateJava, swift: generateSwift, objc: generateObjC, reactnative: generateReactNative, flutter: generateFlutter };
+      return generators[currentPlatform]();
+    }
+
+    function generateKotlin() {
+      let code = `<span class="text-purple-400">import</span> <span class="text-cyan-400">io.airbridge.sdk.Airbridge</span>\n`;
+      code += `<span class="text-purple-400">import</span> <span class="text-cyan-400">io.airbridge.sdk.event.AirbridgeCategory</span>\n`;
+      code += `<span class="text-purple-400">import</span> <span class="text-cyan-400">io.airbridge.sdk.event.AirbridgeAttribute</span>\n\n`;
+
+      [...selectedEvents].forEach(eventId => {
+        const event = eventsByVertical[currentVertical].find(e => e.id === eventId);
+        const config = eventConfigs[eventId];
+        code += `<span class="text-gray-500">// ${event.name} Event</span>\n`;
+
+        // Build semanticAttributes
+        const semantics = [];
+        if (config.value) semantics.push(`    <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">VALUE</span> <span class="text-purple-400">to</span> <span class="text-orange-400">${config.value}</span>`);
+        if (config.currency) semantics.push(`    <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">CURRENCY</span> <span class="text-purple-400">to</span> <span class="text-green-400">"${config.currency}"</span>`);
+        if (config.transactionID) semantics.push(`    <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">TRANSACTION_ID</span> <span class="text-purple-400">to</span> <span class="text-green-400">"${config.transactionID}"</span>`);
+        if (config.query) semantics.push(`    <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">QUERY</span> <span class="text-purple-400">to</span> <span class="text-green-400">"${config.query}"</span>`);
+
+        // Products
+        if (event.hasProducts && config.products.some(p => p.productID || p.name)) {
+          let prodCode = `    <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">PRODUCTS</span> <span class="text-purple-400">to</span> <span class="text-yellow-400">listOf</span>(\n`;
+          config.products.filter(p => p.productID || p.name).forEach((p, i, arr) => {
+            prodCode += `        <span class="text-yellow-400">mapOf</span>(\n`;
+            if (p.productID) prodCode += `            <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">PRODUCT_ID</span> <span class="text-purple-400">to</span> <span class="text-green-400">"${p.productID}"</span>,\n`;
+            if (p.name) prodCode += `            <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">PRODUCT_NAME</span> <span class="text-purple-400">to</span> <span class="text-green-400">"${p.name}"</span>,\n`;
+            if (p.price) prodCode += `            <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">PRODUCT_PRICE</span> <span class="text-purple-400">to</span> <span class="text-orange-400">${p.price}</span>,\n`;
+            if (p.quantity) prodCode += `            <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">PRODUCT_QUANTITY</span> <span class="text-purple-400">to</span> <span class="text-orange-400">${p.quantity}</span>,\n`;
+            if (p.currency) prodCode += `            <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">PRODUCT_CURRENCY</span> <span class="text-purple-400">to</span> <span class="text-green-400">"${p.currency}"</span>\n`;
+            prodCode += `        )${i < arr.length - 1 ? ',' : ''}\n`;
+          });
+          prodCode += `    )`;
+          semantics.push(prodCode);
+        }
+
+        code += `<span class="text-cyan-400">Airbridge</span>.<span class="text-yellow-400">trackEvent</span>(\n`;
+        code += `    <span class="text-white">category</span> = <span class="text-cyan-400">AirbridgeCategory</span>.<span class="text-white">${event.category}</span>,\n`;
+        if (semantics.length > 0) {
+          code += `    <span class="text-white">semanticAttributes</span> = <span class="text-yellow-400">mapOf</span>(\n${semantics.join(',\n')}\n    ),\n`;
+        }
+        if (config.action) code += `    <span class="text-white">action</span> = <span class="text-green-400">"${config.action}"</span>,\n`;
+        if (config.label) code += `    <span class="text-white">label</span> = <span class="text-green-400">"${config.label}"</span>,\n`;
+        if (config.customAttributes.some(a => a.key)) {
+          code += `    <span class="text-white">customAttributes</span> = <span class="text-yellow-400">mapOf</span>(\n`;
+          config.customAttributes.filter(a => a.key).forEach((a, i, arr) => {
+            const val = a.type === 'String' ? `<span class="text-green-400">"${a.value}"</span>` : a.type === 'Boolean' ? `<span class="text-purple-400">${a.value}</span>` : `<span class="text-orange-400">${a.value}</span>`;
+            code += `        <span class="text-green-400">"${a.key}"</span> <span class="text-purple-400">to</span> ${val}${i < arr.length - 1 ? ',' : ''}\n`;
+          });
+          code += `    )\n`;
+        }
+        code += `)\n\n`;
+      });
+      return code;
+    }
+
+    function generateJava() {
+      let code = `<span class="text-purple-400">import</span> <span class="text-cyan-400">io.airbridge.sdk.Airbridge</span>;\n`;
+      code += `<span class="text-purple-400">import</span> <span class="text-cyan-400">io.airbridge.sdk.event.AirbridgeCategory</span>;\n`;
+      code += `<span class="text-purple-400">import</span> <span class="text-cyan-400">io.airbridge.sdk.event.AirbridgeAttribute</span>;\n\n`;
+
+      [...selectedEvents].forEach(eventId => {
+        const event = eventsByVertical[currentVertical].find(e => e.id === eventId);
+        const config = eventConfigs[eventId];
+        code += `<span class="text-gray-500">// ${event.name} Event</span>\n`;
+        code += `<span class="text-cyan-400">Map</span>&lt;<span class="text-cyan-400">String</span>, <span class="text-cyan-400">Object</span>&gt; <span class="text-white">semanticAttributes</span> = <span class="text-purple-400">new</span> <span class="text-cyan-400">HashMap</span>&lt;&gt;();\n`;
+        if (config.value) code += `<span class="text-white">semanticAttributes</span>.<span class="text-yellow-400">put</span>(<span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">VALUE</span>, <span class="text-orange-400">${config.value}</span>);\n`;
+        if (config.currency) code += `<span class="text-white">semanticAttributes</span>.<span class="text-yellow-400">put</span>(<span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">CURRENCY</span>, <span class="text-green-400">"${config.currency}"</span>);\n`;
+        if (config.transactionID) code += `<span class="text-white">semanticAttributes</span>.<span class="text-yellow-400">put</span>(<span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">TRANSACTION_ID</span>, <span class="text-green-400">"${config.transactionID}"</span>);\n`;
+        code += `\n<span class="text-cyan-400">Airbridge</span>.<span class="text-yellow-400">trackEvent</span>(\n    <span class="text-cyan-400">AirbridgeCategory</span>.<span class="text-white">${event.category}</span>,\n    <span class="text-white">semanticAttributes</span>\n);\n\n`;
+      });
+      return code;
+    }
+
+    function generateSwift() {
+      let code = `<span class="text-purple-400">import</span> <span class="text-cyan-400">AirBridge</span>\n\n`;
+      [...selectedEvents].forEach(eventId => {
+        const event = eventsByVertical[currentVertical].find(e => e.id === eventId);
+        const config = eventConfigs[eventId];
+        code += `<span class="text-gray-500">// ${event.name} Event</span>\n`;
+        code += `<span class="text-cyan-400">Airbridge</span>.<span class="text-yellow-400">trackEvent</span>(\n`;
+        code += `    <span class="text-white">category</span>: <span class="text-cyan-400">AirbridgeCategory</span>.<span class="text-white">${event.category.toLowerCase()}</span>,\n`;
+        code += `    <span class="text-white">semanticAttributes</span>: [\n`;
+        if (config.value) code += `        <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">VALUE</span>: <span class="text-orange-400">${config.value}</span>,\n`;
+        if (config.currency) code += `        <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">CURRENCY</span>: <span class="text-green-400">"${config.currency}"</span>,\n`;
+        if (config.transactionID) code += `        <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">TRANSACTION_ID</span>: <span class="text-green-400">"${config.transactionID}"</span>,\n`;
+        code += `    ]\n)\n\n`;
+      });
+      return code;
+    }
+
+    function generateObjC() {
+      let code = `<span class="text-purple-400">#import</span> <span class="text-green-400">&lt;AirBridge/AirBridge.h&gt;</span>\n\n`;
+      [...selectedEvents].forEach(eventId => {
+        const event = eventsByVertical[currentVertical].find(e => e.id === eventId);
+        const config = eventConfigs[eventId];
+        code += `<span class="text-gray-500">// ${event.name} Event</span>\n`;
+        code += `<span class="text-cyan-400">NSDictionary</span> *<span class="text-white">semanticAttributes</span> = @{\n`;
+        if (config.value) code += `    <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">VALUE</span>: <span class="text-green-400">@(${config.value})</span>,\n`;
+        if (config.currency) code += `    <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">CURRENCY</span>: <span class="text-green-400">@"${config.currency}"</span>,\n`;
+        if (config.transactionID) code += `    <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">TRANSACTION_ID</span>: <span class="text-green-400">@"${config.transactionID}"</span>,\n`;
+        code += `};\n\n`;
+        code += `[<span class="text-cyan-400">Airbridge</span> <span class="text-yellow-400">trackEventWithCategory:</span><span class="text-cyan-400">AirbridgeCategory</span>.${event.category.toLowerCase()}\n`;
+        code += `                <span class="text-yellow-400">semanticAttributes:</span><span class="text-white">semanticAttributes</span>];\n\n`;
+      });
+      return code;
+    }
+
+    function generateReactNative() {
+      let code = `<span class="text-purple-400">import</span> <span class="text-cyan-400">Airbridge</span> <span class="text-purple-400">from</span> <span class="text-green-400">'airbridge-react-native-sdk'</span>;\n`;
+      code += `<span class="text-purple-400">import</span> { <span class="text-cyan-400">AirbridgeCategory</span>, <span class="text-cyan-400">AirbridgeAttribute</span> } <span class="text-purple-400">from</span> <span class="text-green-400">'airbridge-react-native-sdk'</span>;\n\n`;
+      [...selectedEvents].forEach(eventId => {
+        const event = eventsByVertical[currentVertical].find(e => e.id === eventId);
+        const config = eventConfigs[eventId];
+        code += `<span class="text-gray-500">// ${event.name} Event</span>\n`;
+        code += `<span class="text-cyan-400">Airbridge</span>.<span class="text-yellow-400">trackEvent</span>(<span class="text-cyan-400">AirbridgeCategory</span>.<span class="text-white">${event.category}</span>, {\n`;
+        code += `  <span class="text-white">semanticAttributes</span>: {\n`;
+        if (config.value) code += `    [<span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">VALUE</span>]: <span class="text-orange-400">${config.value}</span>,\n`;
+        if (config.currency) code += `    [<span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">CURRENCY</span>]: <span class="text-green-400">'${config.currency}'</span>,\n`;
+        if (config.transactionID) code += `    [<span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">TRANSACTION_ID</span>]: <span class="text-green-400">'${config.transactionID}'</span>,\n`;
+        code += `  },\n`;
+        if (config.customAttributes.some(a => a.key)) {
+          code += `  <span class="text-white">customAttributes</span>: {\n`;
+          config.customAttributes.filter(a => a.key).forEach(a => {
+            const val = a.type === 'String' ? `<span class="text-green-400">'${a.value}'</span>` : a.type === 'Boolean' ? `<span class="text-purple-400">${a.value}</span>` : `<span class="text-orange-400">${a.value}</span>`;
+            code += `    <span class="text-green-400">'${a.key}'</span>: ${val},\n`;
+          });
+          code += `  },\n`;
+        }
+        code += `});\n\n`;
+      });
+      return code;
+    }
+
+    function generateFlutter() {
+      let code = `<span class="text-purple-400">import</span> <span class="text-green-400">'package:airbridge_flutter_sdk/airbridge_flutter_sdk.dart'</span>;\n\n`;
+      [...selectedEvents].forEach(eventId => {
+        const event = eventsByVertical[currentVertical].find(e => e.id === eventId);
+        const config = eventConfigs[eventId];
+        code += `<span class="text-gray-500">// ${event.name} Event</span>\n`;
+        code += `<span class="text-cyan-400">Airbridge</span>.<span class="text-yellow-400">trackEvent</span>(\n`;
+        code += `  <span class="text-white">category</span>: <span class="text-cyan-400">AirbridgeCategory</span>.<span class="text-white">${event.category}</span>,\n`;
+        code += `  <span class="text-white">semanticAttributes</span>: {\n`;
+        if (config.value) code += `    <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">VALUE</span>: <span class="text-orange-400">${config.value}</span>,\n`;
+        if (config.currency) code += `    <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">CURRENCY</span>: <span class="text-green-400">'${config.currency}'</span>,\n`;
+        if (config.transactionID) code += `    <span class="text-cyan-400">AirbridgeAttribute</span>.<span class="text-white">TRANSACTION_ID</span>: <span class="text-green-400">'${config.transactionID}'</span>,\n`;
+        code += `  },\n`;
+        code += `);\n\n`;
+      });
+      return code;
+    }
+
+    function copyCode() {
+      const text = document.getElementById('generatedCode').textContent;
+      navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!'));
+    }
+
+    function downloadCode() {
+      const text = document.getElementById('generatedCode').textContent;
+      const fileName = currentView === 'json' ? 'event_payload.json' : fileNames[currentPlatform];
+      const blob = new Blob([text], { type: 'text/plain' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fileName; a.click();
+      showToast('Downloaded ' + fileName);
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMessage').textContent = message;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 2500);
+    }
+  </script>
+</body>
+</html>
